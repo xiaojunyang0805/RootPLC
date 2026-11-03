@@ -202,17 +202,26 @@ mod tests {
         let tc = find("tc2_system").expect("Tc2_System");
         assert_eq!(
             tc.declare_only,
-            ["ADSLOGSTR", "ADSLOGDINT", "ADSLOGLREAL", "GETCPUCOUNTER"]
+            [
+                "ADSLOGSTR",
+                "ADSLOGDINT",
+                "ADSLOGLREAL",
+                "GETCPUCOUNTER",
+                "MEMCPY",
+                "MEMMOVE",
+                "MEMSET",
+                "MEMCMP"
+            ]
         );
-        assert_eq!(tc.references.len(), 14);
+        assert_eq!(tc.references.len(), 18);
         assert!(find("nope").is_none());
         let r = resolve(&["Tc2_Utilities".into()]).expect("resolve");
         let names: Vec<&str> = r.iter().map(|l| l.name.as_str()).collect();
-        assert_eq!(names, ["Tc2_System", "Tc2_Utilities"]);
+        assert_eq!(names, ["TwinCAT_BuiltIns", "Tc2_System", "Tc2_Utilities"]);
         assert!(resolve(&["Tc9_Nope".into()]).is_err());
         assert_eq!(
             find("TwinCAT_BuiltIns").expect("builtins").intrinsics,
-            ["SIZEOF", "XSIZEOF"]
+            ["SIZEOF", "XSIZEOF", "PVOID"]
         );
     }
 }

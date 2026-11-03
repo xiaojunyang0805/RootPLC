@@ -2018,6 +2018,11 @@ impl<'a> Checker<'a> {
     fn type_name(&mut self, i: usize) -> Ty {
         let name = self.text(i);
         let span = self.tok_span(i);
+        // [stdlib.compat.pvoid]: an untyped reference; any REF_TO (ADR(x))
+        // converts to it
+        if name.eq_ignore_ascii_case("PVOID") && self.intrinsics.contains("PVOID") {
+            return Ty::Ref(Box::new(Ty::Unknown));
+        }
         if let Some(&id) = self.types.get(&name.to_ascii_lowercase()) {
             if matches!(&self.defs[id].kind, Kind::Pou(p) if p.kind == PouKind::Function) {
                 self.diag(

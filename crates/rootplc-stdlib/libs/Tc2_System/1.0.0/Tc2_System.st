@@ -160,3 +160,37 @@ VAR_OUTPUT
     cpuCntHiDW : UDINT;
 END_VAR
 END_FUNCTION_BLOCK
+
+(* Memory functions on addresses (ADR(x)). Declared only: RootPLC models
+   addresses as typed references, so running one stops with UNSUPPORTED. *)
+FUNCTION MEMCPY : UDINT
+VAR_INPUT
+    destAddr : PVOID;
+    srcAddr : PVOID;
+    n : UDINT;
+END_VAR
+END_FUNCTION
+
+FUNCTION MEMMOVE : UDINT
+VAR_INPUT
+    destAddr : PVOID;
+    srcAddr : PVOID;
+    n : UDINT;
+END_VAR
+END_FUNCTION
+
+FUNCTION MEMSET : UDINT
+VAR_INPUT
+    destAddr : PVOID;
+    fillByte : USINT;
+    n : UDINT;
+END_VAR
+END_FUNCTION
+
+FUNCTION MEMCMP : DINT
+VAR_INPUT
+    pBuf1 : PVOID;
+    pBuf2 : PVOID;
+    n : UDINT;
+END_VAR
+END_FUNCTION

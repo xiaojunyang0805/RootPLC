@@ -403,28 +403,48 @@ def analyse() -> None:
             targets.append(([str(d)], d))  # one project: pass the folder (short command line)
         elif top:
             targets.append((top, d))
+        # sub-project folders by the name other sub-projects reference them
+        # with (folder label without its _<n> suffix, last part)
+        siblings: dict[str, Path] = {}
+        for x in subdirs:
+            label = re.sub(r"_\d+$", "", x.name).lower()
+            siblings.setdefault(label, x)
+            siblings.setdefault(label.rsplit("_", 1)[-1], x)
         per_file: dict[str, list] = {}
         for t, folder in targets:
             libs = libraries_for(folder, p["format"], shipped)
             extra = ["--library", ",".join(libs)] if libs else []
             # libraries the corpus provides (e.g. TcUnit): checked alongside,
             # never counted for this project
-            lt = folder / "libraries.txt"
-            refs = lt.read_text(encoding="utf-8").split() if lt.exists() else []
-            deps = []
-            for r in refs:
-                dep = provided.get(r.lower())
-                if dep and dep != folder and not str(folder).startswith(str(dep)):
+            deps: list[str] = []
+            todo, seen_dep = [folder], {folder}
+            while todo:  # references of references too
+                cur = todo.pop()
+                lt = cur / "libraries.txt"
+                for r in lt.read_text(encoding="utf-8").split() if lt.exists() else []:
+                    # a library the corpus provides (TcUnit), or one this
+                    # repository builds itself (TcOpen's TcoCore next to the
+                    # projects using it)
+                    dep = provided.get(r.lower()) or siblings.get(r.lower())
+                    if not dep or dep in seen_dep or str(folder).startswith(str(dep) + os.sep):
+                        continue
+                    seen_dep.add(dep)
+                    todo.append(dep)
                     deps.append(str(dep))
-                    # what the provided library references is active too
+                    # what that library references is active too
                     libs = sorted(set(libs) | set(libraries_for(dep, p["format"], shipped)))
             extra = deps + (["--library", ",".join(libs)] if libs else [])
             r = subprocess.run([exe, "check", *t, *extra, "--json"], capture_output=True, text=True, encoding="utf-8")
             rep = json.loads(r.stdout) if r.stdout.strip().startswith("{") else {}
+            # only the target's own files: a sibling checked alongside is
+            # counted when its own folder is the target
+            mine = {str(Path(x).resolve()) for x in t if Path(x).is_file()}
+            roots = [str(Path(x).resolve()) + os.sep for x in t if Path(x).is_dir()]
             for diag in rep.get("diagnostics", []):
                 if diag["severity"] == "error":
                     key = str(Path(diag["file"]).resolve())
-                    per_file.setdefault(key, []).append(diag)
+                    if key in mine or any(key.startswith(r) for r in roots):
+                        per_file.setdefault(key, []).append(diag)
         key_of = {f: str(f.resolve()) for f in files}
         # diagnostics in provided libraries checked alongside are not this project's
         own = set(key_of.values())

@@ -3,7 +3,9 @@
    BIT: a single bit, used as a structure member; RootPLC treats it as BOOL
    (the packing of BIT members into bytes only matters for memory layout).
    IQueryInterface: the base interface TwinCAT code writes as
-   __SYSTEM.IQueryInterface; it declares no methods. TYPE_CLASS: see below. *)
+   __SYSTEM.IQueryInterface; it declares no methods. TYPE_CLASS: see below.
+   PVOID is an operator of this library (see library.toml): an untyped
+   reference that ADR(x) converts to. *)
 
 TYPE
     BIT : BOOL;
@@ -11,7 +13,6 @@ TYPE
     XINT : LINT;
     UXINT : ULINT;
     XWORD : LWORD;
-    PVOID : ULINT;
     __XINT : LINT;
     __UXINT : ULINT;
     __XWORD : LWORD;

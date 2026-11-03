@@ -2182,7 +2182,8 @@ written from (clean-room; RootPLC is not affiliated with the vendors).
 Bundled: `Tc2_System` (also `ST_LibVersion`, `F_CmpLibVersion`, the AMS
 address types and the task index; RootPLC runs one task, index 1) and
 `Tc2_Utilities` (TwinCAT; `Tc2_Utilities`
-requires `Tc2_System` and activating it activates both) and
+requires `Tc2_System`, which requires `TwinCAT_BuiltIns`; activating a
+library activates what it requires) and
 `TwinCAT_BuiltIns` (names every TwinCAT project has: `BIT`, the 64-bit
 special types `XINT`, `UXINT`, `XWORD`, `PVOID`, `__SYSTEM.IQueryInterface`,
 `__SYSTEM.TYPE_CLASS`, and the system information `_TaskInfo` and `_AppInfo`
@@ -2195,6 +2196,13 @@ standard function block of [stdlib.fbs]; while it is active its declaration
 is the one used.
 Library functions are implemented in ST where their documented behaviour
 can be reproduced (for example `BYTE_TO_HEXSTR`).
+
+**[stdlib.compat.pvoid]** `TwinCAT_BuiltIns` makes `PVOID` an untyped
+reference: any reference (`ADR(x)`, `REF(x)`, a `REF_TO` variable) converts
+to it implicitly, so `MEMCPY(ADR(a), ADR(b), SIZEOF(b))` checks. `Tc2_System`
+declares `MEMCPY`, `MEMMOVE`, `MEMSET` and `MEMCMP` with their documented
+parameters; they are declared only (RP0120), since RootPLC models addresses
+as typed references.
 
 **[stdlib.compat.sizeof]** A library may enable compiler operators;
 `TwinCAT_BuiltIns` enables `SIZEOF(x)` and `XSIZEOF(x)`: the size in bytes
