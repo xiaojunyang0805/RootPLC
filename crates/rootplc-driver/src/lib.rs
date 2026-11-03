@@ -193,32 +193,16 @@ pub fn check_sources_with(
     sources: Vec<(PathBuf, String)>,
     libraries: &[String],
 ) -> Result<CheckReport, String> {
-    let mut libs = Vec::new();
-    for name in libraries.iter().flat_map(|n| n.split(',')).map(str::trim) {
-        if name.is_empty() {
-            continue;
-        }
-        match rootplc_stdlib::compat::find(name) {
-            Some(l)
-                if !libs
-                    .iter()
-                    .any(|x: &rootplc_stdlib::compat::Library| x.name == l.name) =>
-            {
-                libs.push(l)
-            }
-            Some(_) => {}
-            None => {
-                let known: Vec<String> = rootplc_stdlib::compat::libraries()
-                    .into_iter()
-                    .map(|l| l.name)
-                    .collect();
-                return Err(format!(
-                    "unknown compatibility library '{name}'; bundled: {}",
-                    known.join(", ")
-                ));
-            }
-        }
-    }
+    let libs = rootplc_stdlib::compat::resolve(libraries).map_err(|name| {
+        let known: Vec<String> = rootplc_stdlib::compat::libraries()
+            .into_iter()
+            .map(|l| l.name)
+            .collect();
+        format!(
+            "unknown compatibility library '{name}'; bundled: {}",
+            known.join(", ")
+        )
+    })?;
     Ok(check_files(sources, &libs))
 }
 

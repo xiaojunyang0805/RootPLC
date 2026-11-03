@@ -133,10 +133,8 @@ fn analyze_case(
     source: &str,
     libraries: &[String],
 ) -> rootplc_sema::Analysis {
-    let libs: Vec<rootplc_stdlib::compat::Library> = libraries
-        .iter()
-        .filter_map(|n| rootplc_stdlib::compat::find(n))
-        .collect();
+    let libs: Vec<rootplc_stdlib::compat::Library> =
+        rootplc_stdlib::compat::resolve(libraries).unwrap_or_default();
     let lib_src: Vec<&str> = libs
         .iter()
         .flat_map(|l| l.files.iter().map(|(_, s)| *s))

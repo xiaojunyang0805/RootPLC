@@ -29,6 +29,8 @@ pub struct Library {
     pub references: Vec<String>,
     /// Compiler operators the library enables, e.g. `SIZEOF`.
     pub intrinsics: Vec<String>,
+    /// Libraries it builds on; activated with it.
+    pub requires: Vec<String>,
     /// ST files: (name, source).
     pub files: Vec<(&'static str, &'static str)>,
 }
@@ -40,6 +42,13 @@ const BUNDLED: &[(&str, &[(&str, &str)])] = &[
         &[(
             "Tc2_System.st",
             include_str!("../libs/Tc2_System/1.0.0/Tc2_System.st"),
+        )],
+    ),
+    (
+        include_str!("../libs/Tc2_Utilities/library.toml"),
+        &[(
+            "Tc2_Utilities.st",
+            include_str!("../libs/Tc2_Utilities/1.0.0/Tc2_Utilities.st"),
         )],
     ),
     (
@@ -112,6 +121,7 @@ fn parse(text: &str, files: &[(&'static str, &'static str)]) -> Library {
         declare_only: many("declare_only"),
         references: many("references"),
         intrinsics: many("intrinsics"),
+        requires: many("requires"),
         files: files.to_vec(),
     }
 }
@@ -121,6 +131,34 @@ pub fn libraries() -> Vec<Library> {
     let mut v: Vec<Library> = BUNDLED.iter().map(|(t, f)| parse(t, f)).collect();
     v.sort_by(|a, b| a.name.cmp(&b.name));
     v
+}
+
+/// The named libraries and everything they require, without duplicates, in
+/// dependency order. Unknown names are returned in the error.
+pub fn resolve(names: &[String]) -> Result<Vec<Library>, String> {
+    let mut out: Vec<Library> = Vec::new();
+    fn add(name: &str, out: &mut Vec<Library>, depth: usize) -> Result<(), String> {
+        let lib = find(name).ok_or_else(|| name.to_string())?;
+        if out.iter().any(|l| l.name == lib.name) || depth > 16 {
+            return Ok(());
+        }
+        for r in &lib.requires {
+            add(r, out, depth + 1)?;
+        }
+        if !out.iter().any(|l| l.name == lib.name) {
+            out.push(lib);
+        }
+        Ok(())
+    }
+    for n in names
+        .iter()
+        .flat_map(|n| n.split(','))
+        .map(str::trim)
+        .filter(|n| !n.is_empty())
+    {
+        add(n, &mut out, 0)?;
+    }
+    Ok(out)
 }
 
 /// A bundled library by name (case-insensitive).
@@ -157,6 +195,10 @@ mod tests {
         assert_eq!(tc.declare_only, ["ADSLOGSTR", "ADSLOGDINT", "ADSLOGLREAL"]);
         assert_eq!(tc.references.len(), 5);
         assert!(find("nope").is_none());
+        let r = resolve(&["Tc2_Utilities".into()]).expect("resolve");
+        let names: Vec<&str> = r.iter().map(|l| l.name.as_str()).collect();
+        assert_eq!(names, ["Tc2_System", "Tc2_Utilities"]);
+        assert!(resolve(&["Tc9_Nope".into()]).is_err());
         assert_eq!(
             find("TwinCAT_BuiltIns").expect("builtins").intrinsics,
             ["SIZEOF", "XSIZEOF"]

@@ -7,6 +7,14 @@
 
 TYPE
     BIT : BOOL;
+    (* special data types, 64-bit target (RootPLC's TwinCAT layout) *)
+    XINT : LINT;
+    UXINT : ULINT;
+    XWORD : LWORD;
+    PVOID : ULINT;
+    __XINT : LINT;
+    __UXINT : ULINT;
+    __XWORD : LWORD;
 END_TYPE
 
 INTERFACE IQueryInterface

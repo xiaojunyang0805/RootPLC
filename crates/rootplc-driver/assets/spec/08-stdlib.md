@@ -64,8 +64,12 @@ variable hides a library global). A library name may qualify its
 declarations: `Tc2_System.PI`. `rootplc libraries` lists the bundled
 libraries with their vendor, version and the public references they were
 written from (clean-room; RootPLC is not affiliated with the vendors).
-Bundled: `Tc2_System` (TwinCAT) and `TwinCAT_BuiltIns` (names every TwinCAT
-project has, such as `BIT` and `__SYSTEM.IQueryInterface`).
+Bundled: `Tc2_System` and `Tc2_Utilities` (TwinCAT; `Tc2_Utilities`
+requires `Tc2_System` and activating it activates both) and
+`TwinCAT_BuiltIns` (names every TwinCAT project has: `BIT`, the 64-bit
+special types `XINT`, `UXINT`, `XWORD`, `PVOID`, `__SYSTEM.IQueryInterface`).
+Library functions are implemented in ST where their documented behaviour
+can be reproduced (for example `BYTE_TO_HEXSTR`).
 
 **[stdlib.compat.sizeof]** A library may enable compiler operators;
 `TwinCAT_BuiltIns` enables `SIZEOF(x)` and `XSIZEOF(x)`: the size in bytes

@@ -5,7 +5,7 @@
 name = "TwinCAT_BuiltIns"
 vendor = "RootPLC"
 version = "1.0.0"
-description = "TwinCAT built-in names: the BIT type, the __SYSTEM.IQueryInterface base interface, SIZEOF / XSIZEOF"
+description = "TwinCAT built-in names: the BIT type, the __SYSTEM.IQueryInterface base interface, SIZEOF / XSIZEOF, XINT/UXINT/XWORD/PVOID"
 declare_only = []
 # operators this library enables, with TwinCAT's 64-bit memory layout
 intrinsics = ["SIZEOF", "XSIZEOF"]
@@ -14,4 +14,5 @@ references = [
   "https://infosys.beckhoff.com/content/1033/tc3_plc_intro/2528896907.html (SIZEOF: result type by size)",
   "https://infosys.beckhoff.com/content/1033/tc3_plc_intro/13614027275.html (XSIZEOF)",
   "https://infosys.beckhoff.com/content/1033/tc3_grundlagen/3539073675.html (alignment of data types: 8-byte default)",
+  "https://infosys.beckhoff.com/content/1033/tc3_plc_intro/2529448075.html (XINT, UXINT, XWORD, PVOID: 64-bit LINT, ULINT, LWORD)",
 ]
