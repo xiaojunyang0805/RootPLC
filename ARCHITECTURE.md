@@ -55,6 +55,8 @@ phases exist only as stubs, so that the boundaries are fixed early.
 5. `unsafe` is denied workspace-wide. It may be allowed only in modules marked
    `#[allow(unsafe_code)]` inside `rootplc-runtime` and `rootplc-fieldbus`,
    and each such module needs a Kani proof or a written justification.
+   `rootplc-wasm` allows only the `#[unsafe(no_mangle)]` attribute on its
+   browser exports (justified in the crate); it performs no unsafe operation.
 6. No GPL/LGPL code in-process (`deny.toml`). GPL tools run only as optional
    external programs.
 
