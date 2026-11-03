@@ -142,5 +142,8 @@ dependencies = [
 name = "rootplc-wasm"
 version = "0.0.1"
 dependencies = [
+ "rootplc-diag",
  "rootplc-driver",
+ "rootplc-sema",
+ "rootplc-vm",
 ]

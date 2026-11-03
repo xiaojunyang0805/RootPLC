@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RootPLC Playground</title>
+<style>
+:root{--bg:#f6f8fb;--panel:#fff;--ink:#0f172a;--quiet:#475569;--line:#e2e8f0;--accent:#0e7490;--ok:#16a34a;--bad:#dc2626;--warn:#d97706;--code:#0b1220;--codeink:#e2e8f0}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#0b1220;--panel:#111a2b;--ink:#e2e8f0;--quiet:#94a3b8;--line:#1f2a3d;--accent:#22d3ee;--code:#060b14;--codeink:#e2e8f0}}
+:root[data-theme="dark"]{--bg:#0b1220;--panel:#111a2b;--ink:#e2e8f0;--quiet:#94a3b8;--line:#1f2a3d;--accent:#22d3ee;--code:#060b14;--codeink:#e2e8f0}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 "Segoe UI",system-ui,-apple-system,"Microsoft YaHei",sans-serif}
+header{background:#0f172a;color:#fff;padding:14px 20px;display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+header h1{margin:0;font-size:20px}header span{color:#94a3b8;font-size:13px}
+header a{color:#5eead4;margin-left:auto;font-size:13px}
+main{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:14px;padding:14px 20px;max-width:1400px;margin:0 auto}
+@media (max-width:900px){main{grid-template-columns:1fr;padding:12px 16px}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px;min-width:0}
+.bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px}
+select,button{font:inherit;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:6px 12px;cursor:pointer}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+button:disabled{opacity:.5;cursor:default}
+textarea{width:100%;height:470px;resize:vertical;background:var(--code);color:var(--codeink);border:0;border-radius:8px;padding:12px;font:13px/1.5 "Cascadia Code",Consolas,monospace;tab-size:4}
+h2{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--quiet);margin:4px 0 8px}
+#plant{display:flex;gap:18px;flex-wrap:wrap;align-items:center;min-height:120px}
+.lamp{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:12px;color:var(--quiet)}
+.lamp i{width:34px;height:34px;border-radius:50%;background:#334155;box-shadow:inset 0 -3px 6px rgba(0,0,0,.35);transition:background .1s}
+.lamp.on i{background:#22c55e;box-shadow:0 0 14px #22c55e}
+.lamp.on.red i{background:#ef4444;box-shadow:0 0 14px #ef4444}.lamp.on.yellow i{background:#f59e0b;box-shadow:0 0 14px #f59e0b}
+.tl{background:#1e293b;border-radius:14px;padding:10px;display:flex;flex-direction:column;gap:8px}
+.tl i{width:40px;height:40px}
+.switch{display:flex;align-items:center;gap:6px;font-size:13px}
+.switch button{min-width:64px}.switch button.on{background:var(--ok);border-color:var(--ok);color:#fff}
+#vars{font:12px/1.6 Consolas,monospace;color:var(--quiet);columns:2;column-gap:18px;margin-top:8px}
+#out{font-size:13px;max-height:300px;overflow:auto}
+.d{padding:6px 8px;border-left:3px solid var(--line);margin:4px 0;background:var(--bg);border-radius:4px}
+.d.error{border-color:var(--bad)}.d.warning{border-color:var(--warn)}.d.pass{border-color:var(--ok)}.d.fail{border-color:var(--bad)}
+.d small{color:var(--quiet)}code{font-family:Consolas,monospace}
+.clock{margin-left:auto;font:12px Consolas,monospace;color:var(--quiet)}
+footer{text-align:center;color:var(--quiet);font-size:12px;padding:10px}
+</style>
+</head>
+<body>
+<header><h1>RootPLC Playground</h1><span>Check, test and run IEC 61131-3 Structured Text in your browser. Nothing is installed or uploaded.</span>
+<a href="https://github.com/xiaojunyang0805/RootPLC">github.com/xiaojunyang0805/RootPLC</a></header>
+<main>
+<section class="panel">
+  <div class="bar">
+    <select id="example" aria-label="Example"></select>
+    <button class="primary" id="btnCheck">Check</button>
+    <button class="primary" id="btnTest">Test</button>
+    <button class="primary" id="btnRun">Run plant</button>
+    <button id="btnStop" disabled>Stop</button>
+  </div>
+  <textarea id="src" spellcheck="false" aria-label="Structured Text source"></textarea>
+</section>
+<section style="display:flex;flex-direction:column;gap:14px;min-width:0">
+  <div class="panel">
+    <div class="bar"><h2 style="margin:0">Plant</h2><span class="clock" id="clock">stopped</span></div>
+    <div id="plant"><span style="color:var(--quiet)">Press <b>Run plant</b>: inputs become switches, outputs become lamps, time runs at PLC speed.</span></div>
+    <div class="bar" id="inputs" style="margin-top:10px"></div>
+    <div id="vars"></div>
+  </div>
+  <div class="panel">
+    <h2>Results</h2>
+    <div id="out"><span style="color:var(--quiet)">Loading the compiler…</span></div>
+  </div>
+</section>
+</main>
+<footer>rootplc compiled to WebAssembly · same checker, VM and test runner as the CLI and the MCP server used by AI agents · Apache-2.0</footer>
+<script>
+const WASM_B64 = "__WASM_BASE64__";
+const EXAMPLES = __EXAMPLES_JSON__;
+let ex = null, timer = null, inputs = {};
+const $ = id => document.getElementById(id);
+
+function call(fn, text, ...args) {
+  const enc = new TextEncoder().encode(text);
+  const ptr = ex.input_reserve(enc.length);
+  new Uint8Array(ex.memory.buffer, ptr, enc.length).set(enc);
+  const len = ex[fn](...args);
+  return JSON.parse(new TextDecoder().decode(new Uint8Array(ex.memory.buffer, ex.output_ptr(), len)));
+}
+const esc = s => String(s).replace(/[&<>]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+
+function showDiagnostics(list) {
+  return list.map(d => `<div class="d ${d.severity}"><b>${d.code}</b> line ${d.line}:${d.column} — ${esc(d.message)}${d.hint ? `<br><small>hint: ${esc(d.hint)}</small>` : ""}</div>`).join("");
+}
+function doCheck() {
+  const r = call("check", $("src").value);
+  $("out").innerHTML = (r.ok ? `<div class="d pass"><b>No errors.</b> ${r.warnings} warning(s).</div>` : `<div class="d error"><b>${r.errors} error(s)</b></div>`) + showDiagnostics(r.diagnostics);
+}
+function doTest() {
+  const r = call("test", $("src").value);
+  let h = showDiagnostics(r.diagnostics);
+  if (!r.compiled) { $("out").innerHTML = `<div class="d error"><b>Does not compile</b>; fix the errors first.</div>` + h; return; }
+  if (!r.tests.length) h += `<div class="d">No TEST blocks in this source.</div>`;
+  for (const t of r.tests) {
+    h += `<div class="d ${t.passed ? "pass" : "fail"}"><b>${t.passed ? "PASS" : "FAIL"}</b> <code>${esc(t.name)}</code>`;
+    for (const f of t.failures) h += `<br><small>line ${f.line}: ${esc(f.message)}</small>`;
+    if (t.fault) h += `<br><small>fault ${t.fault.kind} at line ${t.fault.line}: ${esc(t.fault.message)}</small>`;
+    h += `</div>`;
+  }
+  $("out").innerHTML = `<div class="d ${r.ok ? "pass" : "fail"}"><b>${r.passed} passed, ${r.failed} failed</b></div>` + h;
+}
+function stop() { clearInterval(timer); timer = null; $("btnStop").disabled = true; $("clock").textContent = "stopped"; }
+function doRun() {
+  stop();
+  const r = call("sim_start", $("src").value);
+  if (!r.ok) { $("out").innerHTML = `<div class="d error"><b>Cannot run</b> ${esc(r.message || "")}</div>` + showDiagnostics((r.check || {}).diagnostics || []); return; }
+  $("out").innerHTML = `<div class="d pass">Running <code>${esc(r.program)}</code> with 10 ms cycles.</div>`;
+  inputs = {};
+  const decl = r.declarations;
+  const boolIn = decl.filter(d => d.section === "Input" && d.type === "BOOL");
+  const boolOut = decl.filter(d => d.section === "Output" && d.type === "BOOL");
+  $("inputs").innerHTML = boolIn.map(d => `<span class="switch"><button data-n="${esc(d.name)}">${esc(d.name)}</button></span>`).join("");
+  for (const b of $("inputs").querySelectorAll("button")) {
+    inputs[b.dataset.n] = false;
+    b.onclick = () => { inputs[b.dataset.n] = !inputs[b.dataset.n]; b.classList.toggle("on", inputs[b.dataset.n]); };
+  }
+  const names = boolOut.map(d => d.name.toLowerCase());
+  const traffic = ["red", "yellow", "green"].every(n => names.includes(n));
+  let plant = "";
+  if (traffic) plant += `<div class="tl">${["red","yellow","green"].map(c => `<span class="lamp ${c}" data-v="${c}"><i></i></span>`).join("")}</div>`;
+  plant += boolOut.filter(d => !(traffic && ["red","yellow","green"].includes(d.name.toLowerCase())))
+                  .map(d => `<span class="lamp" data-v="${esc(d.name)}"><i></i>${esc(d.name)}</span>`).join("");
+  $("plant").innerHTML = plant || `<span style="color:var(--quiet)">This program has no BOOL outputs to show; see the values below.</span>`;
+  $("btnStop").disabled = false;
+  timer = setInterval(step, 50);
+  step();
+}
+function step() {
+  const assign = Object.entries(inputs).map(([k, v]) => `${k}=${v ? "TRUE" : "FALSE"}`).join("\n");
+  const r = call("sim_step", assign, 5, 10);
+  const vars = r.vars || {};
+  for (const el of $("plant").querySelectorAll("[data-v]")) {
+    const key = Object.keys(vars).find(k => k.toLowerCase() === el.dataset.v.toLowerCase());
+    el.classList.toggle("on", key && vars[key] === "TRUE");
+  }
+  $("vars").innerHTML = Object.entries(vars).map(([k, v]) => `${esc(k)} = ${esc(v)}`).join("<br>");
+  $("clock").textContent = `PLC time ${(r.time_ms / 1000).toFixed(1)} s`;
+  if (r.fault) { stop(); $("out").innerHTML = `<div class="d fail"><b>Fault ${r.fault.kind}</b> ${esc(r.fault.message)}</div>`; }
+}
+function load(i) { stop(); $("src").value = EXAMPLES[i].source; $("out").innerHTML = `<div class="d">${esc(EXAMPLES[i].hint)}</div>`; }
+
+(async () => {
+  const bytes = Uint8Array.from(atob(WASM_B64), c => c.charCodeAt(0));
+  ex = (await WebAssembly.instantiate(bytes, {})).instance.exports;
+  $("example").innerHTML = EXAMPLES.map((e, i) => `<option value="${i}">${esc(e.title)}</option>`).join("");
+  $("example").onchange = e => load(+e.target.value);
+  $("btnCheck").onclick = doCheck; $("btnTest").onclick = doTest; $("btnRun").onclick = doRun; $("btnStop").onclick = stop;
+  load(0);
+  const q = new URLSearchParams(location.search).get("demo");
+  if (q === "test") { $("example").value = "2"; load(2); doTest(); }
+  if (q === "run") { inputs = {}; doRun(); setTimeout(() => { const b = $("inputs").querySelector("button"); if (b) b.click(); }, 100); }
+})().catch(e => { $("out").innerHTML = `<div class="d error">Could not start: ${esc(e.message)}</div>`; });
+</script>
+</body>
+</html>

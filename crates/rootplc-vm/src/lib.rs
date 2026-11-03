@@ -493,6 +493,33 @@ impl<'p> Vm<'p> {
         }
     }
 
+    /// Set a variable of the instance at `root` (for example an input from a
+    /// simulator or a test harness). The value is converted to the variable's
+    /// type; returns false if the variable does not exist or the value does
+    /// not fit (subrange).
+    pub fn write_var(&mut self, root: usize, def: usize, name: &str, v: Value) -> bool {
+        let Some(pou) = self.prog.pou(def) else {
+            return false;
+        };
+        let Some(i) = pou
+            .vars
+            .iter()
+            .position(|x| x.name.eq_ignore_ascii_case(name))
+        else {
+            return false;
+        };
+        let Ok(v) = self.convert(v, &pou.vars[i].ty) else {
+            return false;
+        };
+        match self.roots.get_mut(root) {
+            Some(Value::Agg(xs)) if i < xs.len() => {
+                xs[i] = v;
+                true
+            }
+            _ => false,
+        }
+    }
+
     /// Render a value of type `ty` as IEC literal text.
     pub fn display(&self, v: &Value, ty: &Ty) -> String {
         match (v, self.strip(ty)) {

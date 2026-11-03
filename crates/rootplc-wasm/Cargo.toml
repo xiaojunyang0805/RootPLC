@@ -9,8 +9,14 @@ repository.workspace = true
 authors.workspace = true
 publish = false
 
+[lib]
+crate-type = ["cdylib", "rlib"]
+
 [dependencies]
 rootplc-driver.workspace = true
+rootplc-diag.workspace = true
+rootplc-sema.workspace = true
+rootplc-vm.workspace = true
 
 [lints]
 workspace = true
