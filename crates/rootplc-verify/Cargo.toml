@@ -1,0 +1,16 @@
+[package]
+name = "rootplc-verify"
+description = "Formal verification: properties from ST pragmas, CBMC on generated C, readable counterexample traces."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+rootplc-codegen-c.workspace = true
+rootplc-sema.workspace = true
+
+[lints]
+workspace = true

@@ -1,0 +1,10 @@
+# Placeholder: Sigstore-signed release binaries plus a CycloneDX SBOM.
+name: release
+on:
+  push:
+    tags: ['v*']
+jobs:
+  placeholder:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "release pipeline not implemented yet"

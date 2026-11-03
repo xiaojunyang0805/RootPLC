@@ -1,0 +1,16 @@
+[package]
+name = "rootplc-interchange"
+description = "PLCopen XML (IEC 61131-10) and TwinCAT XML import and export."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+rootplc-syntax.workspace = true
+rootplc-diag.workspace = true
+
+[lints]
+workspace = true

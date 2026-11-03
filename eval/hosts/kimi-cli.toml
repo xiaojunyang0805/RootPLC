@@ -1,0 +1,4 @@
+name = "kimi-cli"
+# command = ""        # how to start the host non-interactively
+# model = ""
+# mcp_config = "../../agent/mcp/kimi-cli.json"

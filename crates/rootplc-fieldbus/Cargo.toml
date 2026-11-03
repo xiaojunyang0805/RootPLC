@@ -1,0 +1,15 @@
+[package]
+name = "rootplc-fieldbus"
+description = "Fieldbus transport traits and adapters: EtherCAT (ethercrab), Modbus TCP/RTU, OPC UA, CANopen."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+rootplc-abi.workspace = true
+
+[lints]
+workspace = true

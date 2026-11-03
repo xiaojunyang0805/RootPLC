@@ -1,0 +1,15 @@
+[package]
+name = "rootplc-syntax"
+description = "Lexer, parser and lossless syntax tree for Structured Text and the text forms of SFC/LD/FBD."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+rootplc-diag.workspace = true
+
+[lints]
+workspace = true

@@ -1,0 +1,16 @@
+[package]
+name = "rootplc-codegen-c"
+description = "Typed IR to portable C99 against rootplc-abi, for native, MCU and CBMC targets."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+rootplc-sema.workspace = true
+rootplc-abi.workspace = true
+
+[lints]
+workspace = true

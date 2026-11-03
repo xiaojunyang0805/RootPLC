@@ -1,0 +1,15 @@
+[package]
+name = "rootplc-mcp"
+description = "MCP server (stdio and HTTP) exposing driver commands as agent tools."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+rootplc-driver.workspace = true
+
+[lints]
+workspace = true

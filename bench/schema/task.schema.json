@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PLC-Agent-Bench task",
+  "type": "object",
+  "required": ["id", "version", "category", "difficulty"],
+  "properties": {
+    "id": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+    "version": { "type": "integer", "minimum": 1 },
+    "category": { "enum": ["logic", "timers", "sequence", "motion", "process", "migration", "safety-interlock"] },
+    "difficulty": { "enum": ["easy", "medium", "hard"] },
+    "languages": { "type": "array", "items": { "enum": ["ST", "SFC", "LD", "FBD"] } },
+    "split": { "enum": ["public", "held-out"] },
+    "scoring": {
+      "type": "object",
+      "properties": {
+        "compile": { "type": "number" },
+        "visible_tests": { "type": "number" },
+        "hidden_tests": { "type": "number" },
+        "simulation": { "type": "number" },
+        "properties": { "type": "number" }
+      }
+    }
+  }
+}

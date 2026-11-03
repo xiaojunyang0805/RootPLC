@@ -1,0 +1,4 @@
+name = "codex"
+# command = ""        # how to start the host non-interactively
+# model = ""
+# mcp_config = "../../agent/mcp/codex.json"

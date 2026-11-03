@@ -1,0 +1,20 @@
+[package]
+name = "rootplc-cli"
+description = "The rootplc command-line tool."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[[bin]]
+name = "rootplc"
+path = "src/main.rs"
+
+[dependencies]
+rootplc-driver.workspace = true
+rootplc-mcp.workspace = true
+
+[lints]
+workspace = true

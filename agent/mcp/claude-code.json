@@ -1,0 +1,5 @@
+{
+  "mcpServers": {
+    "rootplc": { "command": "rootplc", "args": ["mcp"] }
+  }
+}

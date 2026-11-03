@@ -1,0 +1,8 @@
+/target
+**/*.rs.bk
+/eval/results/*
+!/eval/results/.gitkeep
+/web/playground/node_modules
+/web/playground/dist
+*.fmu.tmp
+.DS_Store

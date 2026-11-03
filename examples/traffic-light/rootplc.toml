@@ -1,0 +1,12 @@
+[project]
+name = "traffic-light"
+version = "0.1.0"
+spec = "0"
+
+[build]
+target = "vm"
+
+[[task]]
+name = "Main"
+interval = "T#10ms"
+programs = ["PRG_TrafficLight"]

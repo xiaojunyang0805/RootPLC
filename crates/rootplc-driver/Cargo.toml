@@ -1,0 +1,25 @@
+[package]
+name = "rootplc-driver"
+description = "Project model (rootplc.toml) and the implementation of every rootplc command. The CLI and MCP server call only this crate."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+rootplc-diag.workspace = true
+rootplc-syntax.workspace = true
+rootplc-sema.workspace = true
+rootplc-stdlib.workspace = true
+rootplc-vm.workspace = true
+rootplc-testing.workspace = true
+rootplc-codegen-c.workspace = true
+rootplc-verify.workspace = true
+rootplc-interchange.workspace = true
+rootplc-graph.workspace = true
+rootplc-sim.workspace = true
+
+[lints]
+workspace = true

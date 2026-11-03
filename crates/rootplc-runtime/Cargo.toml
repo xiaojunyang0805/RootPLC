@@ -1,0 +1,16 @@
+[package]
+name = "rootplc-runtime"
+description = "Reference runtime on PREEMPT_RT Linux: scheduler, program loading, force/trace, online change, signed deploy, runtime agent API."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+rootplc-abi.workspace = true
+rootplc-fieldbus.workspace = true
+
+[lints]
+workspace = true

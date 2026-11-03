@@ -1,0 +1,9 @@
+# RootPLC
+
+> Open, agent-first IEC 61131-3 toolchain. CLI: `rootplc`. Apache-2.0.
+
+## Docs
+- [Getting started](guide/getting-started.md)
+- [CLI reference](cli/README.md)
+- [Standard library](stdlib/README.md)
+- [Diagnostics](diagnostics/README.md)

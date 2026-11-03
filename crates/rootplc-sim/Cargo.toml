@@ -1,0 +1,16 @@
+[package]
+name = "rootplc-sim"
+description = "Simulation: virtual time, FMI 2/3 plants, simulated EtherCAT slaves, scenarios, deterministic replay and trace diff."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+rootplc-vm.workspace = true
+rootplc-abi.workspace = true
+
+[lints]
+workspace = true

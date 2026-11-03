@@ -1,0 +1,50 @@
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+
+[workspace.package]
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.85"
+license = "Apache-2.0"
+repository = "https://github.com/xiaojunyang0805/RootPLC"
+homepage = "https://rootplc.org"
+authors = ["RootPLC contributors"]
+
+# Internal crates. External dependencies must come from the audited
+# allow-list (see deny.toml) and be added here, never per crate.
+[workspace.dependencies]
+rootplc-abi         = { path = "crates/rootplc-abi" }
+rootplc-diag        = { path = "crates/rootplc-diag" }
+rootplc-syntax      = { path = "crates/rootplc-syntax" }
+rootplc-sema        = { path = "crates/rootplc-sema" }
+rootplc-stdlib      = { path = "crates/rootplc-stdlib" }
+rootplc-vm          = { path = "crates/rootplc-vm" }
+rootplc-codegen-c   = { path = "crates/rootplc-codegen-c" }
+rootplc-testing     = { path = "crates/rootplc-testing" }
+rootplc-verify      = { path = "crates/rootplc-verify" }
+rootplc-interchange = { path = "crates/rootplc-interchange" }
+rootplc-graph       = { path = "crates/rootplc-graph" }
+rootplc-sim         = { path = "crates/rootplc-sim" }
+rootplc-driver      = { path = "crates/rootplc-driver" }
+rootplc-mcp         = { path = "crates/rootplc-mcp" }
+rootplc-fieldbus    = { path = "crates/rootplc-fieldbus" }
+rootplc-runtime     = { path = "crates/rootplc-runtime" }
+
+[workspace.lints.rust]
+# `unsafe` is allowed only in modules marked `#[allow(unsafe_code)]`
+# inside FFI / hardware crates (runtime, fieldbus). Never `forbid` here,
+# so those marked modules can opt in.
+unsafe_code = "deny"
+missing_docs = "warn"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+unwrap_used = "warn"
+dbg_macro = "warn"
+todo = "warn"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = "symbols"
