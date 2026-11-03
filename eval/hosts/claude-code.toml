@@ -1,4 +1,17 @@
+# Claude Code, non-interactive (-p). Verified 2026-11-03 with Claude Code 2.1.317.
+# Tools are restricted: files + rootplc only (mode with), files only (mode without).
+# --strict-mcp-config keeps the user's own MCP servers out of the run.
 name = "claude-code"
-# command = ""        # how to start the host non-interactively
-# model = ""
-# mcp_config = "../../agent/mcp/claude-code.json"
+ecosystem = "western"
+verified = "2026-11-03, Claude Code 2.1.317"
+model = ""   # empty: the account default; e.g. "claude-sonnet-5-5"
+
+command_with = ["claude", "-p", "{prompt}", "--output-format", "stream-json", "--verbose",
+  "--mcp-config", ".mcp.json", "--strict-mcp-config", "--permission-mode", "acceptEdits",
+  "--allowedTools", "Read,Write,Edit,Glob,Grep,Bash(rootplc:*),mcp__rootplc"]
+command_without = ["claude", "-p", "{prompt}", "--output-format", "stream-json", "--verbose",
+  "--strict-mcp-config", "--permission-mode", "acceptEdits",
+  "--allowedTools", "Read,Write,Edit,Glob,Grep"]
+
+[with_files]
+".mcp.json" = '{"mcpServers":{"rootplc":{"command":"rootplc","args":["mcp"]}}}'

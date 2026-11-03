@@ -1,4 +1,4 @@
+# Kimi CLI. NOT CONFIGURED: fill in the non-interactive command and MCP setup.
 name = "kimi-cli"
-# command = ""        # how to start the host non-interactively
-# model = ""
-# mcp_config = "../../agent/mcp/kimi-cli.json"
+ecosystem = "chinese"
+verified = "no"

@@ -1,4 +1,8 @@
+# Codex CLI. NOT VERIFIED: flags taken from its documentation; check with
+# `codex exec --help` once installed, then uncomment.
 name = "codex"
-# command = ""        # how to start the host non-interactively
-# model = ""
-# mcp_config = "../../agent/mcp/codex.json"
+ecosystem = "western"
+verified = "no"
+# command_with = ["codex", "exec", "--skip-git-repo-check", "--full-auto",
+#   "-c", "mcp_servers.rootplc.command=\"rootplc\"", "-c", "mcp_servers.rootplc.args=[\"mcp\"]", "{prompt}"]
+# command_without = ["codex", "exec", "--skip-git-repo-check", "--full-auto", "{prompt}"]

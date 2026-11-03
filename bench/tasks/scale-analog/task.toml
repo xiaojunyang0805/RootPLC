@@ -1,0 +1,19 @@
+id = "scale-analog"
+version = 1
+category = "process"
+difficulty = "easy"
+languages = ["ST"]
+split = "public"
+# Mutants of the reference that no test can kill (same behaviour).
+equivalent_mutants = [
+    "'<=' -> '<' on raw <= 0: the formula also gives lo at raw = 0",
+    "'>=' -> '>' on raw >= 27648: the formula also gives hi at raw = 27648",
+    "'27648' -> '27649': the formula also gives hi at raw = 27648",
+]
+source = "original (RootPLC)"
+licence = "Apache-2.0"
+
+[scoring]
+compile = 0.1
+visible_tests = 0.2
+hidden_tests = 0.7

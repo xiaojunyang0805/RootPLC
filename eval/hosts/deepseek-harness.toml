@@ -1,4 +1,6 @@
+# DeepSeek through an agent harness. NOT CONFIGURED: choose the harness
+# (e.g. a Claude-Code-compatible or OpenAI-compatible agent CLI pointed at the
+# DeepSeek API), then fill in the commands.
 name = "deepseek-harness"
-# command = ""        # how to start the host non-interactively
-# model = ""
-# mcp_config = "../../agent/mcp/deepseek-harness.json"
+ecosystem = "chinese"
+verified = "no"

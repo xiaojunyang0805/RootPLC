@@ -1,7 +1,6 @@
 # TEST blocks and assertions
 
-*Status: draft v0.2 (assertions, white-box access, runner). Normative. Mocked
-time follows in a later revision.*
+*Status: draft v0.3 (assertions, white-box access, runner, mocked time). Normative.*
 
 A `TEST … END_TEST` block ([pous.test]) is a POU that only the test runner
 executes. It may declare instances of programs and function blocks, call
@@ -30,4 +29,11 @@ at 0. A failed assertion is recorded and execution continues. A run-time
 fault (division by zero, index or subrange violation, NULL dereference,
 watchdog) ends the test. A test passes when no assertion failed and no fault
 occurred.
+
+**[tests.time]** Time in a test is virtual. The clock starts at 0 and moves
+only when the test calls `ADVANCE(d)` with a duration `d` (`TIME` or
+`LTIME`), for example `ADVANCE(T#5s)`. Timers (`TON`, `TOF`, `TP`) read the
+clock when they are called, so a typical test calls the instance, advances,
+and calls it again. `ADVANCE` is available only in TEST blocks; elsewhere it
+is error RP0203. A negative duration does nothing.
 

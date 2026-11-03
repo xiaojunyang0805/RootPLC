@@ -926,6 +926,17 @@ impl<'p> Vm<'p> {
                 .map_err(|k| vm.fault(k, e.span, "result outside the subrange"))
         };
         match name {
+            "ADVANCE" => {
+                // [tests.time]: TIME is in ms, LTIME in ns.
+                let n = int(&arg(0)).max(0);
+                let ns = if ty.is_some_and(|t| *t == Ty::Elem(Elem::Ltime)) {
+                    n
+                } else {
+                    n * 1_000_000
+                };
+                self.now_ns += ns;
+                Ok(Value::Int(0))
+            }
             "ASSERT_TRUE" | "ASSERT_FALSE" => {
                 let want = name == "ASSERT_TRUE";
                 if truthy(&arg(0)) != want {

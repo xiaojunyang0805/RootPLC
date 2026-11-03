@@ -1,0 +1,158 @@
+# Real-world PLC code corpus. The repository stores only this manifest and
+# the tools; code is cloned into corpus/.cache (git-ignored) and analysed
+# there. `redistribute = true` only for permissive licences (MIT, BSD,
+# Apache, CC0, Unlicense): only those may ever be copied into a published
+# dataset. Everything else is analysed locally and cited by URL.
+#
+# format: "st" (plain files), "twincat" (.TcPOU/.TcDUT/.TcGVL XML),
+#         "brx" (B&R: declarations in .fun/.typ/.var, bodies in .st),
+#         "binary" / "none": nothing to extract (see note)
+
+[[project]]
+name = "tcunit"
+url = "https://github.com/tcunit/TcUnit"
+licence = "MIT (custom text)"
+redistribute = false
+format = "twincat"
+kind = "test framework"
+
+[[project]]
+name = "twincat-dynamic-collections"
+url = "https://github.com/fisothemes/TwinCat-Dynamic-Collections"
+licence = "MIT"
+redistribute = true
+format = "twincat"
+kind = "library"
+
+[[project]]
+name = "fisothemes-standard-library"
+url = "https://github.com/fisothemes/FisoThemes-Standard-Library-for-TwinCAT"
+licence = "MIT"
+redistribute = true
+format = "twincat"
+kind = "library"
+
+[[project]]
+name = "tccontrol"
+url = "https://github.com/rruiter87/TcControl"
+licence = "MIT"
+redistribute = true
+format = "twincat"
+kind = "control library"
+
+[[project]]
+name = "oc-twincat-core"
+url = "https://github.com/OpenCommissioning/OC_TwinCAT_Core"
+licence = "BSD-3-Clause"
+redistribute = true
+format = "twincat"
+kind = "library"
+
+[[project]]
+name = "tcmath"
+url = "https://github.com/sagatowski/alltwincat.com-TcMath"
+licence = "MIT"
+redistribute = true
+format = "twincat"
+kind = "example with unit tests"
+
+[[project]]
+name = "zeugwerk-testbench"
+url = "https://github.com/Zeugwerk/Testbench"
+licence = "MIT"
+redistribute = true
+format = "twincat"
+kind = "test library"
+
+[[project]]
+name = "oscat-basic-twincat"
+url = "https://github.com/sagatowski/alltwincat.com-oscat-basic"
+licence = "OSCAT licence (no SPDX)"
+redistribute = false
+format = "binary"
+note = "compiled TwinCAT .library only"
+kind = "standard library (OSCAT)"
+
+[[project]]
+name = "aixocat"
+url = "https://github.com/RWTH-EBC/AixOCAT"
+licence = "MIT"
+redistribute = true
+format = "twincat"
+kind = "building automation library (OSCAT based)"
+
+[[project]]
+name = "br-oscat"
+url = "https://github.com/tkucic/brOscatLib"
+licence = "MIT"
+redistribute = true
+format = "brx"
+kind = "standard library (OSCAT, B&R)"
+
+[[project]]
+name = "structured-text-utilities"
+url = "https://github.com/WengerAG/structured-text-utilities"
+licence = "MIT"
+redistribute = true
+format = "st"
+kind = "utilities"
+
+[[project]]
+name = "codesys-oop-examples"
+url = "https://github.com/Aliazzzz/OOP-Concept-Examples-in-CODESYS-V3"
+licence = "Unlicense"
+redistribute = true
+format = "binary"
+note = "CODESYS .project files only; not extractable without CODESYS"
+kind = "examples (OOP)"
+
+[[project]]
+name = "fb-case-state-machine"
+url = "https://github.com/FellowWithLaptop/FB_CaseStateMachine"
+licence = "CC0-1.0"
+redistribute = true
+format = "twincat"
+kind = "example"
+
+[[project]]
+name = "spec2control"
+url = "https://github.com/hkoziolek/Spec2Control"
+licence = "Apache-2.0"
+redistribute = true
+format = "none"
+note = "interface specs (CSV) and control narratives, no ST source: a source of bench tasks"
+kind = "LLM-generated control logic (research)"
+
+[[project]]
+name = "echidna"
+url = "https://github.com/61131/echidna"
+licence = "BSD-2-Clause"
+redistribute = true
+format = "none"
+note = "compiler written in C; no ST corpus in the repository"
+kind = "compiler test programs"
+
+[[project]]
+name = "struckig"
+url = "https://github.com/stefanbesler/struckig"
+licence = "GPL-3.0"
+redistribute = false
+format = "twincat"
+kind = "motion library (analysis only)"
+
+[[project]]
+name = "iec-checker"
+url = "https://github.com/iec-checker/iec-checker"
+licence = "LGPL-3.0"
+redistribute = false
+format = "st"
+kind = "static-analysis test programs (analysis only)"
+
+[[project]]
+name = "conveyor-pid"
+url = "https://github.com/Spatelio/conveyer-belt-automation-control"
+licence = "MIT"
+redistribute = true
+format = "binary"
+note = "CODESYS .project file only"
+kind = "application"

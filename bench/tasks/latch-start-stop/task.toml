@@ -1,0 +1,13 @@
+id = "latch-start-stop"
+version = 1
+category = "logic"
+difficulty = "easy"
+languages = ["ST"]
+split = "public"
+source = "original (RootPLC)"
+licence = "Apache-2.0"
+
+[scoring]
+compile = 0.1
+visible_tests = 0.2
+hidden_tests = 0.7

@@ -152,6 +152,7 @@ enum Cls {
 }
 
 enum Builtin {
+    Advance,
     AssertBool,
     AssertCmp,
     Conv(Ty, Ty),
@@ -212,6 +213,7 @@ fn elem_or_str(name: &str) -> Option<Ty> {
 fn builtin(up: &str) -> Option<Builtin> {
     use Builtin::*;
     Some(match up {
+        "ADVANCE" => Advance,
         "ASSERT_TRUE" | "ASSERT_FALSE" => AssertBool,
         "ASSERT_EQ" | "ASSERT_NE" => AssertCmp,
         "TRUNC" => Trunc,
@@ -2227,6 +2229,26 @@ impl<'a> Checker<'a> {
         let vals: Vec<V> = args.iter().map(|a| self.expr(a.expr)).collect();
         let bool_ty = Ty::Elem(Elem::Bool);
         let (ret, hint): (Ty, Option<Ty>) = match b {
+            Builtin::Advance => {
+                // [tests.time]: mocked time exists only in TEST blocks.
+                if self.scope_kind() != Some(PouKind::Test) {
+                    let msg = "ADVANCE is only available in TEST blocks".to_string();
+                    self.diag(codes::UNKNOWN_NAME, msg, span, None);
+                }
+                let t = match vals.first() {
+                    Some(v) => {
+                        let st = self.strip(&v.ty);
+                        if matches!(st, Ty::Elem(e) if e.is_duration()) || st == Ty::Unknown {
+                            st
+                        } else {
+                            self.mismatch(&Ty::Elem(Elem::Time), v);
+                            Ty::Unknown
+                        }
+                    }
+                    None => Ty::Unknown,
+                };
+                (Ty::Unknown, Some(t))
+            }
             Builtin::AssertBool => {
                 if let Some(v) = vals.first() {
                     self.coerce(&bool_ty, v);

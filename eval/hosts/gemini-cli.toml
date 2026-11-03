@@ -1,4 +1,9 @@
+# Gemini CLI. NOT VERIFIED: check `gemini --help` once installed, then uncomment.
 name = "gemini-cli"
-# command = ""        # how to start the host non-interactively
-# model = ""
-# mcp_config = "../../agent/mcp/gemini-cli.json"
+ecosystem = "western"
+verified = "no"
+# command_with = ["gemini", "-p", "{prompt}", "--yolo"]
+# command_without = ["gemini", "-p", "{prompt}", "--yolo"]
+
+[with_files]
+".gemini/settings.json" = '{"mcpServers":{"rootplc":{"command":"rootplc","args":["mcp"]}}}'

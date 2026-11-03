@@ -7,3 +7,4 @@
 *.fmu.tmp
 .DS_Store
 npm-out/
+corpus/.cache/

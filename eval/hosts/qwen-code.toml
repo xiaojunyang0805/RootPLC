@@ -1,4 +1,9 @@
+# Qwen Code (Gemini CLI fork). NOT VERIFIED: check `qwen --help` once installed.
 name = "qwen-code"
-# command = ""        # how to start the host non-interactively
-# model = ""
-# mcp_config = "../../agent/mcp/qwen-code.json"
+ecosystem = "chinese"
+verified = "no"
+# command_with = ["qwen", "-p", "{prompt}", "--yolo"]
+# command_without = ["qwen", "-p", "{prompt}", "--yolo"]
+
+[with_files]
+".qwen/settings.json" = '{"mcpServers":{"rootplc":{"command":"rootplc","args":["mcp"]}}}'
