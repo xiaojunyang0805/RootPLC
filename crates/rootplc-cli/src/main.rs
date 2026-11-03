@@ -205,11 +205,15 @@ fn cmd_init(dir: Option<&String>, name: Option<&str>) -> ExitCode {
 
 fn main() -> ExitCode {
     let args = Args::parse();
+    if args.positional.iter().any(|a| a == "--version" || a == "-V") {
+        println!("rootplc {}", env!("CARGO_PKG_VERSION"));
+        return ExitCode::SUCCESS;
+    }
+    if args.positional.iter().any(|a| a == "--help" || a == "-h") {
+        println!("{USAGE}");
+        return ExitCode::SUCCESS;
+    }
     let Some(first) = args.positional.first() else {
-        if std::env::args().any(|a| a == "--version" || a == "-V") {
-            println!("rootplc {}", env!("CARGO_PKG_VERSION"));
-            return ExitCode::SUCCESS;
-        }
         eprintln!("{USAGE}");
         return ExitCode::from(2);
     };

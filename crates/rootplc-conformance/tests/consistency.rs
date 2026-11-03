@@ -61,3 +61,11 @@ fn cases_execute_and_assertions_hold() {
 fn example_tests_pass() {
     assert_clean("example tests", rc::test_examples(&rc::repo_root()));
 }
+
+#[test]
+fn embedded_spec_copies_match() {
+    assert_clean(
+        "embedded assets",
+        rc::check_embedded_assets(&rc::repo_root()),
+    );
+}

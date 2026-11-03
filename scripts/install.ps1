@@ -18,7 +18,7 @@ try {
     } catch {
         Write-Host 'rootplc: no release binary found; building from source with cargo.'
         if (-not (Get-Command cargo -ErrorAction SilentlyContinue)) { throw 'install Rust first: https://rustup.rs' }
-        cargo install --locked --git "https://github.com/$repo" rootplc-cli
+        cargo install --locked --git "https://github.com/$repo" rootplc
         return
     }
     $expected = ((Get-Content (Join-Path $tmp "$asset.sha256")) -split '\s+')[0].ToLower()

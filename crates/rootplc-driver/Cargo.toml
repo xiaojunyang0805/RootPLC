@@ -12,14 +12,8 @@ authors.workspace = true
 rootplc-diag.workspace = true
 rootplc-syntax.workspace = true
 rootplc-sema.workspace = true
-rootplc-stdlib.workspace = true
 rootplc-vm.workspace = true
 rootplc-testing.workspace = true
-rootplc-codegen-c.workspace = true
-rootplc-verify.workspace = true
-rootplc-interchange.workspace = true
-rootplc-graph.workspace = true
-rootplc-sim.workspace = true
 
 [lints]
 workspace = true

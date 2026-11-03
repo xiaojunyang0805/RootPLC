@@ -15,7 +15,11 @@ curl -fsSL https://raw.githubusercontent.com/xiaojunyang0805/RootPLC/main/script
 # Windows (PowerShell)
 irm https://raw.githubusercontent.com/xiaojunyang0805/RootPLC/main/scripts/install.ps1 | iex
 # Any platform with Rust
-cargo install --locked --git https://github.com/xiaojunyang0805/RootPLC rootplc-cli
+cargo install rootplc            # after the first release
+cargo install --locked --git https://github.com/xiaojunyang0805/RootPLC rootplc
+# Agent hosts that launch MCP servers with npx or uvx
+npx -y rootplc mcp
+uvx rootplc mcp
 ```
 
 The scripts download a checksummed release binary, or build with cargo if no

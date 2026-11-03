@@ -1,0 +1,27 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-09-29/server.schema.json",
+  "name": "com.rootplc/rootplc",
+  "title": "RootPLC",
+  "description": "Check, test and run IEC 61131-3 Structured Text (PLC code): diagnostics with stable codes, TEST blocks in a deterministic VM.",
+  "repository": {
+    "url": "https://github.com/xiaojunyang0805/RootPLC",
+    "source": "github"
+  },
+  "version": "0.0.1",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "rootplc",
+      "version": "0.0.1",
+      "transport": { "type": "stdio" },
+      "packageArguments": [{ "type": "positional", "value": "mcp" }]
+    },
+    {
+      "registryType": "pypi",
+      "identifier": "rootplc",
+      "version": "0.0.1",
+      "transport": { "type": "stdio" },
+      "packageArguments": [{ "type": "positional", "value": "mcp" }]
+    }
+  ]
+}

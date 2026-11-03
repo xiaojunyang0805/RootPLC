@@ -3,12 +3,8 @@
 version = 4
 
 [[package]]
-name = "rootplc-abi"
-version = "0.0.0"
-
-[[package]]
-name = "rootplc-cli"
-version = "0.0.0"
+name = "rootplc"
+version = "0.0.1"
 dependencies = [
  "rootplc-diag",
  "rootplc-driver",
@@ -16,8 +12,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "rootplc-abi"
+version = "0.0.1"
+
+[[package]]
 name = "rootplc-codegen-c"
-version = "0.0.0"
+version = "0.0.1"
 dependencies = [
  "rootplc-abi",
  "rootplc-sema",
@@ -25,7 +25,7 @@ dependencies = [
 
 [[package]]
 name = "rootplc-conformance"
-version = "0.0.0"
+version = "0.0.1"
 dependencies = [
  "rootplc-diag",
  "rootplc-sema",
@@ -35,42 +35,36 @@ dependencies = [
 
 [[package]]
 name = "rootplc-diag"
-version = "0.0.0"
+version = "0.0.1"
 
 [[package]]
 name = "rootplc-driver"
-version = "0.0.0"
+version = "0.0.1"
 dependencies = [
- "rootplc-codegen-c",
  "rootplc-diag",
- "rootplc-graph",
- "rootplc-interchange",
  "rootplc-sema",
- "rootplc-sim",
- "rootplc-stdlib",
  "rootplc-syntax",
  "rootplc-testing",
- "rootplc-verify",
  "rootplc-vm",
 ]
 
 [[package]]
 name = "rootplc-fieldbus"
-version = "0.0.0"
+version = "0.0.1"
 dependencies = [
  "rootplc-abi",
 ]
 
 [[package]]
 name = "rootplc-graph"
-version = "0.0.0"
+version = "0.0.1"
 dependencies = [
  "rootplc-syntax",
 ]
 
 [[package]]
 name = "rootplc-interchange"
-version = "0.0.0"
+version = "0.0.1"
 dependencies = [
  "rootplc-diag",
  "rootplc-syntax",
@@ -78,7 +72,7 @@ dependencies = [
 
 [[package]]
 name = "rootplc-mcp"
-version = "0.0.0"
+version = "0.0.1"
 dependencies = [
  "rootplc-diag",
  "rootplc-driver",
@@ -86,7 +80,7 @@ dependencies = [
 
 [[package]]
 name = "rootplc-runtime"
-version = "0.0.0"
+version = "0.0.1"
 dependencies = [
  "rootplc-abi",
  "rootplc-fieldbus",
@@ -94,7 +88,7 @@ dependencies = [
 
 [[package]]
 name = "rootplc-sema"
-version = "0.0.0"
+version = "0.0.1"
 dependencies = [
  "rootplc-diag",
  "rootplc-syntax",
@@ -102,7 +96,7 @@ dependencies = [
 
 [[package]]
 name = "rootplc-sim"
-version = "0.0.0"
+version = "0.0.1"
 dependencies = [
  "rootplc-abi",
  "rootplc-vm",
@@ -110,18 +104,18 @@ dependencies = [
 
 [[package]]
 name = "rootplc-stdlib"
-version = "0.0.0"
+version = "0.0.1"
 
 [[package]]
 name = "rootplc-syntax"
-version = "0.0.0"
+version = "0.0.1"
 dependencies = [
  "rootplc-diag",
 ]
 
 [[package]]
 name = "rootplc-testing"
-version = "0.0.0"
+version = "0.0.1"
 dependencies = [
  "rootplc-sema",
  "rootplc-vm",
@@ -129,7 +123,7 @@ dependencies = [
 
 [[package]]
 name = "rootplc-verify"
-version = "0.0.0"
+version = "0.0.1"
 dependencies = [
  "rootplc-codegen-c",
  "rootplc-sema",
@@ -137,7 +131,7 @@ dependencies = [
 
 [[package]]
 name = "rootplc-vm"
-version = "0.0.0"
+version = "0.0.1"
 dependencies = [
  "rootplc-diag",
  "rootplc-sema",
@@ -146,7 +140,7 @@ dependencies = [
 
 [[package]]
 name = "rootplc-wasm"
-version = "0.0.0"
+version = "0.0.1"
 dependencies = [
  "rootplc-driver",
 ]

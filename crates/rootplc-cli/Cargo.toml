@@ -1,6 +1,10 @@
 [package]
-name = "rootplc-cli"
-description = "The rootplc command-line tool."
+name = "rootplc"
+description = "Agent-first IEC 61131-3 toolchain: check, test and run PLC Structured Text; MCP server for AI agents."
+readme = "README.md"
+keywords = ["plc", "iec-61131-3", "structured-text", "mcp", "automation"]
+categories = ["command-line-utilities", "compilers", "development-tools::testing"]
+homepage.workspace = true
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

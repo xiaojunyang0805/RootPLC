@@ -6,3 +6,4 @@
 /web/playground/dist
 *.fmu.tmp
 .DS_Store
+npm-out/

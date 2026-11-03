@@ -1,0 +1,38 @@
+{
+  "name": "rootplc",
+  "version": "0.0.1",
+  "mcpName": "com.rootplc/rootplc",
+  "description": "Agent-first IEC 61131-3 toolchain: check, test and run PLC Structured Text; MCP server for AI agents.",
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/xiaojunyang0805/RootPLC",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/xiaojunyang0805/RootPLC.git"
+  },
+  "keywords": [
+    "plc",
+    "iec-61131-3",
+    "structured-text",
+    "mcp",
+    "mcp-server",
+    "automation",
+    "codesys"
+  ],
+  "bin": {
+    "rootplc": "bin/rootplc.js"
+  },
+  "files": [
+    "bin",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "optionalDependencies": {
+    "@rootplc/linux-x64": "0.0.1",
+    "@rootplc/linux-arm64": "0.0.1",
+    "@rootplc/darwin-arm64": "0.0.1",
+    "@rootplc/darwin-x64": "0.0.1",
+    "@rootplc/win32-x64": "0.0.1"
+  }
+}

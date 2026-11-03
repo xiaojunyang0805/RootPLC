@@ -1,0 +1,234 @@
+# Diagnostic code registry: the machine-readable source for spec/11-diagnostics.md
+# and `rootplc explain`. Codes are permanent: never reuse or renumber one.
+# A retired code stays here with `retired = true`.
+# stage: the compiler phase that reports it (lex, parse, sema). The conformance
+# runner uses it to decide which expectations each implemented phase must meet.
+#
+# Ranges: RP0001-0099 lexical, RP0100-0199 types, RP0200-0299 declarations and POUs,
+#         RP0300-0399 statements and expressions, RP0400-0499 tasks/config,
+#         RP0500-0599 tests, RP0600-0699 properties, RP0700-0799 graphical text,
+#         RP0800-0899 project manifest.
+
+[[code]]
+id = "RP0001"
+severity = "error"
+summary = "unterminated block comment"
+spec = "lexical.comment.unterminated"
+stage = "lex"
+
+[[code]]
+id = "RP0002"
+severity = "error"
+summary = "unterminated string literal"
+spec = "lexical.literal.string"
+stage = "lex"
+
+[[code]]
+id = "RP0003"
+severity = "warning"
+summary = "comment opener inside a block comment; comments do not nest"
+spec = "lexical.comment.nesting"
+stage = "lex"
+
+[[code]]
+id = "RP0004"
+severity = "error"
+summary = "keyword used as an identifier"
+spec = "lexical.keyword"
+stage = "parse"
+
+[[code]]
+id = "RP0005"
+severity = "error"
+summary = "invalid character in source"
+spec = "lexical.source.charset"
+stage = "lex"
+
+[[code]]
+id = "RP0006"
+severity = "warning"
+summary = "consecutive underscores in identifier"
+spec = "lexical.identifier.underscore"
+stage = "lex"
+
+[[code]]
+id = "RP0007"
+severity = "error"
+summary = "misplaced underscore in numeric literal"
+spec = "lexical.literal.underscore"
+stage = "lex"
+
+[[code]]
+id = "RP0008"
+severity = "error"
+summary = "malformed numeric or character literal"
+spec = "lexical.literal.integer"
+stage = "lex"
+
+[[code]]
+id = "RP0009"
+severity = "error"
+summary = "character outside Latin-1 in STRING literal; use a WSTRING literal"
+spec = "lexical.literal.string.latin1"
+stage = "lex"
+
+[[code]]
+id = "RP0010"
+severity = "error"
+summary = "unknown escape sequence"
+spec = "lexical.literal.escape"
+stage = "lex"
+
+[[code]]
+id = "RP0011"
+severity = "error"
+summary = "malformed duration or date/time literal"
+spec = "lexical.literal.duration"
+stage = "lex"
+
+[[code]]
+id = "RP0012"
+severity = "error"
+summary = "date or time value out of range"
+spec = "lexical.literal.date"
+stage = "lex"
+
+[[code]]
+id = "RP0013"
+severity = "warning"
+summary = "unknown pragma, ignored"
+spec = "lexical.pragma"
+stage = "lex"
+
+[[code]]
+id = "RP0014"
+severity = "error"
+summary = "unknown type name in typed literal"
+spec = "lexical.literal.typed"
+stage = "lex"
+
+[[code]]
+id = "RP0015"
+severity = "error"
+summary = "unterminated pragma"
+spec = "lexical.pragma"
+stage = "lex"
+
+[[code]]
+id = "RP0016"
+severity = "error"
+summary = "malformed directly represented variable"
+spec = "lexical.direct-variable"
+stage = "lex"
+
+[[code]]
+id = "RP0201"
+severity = "error"
+summary = "syntax error: unexpected token"
+spec = "syntax.general"
+stage = "parse"
+
+[[code]]
+id = "RP0202"
+severity = "error"
+summary = "block is never closed: missing END keyword"
+spec = "pous.end"
+stage = "parse"
+
+[[code]]
+id = "RP0301"
+severity = "error"
+summary = "missing ';' at end of statement or declaration"
+spec = "statements.terminator"
+stage = "parse"
+
+[[code]]
+id = "RP0101"
+severity = "error"
+summary = "overflow or division by zero in constant expression"
+spec = "types.int.overflow"
+stage = "sema"
+
+[[code]]
+id = "RP0102"
+severity = "error"
+summary = "literal out of range for its type"
+spec = "types.literal.range"
+stage = "sema"
+
+[[code]]
+id = "RP0103"
+severity = "error"
+summary = "implicit conversion not allowed; use an explicit conversion function"
+spec = "types.conversion.implicit"
+stage = "sema"
+
+[[code]]
+id = "RP0104"
+severity = "error"
+summary = "generic type used in a user declaration"
+spec = "types.generic"
+stage = "sema"
+
+[[code]]
+id = "RP0105"
+severity = "error"
+summary = "constant outside subrange"
+spec = "types.derived.subrange"
+stage = "sema"
+
+[[code]]
+id = "RP0106"
+severity = "error"
+summary = "ambiguous enumeration value; qualify it as Type#Value"
+spec = "types.derived.enum"
+stage = "sema"
+
+[[code]]
+id = "RP0107"
+severity = "error"
+summary = "structure contains itself"
+spec = "types.derived.struct"
+stage = "sema"
+
+[[code]]
+id = "RP0108"
+severity = "error"
+summary = "invalid bounds or length"
+spec = "types.derived.array"
+stage = "sema"
+
+[[code]]
+id = "RP0109"
+severity = "error"
+summary = "constant array index out of bounds"
+spec = "types.derived.array"
+stage = "sema"
+
+[[code]]
+id = "RP0110"
+severity = "warning"
+summary = "string literal longer than declared length; it will be truncated"
+spec = "types.derived.string"
+stage = "sema"
+
+[[code]]
+id = "RP0111"
+severity = "error"
+summary = "unknown type name"
+spec = "types.derived.alias"
+stage = "sema"
+
+[[code]]
+id = "RP0203"
+severity = "error"
+summary = "unknown name"
+spec = "variables.resolution"
+stage = "sema"
+
+[[code]]
+id = "RP0204"
+severity = "error"
+summary = "name declared twice in the same POU"
+spec = "variables.unique"
+stage = "sema"

@@ -674,6 +674,37 @@ pub fn lex_examples(root: &Path) -> Result<Vec<String>, String> {
     Ok(problems)
 }
 
+/// The spec files and the AGENTS.md template embedded in `rootplc-driver`
+/// (so that `cargo publish` can package them) must equal the originals.
+pub fn check_embedded_assets(root: &Path) -> Result<Vec<String>, String> {
+    let assets = root.join("crates/rootplc-driver/assets");
+    let mut pairs: Vec<(PathBuf, PathBuf)> = vec![(
+        root.join("agent/templates/AGENTS.md"),
+        assets.join("AGENTS.md"),
+    )];
+    for entry in fs::read_dir(assets.join("spec")).map_err(|e| e.to_string())? {
+        let copy = entry.map_err(|e| e.to_string())?.path();
+        let name = copy
+            .file_name()
+            .map(|n| n.to_os_string())
+            .unwrap_or_default();
+        pairs.push((root.join("spec").join(name), copy));
+    }
+    let mut problems = Vec::new();
+    for (orig, copy) in pairs {
+        let a = fs::read(&orig).map_err(|e| format!("{}: {e}", orig.display()))?;
+        let b = fs::read(&copy).map_err(|e| format!("{}: {e}", copy.display()))?;
+        if a != b {
+            problems.push(format!(
+                "{} differs from {}; copy the original over it",
+                copy.display(),
+                orig.display()
+            ));
+        }
+    }
+    Ok(problems)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -1,0 +1,33 @@
+# PyPI distribution of the rootplc binary (wheels built by maturin).
+#   pipx install rootplc      or      uvx rootplc mcp
+[build-system]
+requires = ["maturin>=1.7,<2"]
+build-backend = "maturin"
+
+[project]
+name = "rootplc"
+description = "Agent-first IEC 61131-3 toolchain: check, test and run PLC Structured Text; MCP server for AI agents."
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "Apache-2.0" }
+keywords = ["plc", "iec-61131-3", "structured-text", "mcp", "automation"]
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Manufacturing",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Rust",
+    "Topic :: Software Development :: Compilers",
+    "Topic :: Software Development :: Testing",
+]
+dynamic = ["version"]
+
+[project.urls]
+Homepage = "https://github.com/xiaojunyang0805/RootPLC"
+Repository = "https://github.com/xiaojunyang0805/RootPLC"
+Issues = "https://github.com/xiaojunyang0805/RootPLC/issues"
+
+[tool.maturin]
+bindings = "bin"
+strip = true

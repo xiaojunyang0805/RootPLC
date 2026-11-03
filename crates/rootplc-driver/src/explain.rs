@@ -2,33 +2,33 @@
 //! defines it. The registry and the spec chapters are compiled in, so the
 //! explanation always matches the toolchain version.
 
-const REGISTRY: &str = include_str!("../../../spec/diagnostics.toml");
+const REGISTRY: &str = include_str!("../assets/spec/diagnostics.toml");
 
 const SPEC: &[(&str, &str)] = &[
     (
         "spec/01-lexical.md",
-        include_str!("../../../spec/01-lexical.md"),
+        include_str!("../assets/spec/01-lexical.md"),
     ),
     (
         "spec/02-types.md",
-        include_str!("../../../spec/02-types.md"),
+        include_str!("../assets/spec/02-types.md"),
     ),
     (
         "spec/03-variables.md",
-        include_str!("../../../spec/03-variables.md"),
+        include_str!("../assets/spec/03-variables.md"),
     ),
-    ("spec/04-pous.md", include_str!("../../../spec/04-pous.md")),
+    ("spec/04-pous.md", include_str!("../assets/spec/04-pous.md")),
     (
         "spec/05-statements.md",
-        include_str!("../../../spec/05-statements.md"),
+        include_str!("../assets/spec/05-statements.md"),
     ),
     (
         "spec/07-test-blocks.md",
-        include_str!("../../../spec/07-test-blocks.md"),
+        include_str!("../assets/spec/07-test-blocks.md"),
     ),
     (
         "spec/08-stdlib.md",
-        include_str!("../../../spec/08-stdlib.md"),
+        include_str!("../assets/spec/08-stdlib.md"),
     ),
 ];
 

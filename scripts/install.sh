@@ -21,7 +21,7 @@ esac
 fallback() {
   echo "rootplc: no release binary for this platform; building from source with cargo." >&2
   command -v cargo >/dev/null || { echo "install Rust first: https://rustup.rs" >&2; exit 1; }
-  cargo install --locked --git "https://github.com/$REPO" rootplc-cli
+  cargo install --locked --git "https://github.com/$REPO" rootplc
   exit 0
 }
 

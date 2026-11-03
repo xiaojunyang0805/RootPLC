@@ -1,5 +1,10 @@
-# Release binaries for the one-line installers (scripts/install.sh, install.ps1).
-# Trigger: push a tag v*. Each asset ships with a .sha256 file.
+# Release: one tag v<version> builds every artifact and publishes every channel.
+#   GitHub release  binaries + .sha256 (used by scripts/install.sh, install.ps1)
+#   crates.io       rootplc and its library crates     (cargo install rootplc)
+#   npm             rootplc + @rootplc/<platform>      (npx -y rootplc mcp)
+#   PyPI            rootplc wheels                     (uvx rootplc mcp)
+# Publishing to the registries runs only when the repository variable
+# PUBLISH is "true" (set it once the accounts exist; see the accounts work note).
 # Planned next: Sigstore signatures and a CycloneDX SBOM.
 name: release
 on:
@@ -7,10 +12,27 @@ on:
     tags: ['v*']
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - uses: actions/checkout@v5
+      - id: v
+        name: Tag must match the workspace version
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          cargo_version=$(grep -m1 '^version = ' Cargo.toml | cut -d'"' -f2)
+          npm_version=$(node -p "require('./npm/rootplc/package.json').version")
+          [ "$tag" = "$cargo_version" ] || { echo "tag $tag != Cargo.toml $cargo_version"; exit 1; }
+          [ "$tag" = "$npm_version" ] || { echo "tag $tag != npm/rootplc/package.json $npm_version"; exit 1; }
+          echo "version=$tag" >> "$GITHUB_OUTPUT"
+
   build:
+    needs: version
     strategy:
       fail-fast: false
       matrix:
@@ -27,7 +49,7 @@ jobs:
         with:
           targets: ${{ matrix.target }}
       - run: cargo test --workspace --release
-      - run: cargo build --release --locked -p rootplc-cli --target ${{ matrix.target }}
+      - run: cargo build --release --locked -p rootplc --target ${{ matrix.target }}
       - name: Package
         shell: bash
         run: |
@@ -43,16 +65,43 @@ jobs:
           else shasum -a 256 "$name.${{ matrix.ext }}" > "$name.${{ matrix.ext }}.sha256"; fi
       - uses: actions/upload-artifact@v4
         with:
-          name: rootplc-${{ matrix.target }}
+          name: bin-${{ matrix.target }}
           path: rootplc-${{ matrix.target }}.*
 
-  publish:
+  wheels:
+    needs: version
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest, target: x86_64, manylinux: auto }
+          - { os: ubuntu-24.04-arm, target: aarch64, manylinux: auto }
+          - { os: macos-latest, target: aarch64 }
+          - { os: macos-13, target: x86_64 }
+          - { os: windows-latest, target: x64 }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: PyO3/maturin-action@v1
+        with:
+          target: ${{ matrix.target }}
+          manylinux: ${{ matrix.manylinux || 'off' }}
+          args: --release --out dist -m crates/rootplc-cli/Cargo.toml
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheel-${{ matrix.os }}-${{ matrix.target }}
+          path: dist/*.whl
+
+  github-release:
     needs: build
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v5
       - uses: actions/download-artifact@v4
         with:
+          pattern: bin-*
           path: dist
           merge-multiple: true
       - name: Create release
@@ -63,3 +112,69 @@ jobs:
             --title "rootplc ${GITHUB_REF_NAME}" \
             --notes "Install: see README. Each archive has a .sha256 checksum." \
             --prerelease
+
+  crates-io:
+    needs: build
+    if: vars.PUBLISH == 'true'
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - id: auth
+        uses: rust-lang/crates-io-auth-action@v1
+        continue-on-error: true   # first release: trusted publishing is not set up yet
+      - name: Publish all crates in dependency order
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token || secrets.CARGO_REGISTRY_TOKEN }}
+        run: cargo publish --workspace --locked
+
+  npm:
+    needs: [version, build]
+    if: vars.PUBLISH == 'true'
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: bin-*
+          path: dist
+          merge-multiple: true
+      - name: Unpack binaries
+        run: |
+          for a in dist/*.tar.gz; do t=$(basename "$a" .tar.gz); t=${t#rootplc-}; mkdir -p "bin/$t"; tar xzf "$a" -C "bin/$t"; done
+          for a in dist/*.zip; do t=$(basename "$a" .zip); t=${t#rootplc-}; mkdir -p "bin/$t"; unzip -q "$a" -d "bin/$t"; done
+      - run: node npm/build.mjs "${{ needs.version.outputs.version }}" bin npm-out
+      - name: Publish platform packages, then the launcher
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}   # empty once trusted publishing is configured
+        run: |
+          for d in npm-out/*/; do
+            [ "$(basename "$d")" = rootplc ] && continue
+            (cd "$d" && npm publish --access public --provenance)
+          done
+          (cd npm-out/rootplc && npm publish --access public --provenance)
+
+  pypi:
+    needs: wheels
+    if: vars.PUBLISH == 'true'
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: wheel-*
+          path: dist
+          merge-multiple: true
+      - uses: pypa/gh-action-pypi-publish@release/v1
