@@ -298,8 +298,32 @@ def rootplc() -> str:
     return shutil.which("rootplc") or sys.exit("build rootplc first: cargo build --release")
 
 
+def shipped_libraries(exe: str) -> dict[str, str]:
+    """Compatibility libraries this rootplc bundles: lower-case name -> name."""
+    r = subprocess.run([exe, "libraries", "--json"], capture_output=True, text=True, encoding="utf-8")
+    try:
+        return {l["name"].lower(): l["name"] for l in json.loads(r.stdout)["libraries"]}
+    except (ValueError, KeyError):
+        return {}
+
+
+def libraries_for(folder: Path, fmt: str, shipped: dict[str, str]) -> list[str]:
+    """The bundled libraries a project folder activates: those its .plcproj
+    references (libraries.txt, see extract) plus TwinCAT_BuiltIns for every
+    TwinCAT project. Out of band only; never inferred from the code."""
+    refs = []
+    lt = folder / "libraries.txt"
+    if lt.exists():
+        refs = [x.strip() for x in lt.read_text(encoding="utf-8").split() if x.strip()]
+    libs = [shipped[r.lower()] for r in refs if r.lower() in shipped]
+    if fmt == "twincat" and "twincat_builtins" in shipped:
+        libs.append(shipped["twincat_builtins"])
+    return sorted(set(libs))
+
+
 def analyse() -> None:
     exe = rootplc()
+    shipped = shipped_libraries(exe)
     results = []
     all_codes, all_features = Counter(), Counter()
     for p in projects():
@@ -324,13 +348,15 @@ def analyse() -> None:
         # one check per sub-project folder (see extract); files directly in d
         # form a project of their own
         subdirs = sorted(x for x in d.iterdir() if x.is_dir())
-        targets = [[str(x)] for x in subdirs]
+        targets = [([str(x)], x) for x in subdirs]
         top = [str(f) for f in files if f.parent == d]
         if top:
-            targets.append(top)
+            targets.append((top, d))
         per_file: dict[str, list] = {}
-        for t in targets:
-            r = subprocess.run([exe, "check", *t, "--json"], capture_output=True, text=True, encoding="utf-8")
+        for t, folder in targets:
+            libs = libraries_for(folder, p["format"], shipped)
+            extra = ["--library", ",".join(libs)] if libs else []
+            r = subprocess.run([exe, "check", *t, *extra, "--json"], capture_output=True, text=True, encoding="utf-8")
             rep = json.loads(r.stdout) if r.stdout.strip().startswith("{") else {}
             for diag in rep.get("diagnostics", []):
                 if diag["severity"] == "error":
