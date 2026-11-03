@@ -222,6 +222,8 @@ pub(crate) struct Checker<'a> {
     struct_base: HashMap<usize, (usize, usize)>,
     /// While set, a REFERENCE TO variable denotes the reference itself.
     raw_alias: bool,
+    /// Property accessor definition -> (its PROPERTY node, is the getter).
+    prop_info: HashMap<usize, (&'a Node, bool)>,
     /// Diagnostics with the index of their file.
     pub(crate) diags: Vec<(usize, Diagnostic)>,
 }
@@ -286,6 +288,7 @@ impl<'a> Checker<'a> {
             abstract_fbs: HashSet::new(),
             struct_base: HashMap::new(),
             raw_alias: false,
+            prop_info: HashMap::new(),
             diags: Vec::new(),
         };
         // [stdlib.fbs]
@@ -628,6 +631,34 @@ impl<'a> Checker<'a> {
                                 self.owner.insert(mid, fb);
                             }
                         }
+                        // [pous.oop.property]: GET and SET become methods P#get / P#set
+                        for pr in self.child_nodes(n, N::Property) {
+                            let Some(pt) = self.decl_name(pr) else {
+                                continue;
+                            };
+                            let mut accs: Vec<(&'a Node, bool)> = Vec::new();
+                            accs.extend(
+                                self.child_nodes(pr, N::PropertyGet)
+                                    .into_iter()
+                                    .map(|a| (a, true)),
+                            );
+                            accs.extend(
+                                self.child_nodes(pr, N::PropertySet)
+                                    .into_iter()
+                                    .map(|a| (a, false)),
+                            );
+                            if accs.is_empty() {
+                                accs.push((pr, true)); // an interface property: its getter
+                            }
+                            for (acc, get) in accs {
+                                let suffix = if get { "get" } else { "set" };
+                                let full = format!("{}.{}#{suffix}", self.text(t), self.text(pt));
+                                let ps = self.tok_span(pt);
+                                let aid = self.add_def(&full, Kind::Pending, Some(acc), ps);
+                                self.owner.insert(aid, fb);
+                                self.prop_info.insert(aid, (pr, get));
+                            }
+                        }
                     }
                 }
                 N::GlobalVarList => self.collect_global_sections(n),
@@ -816,6 +847,126 @@ impl<'a> Checker<'a> {
                 V::with(*t, span, ExprKind::Deref(Box::new(v.ir())))
             }
             _ => v,
+        }
+    }
+
+    /// A call of a property accessor (or any method) as an expression.
+    #[allow(clippy::too_many_arguments)]
+    fn accessor_call(
+        &self,
+        inst: ir::Expr,
+        fb: usize,
+        def: usize,
+        dispatch: bool,
+        inputs: Vec<(usize, ir::Expr)>,
+        ty: Ty,
+        span: Span,
+    ) -> ir::Expr {
+        let call = ir::Call {
+            target: CallTarget::Method {
+                inst,
+                fb,
+                method: def,
+                name: self.method_name(def).to_string(),
+                dispatch,
+            },
+            inputs,
+            outputs: Vec::new(),
+            args: Vec::new(),
+        };
+        ir::Expr {
+            ty,
+            kind: ExprKind::Call(Box::new(call)),
+            span,
+        }
+    }
+
+    /// `SUPER^.P`: the base expression denotes the current instance seen as
+    /// a base block (no dispatch).
+    fn is_super_ir(&self, e: &ir::Expr) -> bool {
+        let this = match &e.kind {
+            ExprKind::Deref(r) => match &r.kind {
+                ExprKind::Ref(x) if matches!(x.kind, ExprKind::This) => Some(&x.ty),
+                _ => None,
+            },
+            _ => None,
+        };
+        match (this, self.current_fb()) {
+            (Some(Ty::Named(t)), Some(fb)) => *t != fb,
+            _ => false,
+        }
+    }
+
+    /// `x.P := v` or `P := v` where P is a property: a call of its setter,
+    /// [pous.oop.property]. `None` when the target is not a property.
+    fn property_assign(&mut self, t: &'a Node, e: &'a Node) -> Option<Stmt> {
+        let span = self.span(t);
+        let (inst, fb, pname) = match t.kind {
+            N::MemberExpr => {
+                let its = self.items(t);
+                let (Some(Item::Node(b)), Some(Item::Tok(m))) =
+                    (its.first().copied(), its.get(2).copied())
+                else {
+                    return None;
+                };
+                let mark = self.diags.len();
+                let base = self.expr(b);
+                let fb = match self.strip(&base.ty) {
+                    Ty::Named(fb) => fb,
+                    _ => {
+                        self.diags.truncate(mark);
+                        return None;
+                    }
+                };
+                let name = self.text(m).to_string();
+                if self.method_lookup(fb, &format!("{name}#set")).is_none()
+                    || self.has_data_member(fb, &name)
+                {
+                    self.diags.truncate(mark);
+                    return None;
+                }
+                (base.ir(), fb, name)
+            }
+            N::NameRef => {
+                let Some(Item::Tok(i)) = self.items(t).first().copied() else {
+                    return None;
+                };
+                let name = self.text(i).to_string();
+                if self.lookup_var(&name).is_some() || self.lookup_owner_var(&name).is_some() {
+                    return None;
+                }
+                let fb = self.current_fb()?;
+                self.method_lookup(fb, &format!("{name}#set"))?;
+                (self.this_ir(fb, span), fb, name)
+            }
+            _ => return None,
+        };
+        let setter = self.method_lookup(fb, &format!("{pname}#set"))?;
+        let ty = match &self.defs[setter].kind {
+            Kind::Pou(p) => p.vars.first().map(|v| v.ty.clone()).unwrap_or(Ty::Unknown),
+            _ => Ty::Unknown,
+        };
+        let value = self.expr(e);
+        let value = self.adapt(&ty, value);
+        let dispatch = !self.is_super_ir(&inst);
+        let call = self.accessor_call(
+            inst,
+            fb,
+            setter,
+            dispatch,
+            vec![(0, value)],
+            Ty::Unknown,
+            span,
+        );
+        Some(Stmt::Eval(call))
+    }
+
+    /// Block or structure `id` has a variable or member called `name`.
+    fn has_data_member(&self, id: usize, name: &str) -> bool {
+        match &self.defs[id].kind {
+            Kind::Pou(p) => p.vars.iter().any(|v| v.name.eq_ignore_ascii_case(name)),
+            Kind::Struct(m) => m.iter().any(|v| v.name.eq_ignore_ascii_case(name)),
+            _ => false,
         }
     }
 
@@ -1009,8 +1160,14 @@ impl<'a> Checker<'a> {
                 for (name, _) in self.method_table(itf) {
                     if self.method_lookup(fb, &name).is_none() {
                         self.cur = self.defs[fb].file;
+                        let what = match name.split_once('#') {
+                            Some((p, acc)) => {
+                                format!("property '{p}' ({})", acc.to_ascii_uppercase())
+                            }
+                            None => format!("method '{name}'"),
+                        };
                         let msg = format!(
-                            "'{}' does not implement method '{name}' of interface '{}'",
+                            "'{}' does not implement {what} of interface '{}'",
                             self.defs[fb].name, self.defs[itf].name
                         );
                         let sp = self.defs[fb].span;
@@ -1196,6 +1353,43 @@ impl<'a> Checker<'a> {
             if let Some(ext) = find(N::Extends) {
                 self.struct_extends(id, ext);
             }
+            return;
+        }
+        if let Some(&(prop, get)) = self.prop_info.get(&id) {
+            // [pous.oop.property]: getter returns the property type; the
+            // setter's first input, named like the property, is the value
+            let ty = self
+                .child_nodes(prop, N::TypeSpec)
+                .first()
+                .copied()
+                .map_or(Ty::Unknown, |s| self.type_spec(s, None));
+            let mut vars = Vec::new();
+            if !get {
+                if let Some(pt) = self.decl_name(prop) {
+                    vars.push(Var {
+                        name: self.text(pt).to_string(),
+                        ty: ty.clone(),
+                        section: Section::Input,
+                        span: self.tok_span(pt),
+                        init: None,
+                        alias: false,
+                    });
+                }
+            }
+            if !std::ptr::eq(node, prop) {
+                for s in self.child_nodes(node, N::VarSection) {
+                    for d in self.child_nodes(s, N::VarDecl) {
+                        self.var_decl(d, Section::Local, &mut vars);
+                    }
+                }
+            }
+            self.defs[id].kind = Kind::Pou(Pou {
+                kind: PouKind::Method,
+                vars,
+                ret: if get { Some(ty) } else { None },
+                base: None,
+                inherited: 0,
+            });
             return;
         }
         if node.kind == N::Interface {
@@ -1837,6 +2031,11 @@ impl<'a> Checker<'a> {
                 ) else {
                     return None;
                 };
+                if self.tkind(op) == T::Assign {
+                    if let Some(st) = self.property_assign(t, e) {
+                        return Some(st);
+                    }
+                }
                 let target = self.expr(t);
                 let value = self.expr(e);
                 let value = if self.tkind(op) == T::Assign {
@@ -2043,7 +2242,10 @@ impl<'a> Checker<'a> {
         }
         let is_result = match p.kind {
             PouKind::Function => self.defs[id].name.eq_ignore_ascii_case(name),
-            PouKind::Method => self.method_name(id).eq_ignore_ascii_case(name),
+            PouKind::Method => self
+                .method_name(id)
+                .trim_end_matches("#get")
+                .eq_ignore_ascii_case(name),
             _ => false,
         };
         if is_result {
@@ -2346,6 +2548,25 @@ impl<'a> Checker<'a> {
                         let inst = self.this_ir(fb, span);
                         let v = V::with(t, span, ExprKind::Member(Box::new(inst), slot));
                         return self.alias_var(v, self.is_alias(name, Some(fb)));
+                    }
+                    if let Some(fb) = self.current_fb() {
+                        if let Some(getter) = self.method_lookup(fb, &format!("{name}#get")) {
+                            let ty = match &self.defs[getter].kind {
+                                Kind::Pou(p) => p.ret.clone().unwrap_or(Ty::Unknown),
+                                _ => Ty::Unknown,
+                            };
+                            let inst = self.this_ir(fb, span);
+                            let call = self.accessor_call(
+                                inst,
+                                fb,
+                                getter,
+                                true,
+                                Vec::new(),
+                                ty.clone(),
+                                span,
+                            );
+                            return V::with(ty, span, call.kind);
+                        }
                     }
                     if let Some((t, slot)) = self.lookup_global(name) {
                         let mut v = V::with(t, span, ExprKind::Global(slot));
@@ -2876,6 +3097,20 @@ impl<'a> Checker<'a> {
             ),
             _ => None,
         };
+        if matches!(found, Some(None) | None) {
+            // [pous.oop.property]: reading a property calls its getter
+            if let Some(getter) = self.method_lookup(id, &format!("{name}#get")) {
+                let ty = match &self.defs[getter].kind {
+                    Kind::Pou(p) => p.ret.clone().unwrap_or(Ty::Unknown),
+                    _ => Ty::Unknown,
+                };
+                let inst = base.ir();
+                let dispatch = !self.is_super_ir(&inst);
+                let call =
+                    self.accessor_call(inst, id, getter, dispatch, Vec::new(), ty.clone(), span);
+                return V::with(ty, span, call.kind);
+            }
+        }
         match found {
             Some(Some((i, t))) => V::with(t, span, ExprKind::Member(Box::new(base.ir()), i)),
             Some(None) => {

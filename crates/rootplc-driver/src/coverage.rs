@@ -3,7 +3,7 @@
 //!
 //! - `portable`: checks without errors; tests and the VM can run it.
 //! - `dialect`: has errors and uses constructs RootPLC does not support yet
-//!   (vendor extensions such as properties, actions, unions, SIZEOF). The
+//!   (vendor extensions such as actions, unions, SIZEOF). The
 //!   constructs are listed with their lines, so the cause is visible.
 //!   Implicit narrowing conversions (RP0103), which vendor compilers accept
 //!   and strict IEC 61131-3 does not, count as a dialect trait here.
@@ -131,7 +131,6 @@ impl Ctx<'_> {
 }
 
 const RULES: &[Rule] = &[
-    ("PROPERTY", false, |c, i| c.decl(i, "PROPERTY")),
     ("ACTION", false, |c, i| c.decl(i, "ACTION")),
     ("UNION", false, |c, i| c.is(i, "UNION")),
     ("VAR_INST / VAR_STAT", false, |c, i| {
@@ -326,7 +325,7 @@ mod tests {
     #[test]
     fn detects_constructs_on_tokens_only() {
         let src = "FUNCTION_BLOCK FB_A EXTENDS FB_Base\nVAR n : INT; u : UNION a : INT; END_UNION; END_VAR\n\
-                   n := SIZEOF(n); (* SIZEOF(n) in a comment *) s := 'UNION';\nTHIS^.x := __NEW(INT);\n{region main}\n{attribute 'hide'}\nEND_FUNCTION_BLOCK\nPROPERTY P : BOOL\nEND_PROPERTY";
+                   n := SIZEOF(n); (* SIZEOF(n) in a comment *) s := 'UNION';\nTHIS^.x := __NEW(INT);\n{region main}\n{attribute 'hide'}\nEND_FUNCTION_BLOCK\nACTION Act:\nEND_ACTION";
         let found = constructs(src);
         let n: Vec<_> = found.iter().map(|c| c.name).collect();
         assert_eq!(
@@ -336,7 +335,7 @@ mod tests {
                 "SIZEOF",
                 "__ system calls",
                 "vendor pragmas {..}",
-                "PROPERTY"
+                "ACTION"
             ]
         );
         assert_eq!(found[1].line, 3);
@@ -346,8 +345,8 @@ mod tests {
     }
 
     #[test]
-    fn property_only_as_declaration() {
-        assert!(names("PROGRAM p VAR property : INT; END_VAR END_PROGRAM").is_empty());
+    fn action_only_as_declaration() {
+        assert!(names("PROGRAM p VAR action : INT; END_VAR END_PROGRAM").is_empty());
     }
 
     #[test]

@@ -130,8 +130,13 @@ property = 'PROPERTY' { modifier } name ':' type_spec { var_section }
            [ 'SET' { var_section } statement_list 'END_SET' ] 'END_PROPERTY'
 ```
 
-`PROPERTY`, `GET` and `SET` are not reserved words. Properties are parsed;
-reading and writing them follows in a later revision.
+`PROPERTY`, `GET` and `SET` are not reserved words. Reading a property
+(`inst.P`, `THIS^.P`, `itf.P`, or `P` inside the block and its methods)
+runs its GET part, in which the property name holds the result. Assigning
+it (`inst.P := v`) runs its SET part, in which the property name holds the
+assigned value. GET and SET behave like methods: they are inherited, may be
+overridden (dynamic dispatch) and may be required by an interface. An
+interface property without GET or SET requires a GET part.
 
 **[pous.call.in-out]** A `VAR_IN_OUT` parameter refers to the caller's
 variable: changes made by the called function or function block are visible
