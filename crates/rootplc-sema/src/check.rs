@@ -210,6 +210,12 @@ pub(crate) struct Checker<'a> {
     configs: Vec<(usize, &'a Node)>,
     /// Method definition -> the function block or program it belongs to.
     owner: HashMap<usize, usize>,
+    /// Interface -> the interfaces it extends, [pous.oop.interface].
+    itf_bases: HashMap<usize, Vec<usize>>,
+    /// Function block -> the interfaces it names in IMPLEMENTS.
+    implements: HashMap<usize, Vec<usize>>,
+    /// Function blocks declared ABSTRACT.
+    abstract_fbs: HashSet<usize>,
     /// Diagnostics with the index of their file.
     pub(crate) diags: Vec<(usize, Diagnostic)>,
 }
@@ -269,6 +275,9 @@ impl<'a> Checker<'a> {
             globals_def: None,
             configs: Vec::new(),
             owner: HashMap::new(),
+            itf_bases: HashMap::new(),
+            implements: HashMap::new(),
+            abstract_fbs: HashSet::new(),
             diags: Vec::new(),
         };
         // [stdlib.fbs]
@@ -374,6 +383,7 @@ impl<'a> Checker<'a> {
         }
         self.check_globals();
         self.check_configs();
+        self.check_implements();
     }
 
     /// The typed IR of the project.
@@ -591,7 +601,7 @@ impl<'a> Checker<'a> {
                         }
                     }
                 }
-                N::Program | N::Function | N::FunctionBlock | N::Test => {
+                N::Program | N::Function | N::FunctionBlock | N::Test | N::Interface => {
                     if let Some(t) = self.decl_name(n) {
                         let span = self.tok_span(t);
                         let fb = self.add_def(self.text(t), Kind::Pending, Some(n), span);
@@ -638,10 +648,19 @@ impl<'a> Checker<'a> {
     /// Methods callable on an instance of `fb`: inherited first, overrides
     /// replacing them, [pous.oop.override].
     fn method_table(&self, fb: usize) -> Vec<(String, usize)> {
-        let mut table = match &self.defs[fb].kind {
-            Kind::Pou(p) => p.base.map(|b| self.method_table(b)).unwrap_or_default(),
+        let mut bases: Vec<usize> = match &self.defs[fb].kind {
+            Kind::Pou(p) => p.base.into_iter().collect(),
             _ => Vec::new(),
         };
+        bases.extend(self.itf_bases.get(&fb).cloned().unwrap_or_default());
+        let mut table: Vec<(String, usize)> = Vec::new();
+        for b in bases.into_iter().filter(|&b| b != fb) {
+            for (n, m) in self.method_table(b) {
+                if !table.iter().any(|(x, _)| x.eq_ignore_ascii_case(&n)) {
+                    table.push((n, m));
+                }
+            }
+        }
         let mut own: Vec<usize> = self
             .owner
             .iter()
@@ -762,6 +781,157 @@ impl<'a> Checker<'a> {
             x.kind == N::NameRef
                 && matches!(self.items(x).first(), Some(Item::Tok(t)) if self.is_kw(*t, "SUPER"))
         })
+    }
+
+    /// The interfaces named in the EXTENDS or IMPLEMENTS child of `node`;
+    /// names that are not interfaces are RP0111.
+    fn named_list(&mut self, node: &'a Node, kind: N, must_be_itf: bool) -> Vec<usize> {
+        let Some(list) = self.child_nodes(node, kind).first().copied() else {
+            return Vec::new();
+        };
+        let toks: Vec<usize> = self
+            .items(list)
+            .into_iter()
+            .filter_map(|i| match i {
+                Item::Tok(t) if self.tkind(t) == T::Ident => Some(t),
+                _ => None,
+            })
+            .collect();
+        let mut out = Vec::new();
+        for t in toks {
+            let name = self.text(t).to_string();
+            let found = self.types.get(&name.to_ascii_lowercase()).copied();
+            if let Some(i) = found {
+                self.resolve(i);
+            }
+            match found {
+                Some(i) if !must_be_itf || self.is_itf(&Ty::Named(i)) => out.push(i),
+                _ => {
+                    let sp = self.tok_span(t);
+                    self.diag(
+                        codes::UNKNOWN_TYPE,
+                        format!("'{name}' is not an interface"),
+                        sp,
+                        None,
+                    );
+                }
+            }
+        }
+        out
+    }
+
+    /// The type is an interface.
+    fn is_itf(&self, ty: &Ty) -> bool {
+        matches!(ty, Ty::Named(i) if matches!(&self.defs[*i].kind, Kind::Pou(p) if p.kind == PouKind::Interface))
+    }
+
+    /// Interface `i` is `t` or extends it.
+    fn itf_extends(&self, i: usize, t: usize, depth: usize) -> bool {
+        i == t
+            || (depth < 32
+                && self
+                    .itf_bases
+                    .get(&i)
+                    .is_some_and(|bs| bs.iter().any(|&b| self.itf_extends(b, t, depth + 1))))
+    }
+
+    /// Function block `fb` (or one of its bases) implements interface `t`.
+    fn implements_itf(&self, fb: usize, t: usize) -> bool {
+        let mut cur = Some(fb);
+        let mut guard = 0;
+        while let Some(c) = cur {
+            if self
+                .implements
+                .get(&c)
+                .is_some_and(|is| is.iter().any(|&i| self.itf_extends(i, t, 0)))
+            {
+                return true;
+            }
+            guard += 1;
+            if guard > 64 {
+                return false;
+            }
+            cur = match &self.defs[c].kind {
+                Kind::Pou(p) => p.base,
+                _ => None,
+            };
+        }
+        false
+    }
+
+    /// A value for a target of type `target`: a function-block instance
+    /// becomes a reference when the target is an interface it implements,
+    /// [pous.oop.interface-ref]; otherwise the usual conversion rules apply.
+    fn adapt(&mut self, target: &Ty, v: V) -> ir::Expr {
+        let tt = self.strip(target);
+        if let Ty::Named(t) = tt {
+            if self.is_itf(&tt) {
+                let vt = self.strip(&v.ty);
+                let span = v.span;
+                match vt {
+                    Ty::Named(s) if self.is_itf(&vt) => {
+                        if !self.itf_extends(s, t, 0) {
+                            self.mismatch(target, &v);
+                        }
+                        return v.ir();
+                    }
+                    Ty::Named(s) if matches!(&self.defs[s].kind, Kind::Pou(p) if matches!(p.kind, PouKind::FunctionBlock | PouKind::Program)) =>
+                    {
+                        if !self.implements_itf(s, t) {
+                            let msg = format!(
+                                "'{}' does not implement interface '{}'",
+                                self.defs[s].name, self.defs[t].name
+                            );
+                            self.diag(codes::IMPLICIT_CONVERSION, msg, span, None);
+                        }
+                        return ir::Expr {
+                            ty: target.clone(),
+                            kind: ExprKind::ToItf(Box::new(v.ir()), s),
+                            span,
+                        };
+                    }
+                    // NULL, or the TwinCAT idiom 0, clears the reference
+                    Ty::Null => return v.ir(),
+                    Ty::IntLit if v.k == Some(K::Int(0)) => {
+                        return ir::Expr {
+                            ty: Ty::Null,
+                            kind: ExprKind::Null,
+                            span,
+                        };
+                    }
+                    _ => {}
+                }
+            }
+        }
+        self.coerce(target, &v);
+        v.ir()
+    }
+
+    /// IMPLEMENTS: every method of every named interface exists, unless the
+    /// block is ABSTRACT, [pous.oop.implements].
+    fn check_implements(&mut self) {
+        let saved = self.cur;
+        let mut list: Vec<(usize, Vec<usize>)> = self.implements.clone().into_iter().collect();
+        list.sort_unstable();
+        for (fb, itfs) in list {
+            if self.abstract_fbs.contains(&fb) {
+                continue;
+            }
+            for itf in itfs {
+                for (name, _) in self.method_table(itf) {
+                    if self.method_lookup(fb, &name).is_none() {
+                        self.cur = self.defs[fb].file;
+                        let msg = format!(
+                            "'{}' does not implement method '{name}' of interface '{}'",
+                            self.defs[fb].name, self.defs[itf].name
+                        );
+                        let sp = self.defs[fb].span;
+                        self.diag(codes::UNKNOWN_NAME, msg, sp, None);
+                    }
+                }
+            }
+        }
+        self.cur = saved;
     }
 
     /// VAR_GLOBAL sections of a global list, a configuration or its resources.
@@ -936,6 +1106,30 @@ impl<'a> Checker<'a> {
                 self.defs[id].kind = Kind::Alias(ty);
             }
             return;
+        }
+        if node.kind == N::Interface {
+            // [pous.oop.interface]: the interfaces it extends
+            let bases = self.named_list(node, N::Extends, true);
+            self.itf_bases.insert(id, bases);
+            self.defs[id].kind = Kind::Pou(Pou {
+                kind: PouKind::Interface,
+                vars: Vec::new(),
+                ret: None,
+                base: None,
+                inherited: 0,
+            });
+            return;
+        }
+        if node.kind == N::FunctionBlock {
+            let itfs = self.named_list(node, N::Implements, true);
+            self.implements.insert(id, itfs);
+            if self
+                .items(node)
+                .iter()
+                .any(|i| matches!(i, Item::Tok(t) if self.is_kw(*t, "ABSTRACT")))
+            {
+                self.abstract_fbs.insert(id);
+            }
         }
         let kind = match node.kind {
             N::Program => PouKind::Program,
@@ -1511,10 +1705,12 @@ impl<'a> Checker<'a> {
                 };
                 let target = self.expr(t);
                 let value = self.expr(e);
-                if self.tkind(op) == T::Assign {
-                    self.coerce(&target.ty, &value);
-                }
-                Some(Stmt::Assign(target.ir(), value.ir()))
+                let value = if self.tkind(op) == T::Assign {
+                    self.adapt(&target.ty, value)
+                } else {
+                    value.ir()
+                };
+                Some(Stmt::Assign(target.ir(), value))
             }
             N::CallStmt => self.first_node(n).map(|c| Stmt::Eval(self.expr(c).ir())),
             N::IfStmt => {
@@ -1730,6 +1926,7 @@ impl<'a> Checker<'a> {
             K::Var(_)
                 | K::Global(_)
                 | K::This
+                | K::ToItf(..)
                 | K::Member(..)
                 | K::Index(..)
                 | K::Deref(_)
@@ -2381,6 +2578,29 @@ impl<'a> Checker<'a> {
                 _ => (Cls::Logic, BinOp::Xor),
             },
         };
+        // [pous.oop.interface-ref]: itf = other, itf <> NULL, itf <> 0
+        if matches!(bop, BinOp::Eq | BinOp::Ne)
+            && (self.is_itf(&self.strip(&l.ty)) || self.is_itf(&self.strip(&r.ty)))
+        {
+            let other_ok = |v: &V, me: &Self| {
+                let t = me.strip(&v.ty);
+                me.is_itf(&t) || t == Ty::Null || (t == Ty::IntLit && v.k == Some(K::Int(0)))
+            };
+            if other_ok(&l, self) && other_ok(&r, self) {
+                let opty = if self.is_itf(&self.strip(&l.ty)) {
+                    l.ty.clone()
+                } else {
+                    r.ty.clone()
+                };
+                let e = ExprKind::Binary {
+                    op: bop,
+                    opty,
+                    l: Box::new(l.ir()),
+                    r: Box::new(r.ir()),
+                };
+                return V::with(Ty::Elem(Elem::Bool), span, e);
+            }
+        }
         // [types.int.division]: constant divisor zero.
         if (opk == T::Slash || cls == Cls::Mod) && r.k == Some(K::Int(0)) {
             let hint = Some("the divisor is the constant 0".into());
@@ -2720,8 +2940,7 @@ impl<'a> Checker<'a> {
                         }
                         Some(s) => {
                             let val = self.expr(a.expr);
-                            self.coerce(&p.vars[s].ty, &val);
-                            let ir = val.ir();
+                            let ir = self.adapt(&p.vars[s].ty, val);
                             self.check_in_out_arg(p.vars[s].section, &p.vars[s].name, &ir);
                             inputs.push((s, ir));
                         }
@@ -2741,8 +2960,7 @@ impl<'a> Checker<'a> {
                 None => {
                     let val = self.expr(a.expr);
                     if let Some(&s) = input_slots.get(pos) {
-                        self.coerce(&p.vars[s].ty, &val);
-                        let ir = val.ir();
+                        let ir = self.adapt(&p.vars[s].ty, val);
                         self.check_in_out_arg(p.vars[s].section, &p.vars[s].name, &ir);
                         inputs.push((s, ir));
                     }

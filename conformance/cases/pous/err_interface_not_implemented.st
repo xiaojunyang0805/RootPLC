@@ -1,0 +1,9 @@
+(* spec: [pous.oop.implements]
+   expect: error RP0203 *)
+INTERFACE I_A
+METHOD M : INT
+END_METHOD
+END_INTERFACE
+
+FUNCTION_BLOCK FB_X IMPLEMENTS I_A
+END_FUNCTION_BLOCK

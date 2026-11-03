@@ -31,6 +31,29 @@ pub enum Value {
     Agg(Vec<Value>),
     /// Reference; `None` is NULL.
     Ref(Option<Loc>),
+    /// Interface reference: an instance and its block; `None` is NULL,
+    /// [pous.oop.interface-ref].
+    Obj(Option<(Loc, usize)>),
+}
+
+/// The instance a THIS or THIS^ expression denotes.
+fn is_this_expr(e: &Expr) -> bool {
+    match &e.kind {
+        ExprKind::This => true,
+        ExprKind::Deref(r) => {
+            matches!(&r.kind, ExprKind::Ref(x) if matches!(x.kind, ExprKind::This))
+        }
+        _ => false,
+    }
+}
+
+/// Null-ness and target of a reference-like value, for comparisons.
+fn obj_key(v: &Value) -> Option<Option<&Loc>> {
+    match v {
+        Value::Obj(x) => Some(x.as_ref().map(|(l, _)| l)),
+        Value::Ref(None) | Value::Int(0) => Some(None),
+        _ => None,
+    }
 }
 
 /// A storage location: a root (program instance or call frame) and a path of
@@ -234,6 +257,14 @@ fn to_text(v: &Value) -> String {
 }
 
 fn compare(a: &Value, b: &Value) -> Option<std::cmp::Ordering> {
+    if matches!(a, Value::Obj(_)) || matches!(b, Value::Obj(_)) {
+        let (x, y) = (obj_key(a), obj_key(b));
+        return Some(if x.is_some() && x == y {
+            std::cmp::Ordering::Equal
+        } else {
+            std::cmp::Ordering::Less
+        });
+    }
     match (a, b) {
         (Value::Str(x), Value::Str(y)) => Some(x.cmp(y)),
         (Value::Bool(x), Value::Bool(y)) => Some(x.cmp(y)),
@@ -360,6 +391,7 @@ impl<'p> Vm<'p> {
             DefKind::Enum(v) => Value::Int(v.first().map_or(0, |x| x.1)),
             DefKind::Subrange { lo, .. } => Value::Int(*lo),
             DefKind::Alias(t) => self.default_value(t),
+            DefKind::Pou(p) if p.kind == rootplc_sema::ir::PouKind::Interface => Value::Obj(None),
             DefKind::Pou(p) => {
                 let mut v: Vec<Value> = p
                     .vars
@@ -548,7 +580,8 @@ impl<'p> Vm<'p> {
             (Value::Real(x), _) => format!("{x:?}"),
             (Value::Str(s), Ty::Str { wide: true, .. }) => format!("\"{s}\""),
             (Value::Str(s), _) => format!("'{s}'"),
-            (Value::Ref(None), _) => "NULL".into(),
+            (Value::Ref(None) | Value::Obj(None), _) => "NULL".into(),
+            (Value::Obj(Some(_)), _) => "REF(...)".into(),
             (Value::Ref(Some(_)), _) => "REF(...)".into(),
             (Value::Agg(xs), Ty::Array { elem, .. }) => {
                 let parts: Vec<String> = xs.iter().map(|x| self.display(x, &elem)).collect();
@@ -785,6 +818,14 @@ impl<'p> Vm<'p> {
                     .map_err(|k| self.fault(k, e.span, "division by zero"))
             }
             ExprKind::Call(c) => self.call(c, e, cx),
+            ExprKind::ToItf(x, fb) => {
+                let rt = match &cx.inst {
+                    Some((_, d)) if is_this_expr(x) => *d,
+                    _ => *fb,
+                };
+                let loc = self.place(x, cx)?;
+                Ok(Value::Obj(Some((loc, rt))))
+            }
             ExprKind::Invalid => Err(self.fault(
                 FaultKind::Unsupported,
                 e.span,
@@ -956,19 +997,29 @@ impl<'p> Vm<'p> {
                 name,
                 dispatch,
             } => {
-                let loc = self.place(inst, cx)?;
-                // the instance's own type: for THIS, the block the caller runs on
-                // THIS, or THIS^ (a dereferenced reference to it)
-                let is_this = match &inst.kind {
-                    ExprKind::This => true,
-                    ExprKind::Deref(r) => {
-                        matches!(&r.kind, ExprKind::Ref(x) if matches!(x.kind, ExprKind::This))
+                let through_itf = prog
+                    .pou(*fb)
+                    .is_some_and(|p| p.kind == rootplc_sema::ir::PouKind::Interface);
+                let (loc, rt) = if through_itf {
+                    // [pous.oop.interface-ref]: the referenced instance and its block
+                    match self.eval(inst, cx)? {
+                        Value::Obj(Some((l, d))) => (l, d),
+                        _ => {
+                            return Err(self.fault(
+                                FaultKind::NullRef,
+                                inst.span,
+                                format!("method {name} called through a NULL interface reference"),
+                            ));
+                        }
                     }
-                    _ => false,
-                };
-                let rt = match &cx.inst {
-                    Some((_, d)) if is_this => *d,
-                    _ => *fb,
+                } else {
+                    // the instance's own type: for THIS, the block the caller runs on
+                    let loc = self.place(inst, cx)?;
+                    let rt = match &cx.inst {
+                        Some((_, d)) if is_this_expr(inst) => *d,
+                        _ => *fb,
+                    };
+                    (loc, rt)
                 };
                 let m = if *dispatch {
                     prog.pou(rt)

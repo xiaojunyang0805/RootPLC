@@ -102,12 +102,24 @@ without bodies:
 interface = 'INTERFACE' name [ 'EXTENDS' name { ',' name } ] { method | property } 'END_INTERFACE'
 ```
 
-Interfaces are parsed; interface types, `IMPLEMENTS` checks and calls through
-interface references follow in the next revision.
+An interface that extends others has their methods too. An interface name
+is a type ([pous.oop.interface-ref]).
 
 **[pous.oop.implements]** `IMPLEMENTS I1, I2` names the interfaces a function
-block provides. It is accepted and recorded; that every method of the
-interface exists is checked in the next revision.
+block provides. Every method of each interface, including methods of the
+interfaces it extends, must exist in the block or a base block; a missing
+method is RP0203. An `ABSTRACT` block is exempt. A name that is not an
+interface is RP0111. A block also provides the interfaces of its base.
+
+**[pous.oop.interface-ref]** A variable of an interface type holds a
+reference to a function-block instance, or NULL (the initial value).
+Assigning or passing an instance of a block that provides the interface
+stores a reference to it; an instance of another block is RP0103. `NULL` and
+the TwinCAT idiom `0` clear the reference; `=` and `<>` compare references
+with each other, with `NULL` and with `0`. `itf.M(args)` calls the method of
+the referenced instance's own block (dynamic dispatch); through a NULL
+reference it is the fault `NULL_REF`. Passing `THIS^` hands out a reference
+to the current instance.
 
 **[pous.oop.property]** A property is a value with access methods (a CODESYS
 and TwinCAT extension):

@@ -19,6 +19,8 @@ pub enum PouKind {
     Test,
     /// A method of a function block or program, [pous.oop.method].
     Method,
+    /// An interface: method signatures only, [pous.oop.interface].
+    Interface,
 }
 
 /// Variable section.
@@ -171,6 +173,9 @@ pub enum ExprKind {
     /// The function-block or program instance a method or body runs on
     /// (its type is that block), [pous.oop.this].
     This,
+    /// A reference to the instance at a place, as a value of an interface
+    /// type; `usize` is the instance's block, [pous.oop.interface-ref].
+    ToItf(Box<Expr>, usize),
     /// Global variable `slot`, [config.global-list].
     Global(usize),
     /// Member `index` of a structure or instance.
