@@ -458,12 +458,14 @@ def analyse() -> None:
         names = Counter(f"{x['code']} {m.group(1)}" for xs in per_file.values() for x in xs
                         if x["code"] in ("RP0201", "RP0111", "RP0203")
                         for m in [re.search(r"'([^']*)'", x["message"])] if m)
-        all_codes.update(codes)
-        all_features.update(feats)
+        if not p.get("dialect"):  # other dialects stay out of the totals
+            all_codes.update(codes)
+            all_features.update(feats)
         results.append({"name": p["name"], "url": p["url"], "licence": p["licence"], "redistribute": p["redistribute"],
                         "kind": p.get("kind", ""), "units": len(files), "lines": lines, "syntax_ok": syntax_ok,
                         "clean": clean, "codes": codes.most_common(8), "messages": msgs.most_common(6),
-                        "features": dict(feats), "names": names.most_common(60)})
+                        "features": dict(feats), "names": names.most_common(60),
+                        "dialect": p.get("dialect", "")})
         print(f"{p['name']:30} units {len(files):5}  syntax ok {syntax_ok:5}  clean {clean:5}")
     (CACHE / "analysis.json").write_text(json.dumps(results, indent=1), encoding="utf-8")
     record_history(results)
@@ -475,6 +477,8 @@ def pct(a, b):
 
 
 def write_report(results, all_codes, all_features) -> None:
+    other = [r for r in results if r.get("dialect")]
+    results = [r for r in results if not r.get("dialect")]
     U = sum(r["units"] for r in results)
     L = sum(r["lines"] for r in results)
     S = sum(r["syntax_ok"] for r in results)
@@ -504,6 +508,11 @@ def write_report(results, all_codes, all_features) -> None:
     out += ["", "Most frequent error codes:", "", "| Code | Count |", "|---|---|"]
     for k, v in all_codes.most_common(12):
         out.append(f"| {k} | {v} |")
+    if other:
+        out += ["", "## Other dialects (analysed, not in the totals)", "",
+                "| Project | Dialect | Units | Syntax OK | Clean |", "|---|---|---|---|---|"]
+        out += [f"| [{r['name']}]({r['url']}) | {r['dialect']} | {r['units']} | "
+                f"{pct(r['syntax_ok'], r['units'])} | {pct(r['clean'], r['units'])} |" for r in other]
     skipped = [p for p in projects() if p["format"] in ("binary", "none")]
     if skipped:
         out += ["", "## Listed but not analysed", "", "| Project | Reason |", "|---|---|"]
@@ -518,6 +527,7 @@ def write_report(results, all_codes, all_features) -> None:
 def record_history(results) -> None:
     """Append this run's totals to corpus/history.json (public metrics only)."""
     from datetime import datetime
+    results = [r for r in results if not r.get("dialect")]
     U = sum(r["units"] for r in results) or 1
     row = {"date": datetime.now().strftime("%Y-%m-%d %H:%M"), "units": U,
            "parse": round(100 * sum(r["syntax_ok"] for r in results) / U),
@@ -532,6 +542,7 @@ def record_history(results) -> None:
 def dashboard() -> None:
     """Write corpus/dashboard.html (self-contained) from the last analysis."""
     results = json.loads((CACHE / "analysis.json").read_text(encoding="utf-8"))
+    results = [r for r in results if not r.get("dialect")]
     feats = Counter()
     for r in results:
         feats.update(r["features"])

@@ -9,6 +9,9 @@
 # provides / provides_folder: this project is the library of that name; a
 #   project whose .plcproj references it is checked together with the units
 #   in that folder (which never count for the referencing project).
+# dialect: the code is not IEC 61131-3 Structured Text as CODESYS / TwinCAT
+#   write it (e.g. "lasal": Sigmatek LASAL with C preprocessor lines); it is
+#   analysed and listed, but kept out of the totals.
 # format: "st" (plain files), "twincat" (.TcPOU/.TcDUT/.TcGVL XML),
 #         "brx" (B&R: declarations in .fun/.typ/.var, bodies in .st),
 #         "binary" / "none": nothing to extract (see note)
@@ -364,6 +367,7 @@ licence = "GNU General Public License v3.0"
 redistribute = false
 format = "st"
 kind = "discovered"
+dialect = "lasal"
 
 [[project]]
 name = "qubernetic-flowforge"
