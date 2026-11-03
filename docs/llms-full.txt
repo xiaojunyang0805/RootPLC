@@ -137,7 +137,7 @@ Checks the files as one project and gives each file one status:
 | Status | Meaning |
 |---|---|
 | `portable` | no errors: test and run it now |
-| `dialect` | errors, and the file uses constructs RootPLC does not take yet (`METHOD`, `POINTER TO`, vendor pragmas, implicit narrowing, …), listed with lines |
+| `dialect` | errors, and the file uses constructs RootPLC does not take yet (`PROPERTY` access, `UNION`, `SIZEOF`, `__` system calls, vendor pragmas, implicit narrowing, …), listed with lines |
 | `dependent` | its only errors are unknown names declared in files that fail (`blocked_by`) |
 | `blocked` | other errors: see `rootplc check` |
 
@@ -148,7 +148,7 @@ vendor extension (`vendor`). Exit code 0 whatever the statuses are.
 ```json
 {"command":"coverage","ok":true,"units":3,"portable":1,"dialect":1,"dependent":1,"blocked":0,
  "files":[{"file":"lib.st","status":"dialect","errors":1,"codes":["RP0201"],
-   "constructs":[{"name":"POINTER TO","standard":"vendor","line":2,"count":1}],"blocked_by":[]}]}
+   "constructs":[{"name":"UNION","standard":"vendor","line":2,"count":1}],"blocked_by":[]}]}
 ```
 
 ## mcp

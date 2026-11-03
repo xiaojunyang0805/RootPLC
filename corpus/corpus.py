@@ -30,21 +30,17 @@ REPO = HERE.parent
 CACHE = Path(os.environ.get("ROOTPLC_CORPUS_CACHE") or HERE / ".cache")
 SYNTAX_CODES = {f"RP{n:04d}" for n in list(range(1, 17)) + [201, 202, 301]}
 
-# Constructs that matter for dialect coverage (counted in extracted code).
+# Constructs RootPLC does not support yet (counted in extracted code). Keep in
+# step with the RULES list in crates/rootplc-driver/src/coverage.rs.
 FEATURES = {
-    "METHOD": r"^\s*METHOD\b",
     "PROPERTY": r"^\s*PROPERTY\b",
-    "INTERFACE": r"^\s*INTERFACE\b",
-    "EXTENDS / IMPLEMENTS": r"\b(EXTENDS|IMPLEMENTS)\b",
-    "POINTER TO": r"\bPOINTER\s+TO\b",
-    "REFERENCE TO": r"\bREFERENCE\s+TO\b",
-    "THIS^ / SUPER^": r"\b(THIS|SUPER)\^",
-    "VAR_GLOBAL": r"\bVAR_GLOBAL\b",
+    "ACTION": r"^\s*ACTION\b",
     "VAR_INST / VAR_STAT": r"\bVAR_(INST|STAT)\b",
     "UNION": r"\bUNION\b",
-    "ADR / SIZEOF": r"\b(ADR|SIZEOF)\s*\(",
-    "pragmas {..}": r"\{[a-z_]+",
-    "ACTION": r"^\s*ACTION\b",
+    "SIZEOF": r"\bSIZEOF\s*\(",
+    "__ system calls": r"\b__(?!ISVALIDREF)[A-Z]+\s*\(",
+    "vendor pragmas {..}": r"\{(?!attribute)[a-z_]+",
+    "__SYSTEM types": r"\b__SYSTEM\.",
 }
 
 
@@ -326,7 +322,7 @@ def write_report(results, all_codes, all_features) -> None:
     for r in sorted(results, key=lambda r: -r["units"]):
         out.append(f"| [{r['name']}]({r['url']}) | {r['kind']} | {r['licence']} | {r['units']} | {r['lines']:,} | "
                    f"{pct(r['syntax_ok'], r['units'])} | {pct(r['clean'], r['units'])} |")
-    out += ["", "## What blocks the rest", "", "Units using each construct (dialect features beyond RootPLC v0):", "",
+    out += ["", "## What blocks the rest", "", "Units using each construct RootPLC does not support yet:", "",
             "| Construct | Units |", "|---|---|"]
     for k, v in all_features.most_common():
         out.append(f"| {k} | {v} ({pct(v, U)}) |")

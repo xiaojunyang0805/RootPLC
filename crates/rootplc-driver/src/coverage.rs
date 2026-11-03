@@ -3,7 +3,7 @@
 //!
 //! - `portable`: checks without errors; tests and the VM can run it.
 //! - `dialect`: has errors and uses constructs RootPLC does not support yet
-//!   (vendor extensions or IEC 61131-3 ed.3 object orientation). The
+//!   (vendor extensions such as properties, actions, unions, SIZEOF). The
 //!   constructs are listed with their lines, so the cause is visible.
 //!   Implicit narrowing conversions (RP0103), which vendor compilers accept
 //!   and strict IEC 61131-3 does not, count as a dialect trait here.
@@ -131,31 +131,18 @@ impl Ctx<'_> {
 }
 
 const RULES: &[Rule] = &[
-    ("METHOD", true, |c, i| c.decl(i, "METHOD")),
-    ("INTERFACE", true, |c, i| c.decl(i, "INTERFACE")),
-    ("EXTENDS / IMPLEMENTS", true, |c, i| {
-        c.is(i, "EXTENDS") || c.is(i, "IMPLEMENTS")
-    }),
-    ("THIS^ / SUPER^", true, |c, i| {
-        (c.is(i, "THIS") || c.is(i, "SUPER")) && c.kind(i + 1) == Some(TokenKind::Caret)
-    }),
     ("PROPERTY", false, |c, i| c.decl(i, "PROPERTY")),
     ("ACTION", false, |c, i| c.decl(i, "ACTION")),
-    ("POINTER TO", false, |c, i| {
-        c.is(i, "POINTER") && c.is(i + 1, "TO")
-    }),
-    ("REFERENCE TO", false, |c, i| {
-        c.is(i, "REFERENCE") && c.is(i + 1, "TO")
-    }),
     ("UNION", false, |c, i| c.is(i, "UNION")),
     ("VAR_INST / VAR_STAT", false, |c, i| {
         c.is(i, "VAR_INST") || c.is(i, "VAR_STAT")
     }),
-    ("ADR / SIZEOF", false, |c, i| {
-        (c.is(i, "ADR") || c.is(i, "SIZEOF")) && c.kind(i + 1) == Some(TokenKind::LParen)
+    ("SIZEOF", false, |c, i| {
+        c.is(i, "SIZEOF") && c.kind(i + 1) == Some(TokenKind::LParen)
     }),
     ("__ system calls", false, |c, i| {
-        c.word(i).starts_with("__") && c.kind(i + 1) == Some(TokenKind::LParen)
+        let w = c.word(i);
+        w.starts_with("__") && w != "__ISVALIDREF" && c.kind(i + 1) == Some(TokenKind::LParen)
     }),
     ("vendor pragmas {..}", false, |c, i| {
         let t = c.toks[i];
@@ -338,30 +325,29 @@ mod tests {
 
     #[test]
     fn detects_constructs_on_tokens_only() {
-        let src = "FUNCTION_BLOCK FB_A EXTENDS FB_Base\nVAR p : POINTER TO INT; r : REFERENCE TO INT; END_VAR\n\
-                   p := ADR(x); (* POINTER TO in a comment *) s := 'UNION';\nTHIS^.x := 1;\n{region main}\n{attribute 'hide'}\nEND_FUNCTION_BLOCK\nMETHOD M : BOOL\nEND_METHOD";
+        let src = "FUNCTION_BLOCK FB_A EXTENDS FB_Base\nVAR n : INT; u : UNION a : INT; END_UNION; END_VAR\n\
+                   n := SIZEOF(n); (* SIZEOF(n) in a comment *) s := 'UNION';\nTHIS^.x := __NEW(INT);\n{region main}\n{attribute 'hide'}\nEND_FUNCTION_BLOCK\nPROPERTY P : BOOL\nEND_PROPERTY";
         let found = constructs(src);
         let n: Vec<_> = found.iter().map(|c| c.name).collect();
         assert_eq!(
             n,
             [
-                "EXTENDS / IMPLEMENTS",
-                "POINTER TO",
-                "REFERENCE TO",
-                "ADR / SIZEOF",
-                "THIS^ / SUPER^",
+                "UNION",
+                "SIZEOF",
+                "__ system calls",
                 "vendor pragmas {..}",
-                "METHOD"
+                "PROPERTY"
             ]
         );
-        assert_eq!(found[1].line, 2);
+        assert_eq!(found[1].line, 3);
         assert_eq!(found[1].count, 1, "the comment must not count");
-        assert!(found[0].iec && !found[1].iec);
+        assert_eq!(found[0].count, 1, "the string must not count");
+        assert!(found.iter().all(|c| !c.iec));
     }
 
     #[test]
-    fn method_only_as_declaration() {
-        assert!(names("PROGRAM p VAR method : INT; END_VAR END_PROGRAM").is_empty());
+    fn property_only_as_declaration() {
+        assert!(names("PROGRAM p VAR property : INT; END_VAR END_PROGRAM").is_empty());
     }
 
     #[test]
