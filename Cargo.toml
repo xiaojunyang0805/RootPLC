@@ -14,22 +14,22 @@ authors = ["RootPLC contributors"]
 # Internal crates. External dependencies must come from the audited
 # allow-list (see deny.toml) and be added here, never per crate.
 [workspace.dependencies]
-rootplc-abi         = { path = "crates/rootplc-abi" }
-rootplc-diag        = { path = "crates/rootplc-diag" }
-rootplc-syntax      = { path = "crates/rootplc-syntax" }
-rootplc-sema        = { path = "crates/rootplc-sema" }
-rootplc-stdlib      = { path = "crates/rootplc-stdlib" }
-rootplc-vm          = { path = "crates/rootplc-vm" }
-rootplc-codegen-c   = { path = "crates/rootplc-codegen-c" }
-rootplc-testing     = { path = "crates/rootplc-testing" }
-rootplc-verify      = { path = "crates/rootplc-verify" }
-rootplc-interchange = { path = "crates/rootplc-interchange" }
-rootplc-graph       = { path = "crates/rootplc-graph" }
-rootplc-sim         = { path = "crates/rootplc-sim" }
-rootplc-driver      = { path = "crates/rootplc-driver" }
-rootplc-mcp         = { path = "crates/rootplc-mcp" }
-rootplc-fieldbus    = { path = "crates/rootplc-fieldbus" }
-rootplc-runtime     = { path = "crates/rootplc-runtime" }
+rootplc-abi         = { path = "crates/rootplc-abi", version = "0.0.0" }
+rootplc-diag        = { path = "crates/rootplc-diag", version = "0.0.0" }
+rootplc-syntax      = { path = "crates/rootplc-syntax", version = "0.0.0" }
+rootplc-sema        = { path = "crates/rootplc-sema", version = "0.0.0" }
+rootplc-stdlib      = { path = "crates/rootplc-stdlib", version = "0.0.0" }
+rootplc-vm          = { path = "crates/rootplc-vm", version = "0.0.0" }
+rootplc-codegen-c   = { path = "crates/rootplc-codegen-c", version = "0.0.0" }
+rootplc-testing     = { path = "crates/rootplc-testing", version = "0.0.0" }
+rootplc-verify      = { path = "crates/rootplc-verify", version = "0.0.0" }
+rootplc-interchange = { path = "crates/rootplc-interchange", version = "0.0.0" }
+rootplc-graph       = { path = "crates/rootplc-graph", version = "0.0.0" }
+rootplc-sim         = { path = "crates/rootplc-sim", version = "0.0.0" }
+rootplc-driver      = { path = "crates/rootplc-driver", version = "0.0.0" }
+rootplc-mcp         = { path = "crates/rootplc-mcp", version = "0.0.0" }
+rootplc-fieldbus    = { path = "crates/rootplc-fieldbus", version = "0.0.0" }
+rootplc-runtime     = { path = "crates/rootplc-runtime", version = "0.0.0" }
 
 [workspace.lints.rust]
 # `unsafe` is allowed only in modules marked `#[allow(unsafe_code)]`

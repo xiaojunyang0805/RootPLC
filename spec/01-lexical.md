@@ -166,7 +166,16 @@ error RP0012. A malformed literal is error RP0011.
 **[lexical.pragma]** `{` starts a pragma that ends at the next `}`. Pragmas do
 not nest. The first word names the pragma. Pragmas that RootPLC defines are
 listed in spec/09-properties.md; for example `{attribute 'name'}`. An unknown
-pragma is warning RP0013 and is otherwise ignored.
+pragma is warning RP0013 and is otherwise ignored. A pragma with no closing
+`}` before end of file is error RP0015.
+
+## 7a. Directly represented variables
+
+**[lexical.direct-variable]** `%` followed by a location `I` (input), `Q`
+(output) or `M` (memory), an optional size `X` (bit), `B`, `W`, `D` or `L`,
+and an address: digits separated by single dots (`%IX0.0`, `%QW4`, `%MD12`),
+or `*` for an address assigned later in the configuration (`%I*`). Letters
+are case-insensitive. Anything else after `%` is error RP0016.
 
 ## 8. Operators and punctuation
 

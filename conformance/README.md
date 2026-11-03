@@ -18,6 +18,13 @@ The file starts with a header comment that states the expected outcome:
 | `run:` | no | Program to execute in the VM and number of cycles |
 | `assert:` | no | Final value of a variable after the run (repeatable) |
 
+The header is an ordinary block comment, so it must not contain `(*` or
+`*)`; comments do not nest ([lexical.comment.nesting]).
+
+Each expected code has a `stage` in the registry (`lex`, `parse`, `sema`).
+For every implemented stage, the runner requires that stage to report
+exactly the case's expected codes of that stage, and nothing else.
+
 ## Consistency rules (checked by `cargo test -p rootplc-conformance`)
 
 1. Every case header parses, and every rule ID it cites exists in the spec.
@@ -25,8 +32,8 @@ The file starts with a header comment that states the expected outcome:
 3. Every rule ID in the spec is cited by at least one case.
 4. Every diagnostic code in the registry is expected by at least one case.
 
-Executing the cases (`expect` and `assert` against the real compiler) is
-added once the front end and VM exist.
+Implemented stages: **lex**. Parse, sema and `run`/`assert` execution are
+added as the front end and VM land.
 
 | Folder | Spec chapter |
 |---|---|

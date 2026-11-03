@@ -45,6 +45,8 @@ pub struct CodeEntry {
     pub severity: String,
     /// Rule ID the code belongs to.
     pub spec: String,
+    /// Compiler phase that reports it: `lex`, `parse` or `sema`.
+    pub stage: String,
 }
 
 /// Repository root, derived from this crate's location.
@@ -178,6 +180,7 @@ pub fn load_registry(root: &Path) -> Result<Vec<CodeEntry>, String> {
                 "id" => e.id = v,
                 "severity" => e.severity = v,
                 "spec" => e.spec = v,
+                "stage" => e.stage = v,
                 _ => {}
             }
         }
@@ -199,6 +202,9 @@ pub fn check_consistency(root: &Path) -> Result<Vec<String>, String> {
             && e.id[2..].chars().all(|c| c.is_ascii_digit());
         if !valid {
             problems.push(format!("registry: bad code id '{}'", e.id));
+        }
+        if !matches!(e.stage.as_str(), "lex" | "parse" | "sema") {
+            problems.push(format!("registry: {} has bad stage '{}'", e.id, e.stage));
         }
         if !matches!(e.severity.as_str(), "error" | "warning" | "note") {
             problems.push(format!(
@@ -255,6 +261,86 @@ pub fn check_consistency(root: &Path) -> Result<Vec<String>, String> {
     }
     for id in codes.keys().filter(|id| !expected_codes.contains(**id)) {
         problems.push(format!("code {id} is not expected by any case"));
+    }
+    Ok(problems)
+}
+
+/// The code table compiled into `rootplc-diag` must equal the registry.
+pub fn check_code_table(root: &Path) -> Result<Vec<String>, String> {
+    let registry: BTreeSet<(String, String)> = load_registry(root)?
+        .into_iter()
+        .map(|e| (e.id, e.severity))
+        .collect();
+    let table: BTreeSet<(String, String)> = rootplc_diag::codes::ALL
+        .iter()
+        .map(|(c, s)| (c.to_string(), s.as_str().to_string()))
+        .collect();
+    let mut problems = Vec::new();
+    for x in registry.difference(&table) {
+        problems.push(format!(
+            "{} ({}) is in diagnostics.toml but not in rootplc-diag",
+            x.0, x.1
+        ));
+    }
+    for x in table.difference(&registry) {
+        problems.push(format!(
+            "{} ({}) is in rootplc-diag but not in diagnostics.toml",
+            x.0, x.1
+        ));
+    }
+    Ok(problems)
+}
+
+/// Run every case through the lexer. For each case, the set of lexer codes
+/// must equal the expected codes whose registry stage is `lex`, and the
+/// tokens must reproduce the source exactly (lossless lexing).
+pub fn run_lex_stage(root: &Path) -> Result<Vec<String>, String> {
+    let lex_codes: BTreeSet<String> = load_registry(root)?
+        .into_iter()
+        .filter(|e| e.stage == "lex")
+        .map(|e| e.id)
+        .collect();
+    let mut problems = Vec::new();
+    for c in load_cases(root)? {
+        let name = c
+            .path
+            .strip_prefix(root)
+            .unwrap_or(&c.path)
+            .display()
+            .to_string();
+        let r = rootplc_syntax::lex(&c.source);
+        let joined: String = r.tokens.iter().map(|t| t.text(&c.source)).collect();
+        if joined != c.source {
+            problems.push(format!("{name}: tokens do not reproduce the source"));
+        }
+        let got: BTreeSet<String> = r.diagnostics.iter().map(|d| d.code.to_string()).collect();
+        let want: BTreeSet<String> = match &c.expect {
+            Expect::Ok => BTreeSet::new(),
+            Expect::Error(l) | Expect::Warning(l) => l
+                .iter()
+                .filter(|x| lex_codes.contains(*x))
+                .cloned()
+                .collect(),
+        };
+        if got != want {
+            problems.push(format!("{name}: lexer reported {got:?}, expected {want:?}"));
+        }
+    }
+    Ok(problems)
+}
+
+/// Every `.st` file under `examples/` and the stdlib must lex without diagnostics.
+pub fn lex_examples(root: &Path) -> Result<Vec<String>, String> {
+    let mut files = Vec::new();
+    for dir in ["examples", "crates/rootplc-stdlib/st"] {
+        collect_files(&root.join(dir), "st", &mut files).map_err(|e| e.to_string())?;
+    }
+    let mut problems = Vec::new();
+    for f in files {
+        let src = fs::read_to_string(&f).map_err(|e| e.to_string())?;
+        for d in rootplc_syntax::lex(&src).diagnostics {
+            problems.push(format!("{}: {} {}", f.display(), d.code, d.message));
+        }
     }
     Ok(problems)
 }

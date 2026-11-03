@@ -1,13 +1,33 @@
-//! Spec, diagnostic registry and conformance cases must agree.
+//! Spec, diagnostic registry, code table, cases and the lexer must agree.
 
-#[test]
-fn spec_registry_and_cases_are_consistent() {
-    let root = rootplc_conformance::repo_root();
-    let problems = rootplc_conformance::check_consistency(&root).expect("suite loads");
+use rootplc_conformance as rc;
+
+fn assert_clean(what: &str, problems: Result<Vec<String>, String>) {
+    let problems = problems.expect("suite loads");
     assert!(
         problems.is_empty(),
-        "{} problem(s):\n{}",
+        "{what}: {} problem(s):\n{}",
         problems.len(),
         problems.join("\n")
     );
+}
+
+#[test]
+fn spec_registry_and_cases_are_consistent() {
+    assert_clean("consistency", rc::check_consistency(&rc::repo_root()));
+}
+
+#[test]
+fn code_table_matches_registry() {
+    assert_clean("code table", rc::check_code_table(&rc::repo_root()));
+}
+
+#[test]
+fn lexer_meets_lex_stage_expectations() {
+    assert_clean("lex stage", rc::run_lex_stage(&rc::repo_root()));
+}
+
+#[test]
+fn examples_and_stdlib_lex_cleanly() {
+    assert_clean("examples", rc::lex_examples(&rc::repo_root()));
 }

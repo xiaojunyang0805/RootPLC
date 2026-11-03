@@ -25,6 +25,10 @@ dependencies = [
 [[package]]
 name = "rootplc-conformance"
 version = "0.0.0"
+dependencies = [
+ "rootplc-diag",
+ "rootplc-syntax",
+]
 
 [[package]]
 name = "rootplc-diag"
