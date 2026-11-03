@@ -12,6 +12,7 @@ publish = false
 [dependencies]
 rootplc-diag.workspace = true
 rootplc-syntax.workspace = true
+rootplc-sema.workspace = true
 
 [lints]
 workspace = true

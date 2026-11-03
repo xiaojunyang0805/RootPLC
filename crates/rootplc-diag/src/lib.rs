@@ -89,6 +89,70 @@ impl Diagnostic {
     }
 }
 
+/// 1-based line and column (in characters) of a byte offset.
+pub fn line_col(source: &str, offset: u32) -> (usize, usize) {
+    let off = (offset as usize).min(source.len());
+    let before = source.get(..off).unwrap_or(source);
+    let line = before.matches('\n').count() + 1;
+    let col = before.rsplit('\n').next().unwrap_or("").chars().count() + 1;
+    (line, col)
+}
+
+fn json_str(s: &str) -> String {
+    let mut out = String::with_capacity(s.len() + 2);
+    out.push('"');
+    for c in s.chars() {
+        match c {
+            '"' => out.push_str("\\\""),
+            '\\' => out.push_str("\\\\"),
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            c if (c as u32) < 0x20 => out.push_str(&format!("\\u{:04x}", c as u32)),
+            c => out.push(c),
+        }
+    }
+    out.push('"');
+    out
+}
+
+impl Diagnostic {
+    /// `file:line:col: error[RP0103]: message`, with the hint on a second line.
+    pub fn render_text(&self, file: &str, source: &str) -> String {
+        let (l, c) = line_col(source, self.span.start);
+        let mut s = format!(
+            "{file}:{l}:{c}: {}[{}]: {}",
+            self.severity.as_str(),
+            self.code,
+            self.message
+        );
+        if let Some(h) = &self.hint {
+            s.push_str(&format!("\n  hint: {h}"));
+        }
+        s
+    }
+
+    /// One JSON object with file, 1-based start and end positions, code,
+    /// severity, message and hint.
+    pub fn render_json(&self, file: &str, source: &str) -> String {
+        let (l, c) = line_col(source, self.span.start);
+        let (el, ec) = line_col(source, self.span.end);
+        let hint = self.hint.as_deref().map_or("null".to_string(), json_str);
+        format!(
+            "{{\"file\":{},\"line\":{l},\"column\":{c},\"end_line\":{el},\"end_column\":{ec},\"code\":\"{}\",\"severity\":\"{}\",\"message\":{},\"hint\":{hint}}}",
+            json_str(file),
+            self.code,
+            self.severity.as_str(),
+            json_str(&self.message)
+        )
+    }
+}
+
+/// Escape a string as a JSON string literal.
+pub fn json_string(s: &str) -> String {
+    json_str(s)
+}
+
 /// The diagnostic code table. Mirrors `spec/diagnostics.toml`.
 pub mod codes {
     use super::{Code, Severity};
@@ -122,7 +186,7 @@ pub mod codes {
         UNTERMINATED_PRAGMA = 15, Error;
         MALFORMED_DIRECT_VARIABLE = 16, Error;
         SYNTAX_ERROR = 201, Error;
-        MISSING_END = 202, Error;
+        MISSING_END = 202, Error; UNKNOWN_NAME = 203, Error; DUPLICATE_NAME = 204, Error;
         MISSING_SEMICOLON = 301, Error;
         CONSTANT_OVERFLOW = 101, Error;
         LITERAL_OUT_OF_RANGE = 102, Error;
@@ -156,5 +220,21 @@ mod tests {
     fn severity_comes_from_table() {
         let d = Diagnostic::new(codes::NESTED_COMMENT, "x", Span::new(0, 1));
         assert_eq!(d.severity, Severity::Warning);
+    }
+
+    #[test]
+    fn renders_positions_and_json() {
+        let src = "a\nbc := 1;";
+        assert_eq!(line_col(src, 2), (2, 1));
+        let d = Diagnostic::new(codes::UNKNOWN_NAME, "unknown name 'bc'", Span::new(2, 4))
+            .with_hint("say \"hi\"");
+        assert_eq!(
+            d.render_text("x.st", src),
+            "x.st:2:1: error[RP0203]: unknown name 'bc'\n  hint: say \"hi\""
+        );
+        assert_eq!(
+            d.render_json("x.st", src),
+            r#"{"file":"x.st","line":2,"column":1,"end_line":2,"end_column":3,"code":"RP0203","severity":"error","message":"unknown name 'bc'","hint":"say \"hi\""}"#
+        );
     }
 }

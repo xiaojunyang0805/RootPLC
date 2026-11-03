@@ -382,6 +382,101 @@ pub fn run_parse_stage(root: &Path) -> Result<Vec<String>, String> {
     Ok(problems)
 }
 
+/// Run every case through the checker. Graded only for cases that lex and
+/// parse without errors: the set of checker codes must equal the expected
+/// codes whose registry stage is `sema`.
+pub fn run_sema_stage(root: &Path) -> Result<Vec<String>, String> {
+    let sema_codes: BTreeSet<String> = load_registry(root)?
+        .into_iter()
+        .filter(|e| e.stage == "sema")
+        .map(|e| e.id)
+        .collect();
+    let mut problems = Vec::new();
+    for c in load_cases(root)? {
+        let name = c
+            .path
+            .strip_prefix(root)
+            .unwrap_or(&c.path)
+            .display()
+            .to_string();
+        let p = rootplc_syntax::parse(&c.source);
+        let syntax_error = p
+            .lex_diagnostics
+            .iter()
+            .chain(&p.diagnostics)
+            .any(|d| d.severity == rootplc_diag::Severity::Error);
+        if syntax_error {
+            continue;
+        }
+        let diags = rootplc_sema::check(&p, &c.source);
+        let got: BTreeSet<String> = diags.iter().map(|d| d.code.to_string()).collect();
+        let want: BTreeSet<String> = match &c.expect {
+            Expect::Ok => BTreeSet::new(),
+            Expect::Error(l) | Expect::Warning(l) => l
+                .iter()
+                .filter(|x| sema_codes.contains(*x))
+                .cloned()
+                .collect(),
+        };
+        if got != want {
+            let detail: Vec<String> = diags
+                .iter()
+                .map(|d| format!("{} @{}: {}", d.code, d.span.start, d.message))
+                .collect();
+            problems.push(format!(
+                "{name}: checker reported {got:?}, expected {want:?} [{}]",
+                detail.join("; ")
+            ));
+        }
+    }
+    Ok(problems)
+}
+
+/// Every project under `examples/` (one per folder) and the stdlib must check
+/// without diagnostics. The files of a project are checked together.
+pub fn check_examples(root: &Path) -> Result<Vec<String>, String> {
+    let mut projects = vec![root.join("crates/rootplc-stdlib/st")];
+    for entry in fs::read_dir(root.join("examples")).map_err(|e| e.to_string())? {
+        let path = entry.map_err(|e| e.to_string())?.path();
+        if path.is_dir() {
+            projects.push(path);
+        }
+    }
+    let mut problems = Vec::new();
+    for dir in projects {
+        let mut files = Vec::new();
+        collect_files(&dir, "st", &mut files).map_err(|e| e.to_string())?;
+        let sources = files
+            .iter()
+            .map(|f| fs::read_to_string(f).map_err(|e| e.to_string()))
+            .collect::<Result<Vec<_>, _>>()?;
+        let parses: Vec<_> = sources.iter().map(|s| rootplc_syntax::parse(s)).collect();
+        if parses
+            .iter()
+            .any(|p| !p.lex_diagnostics.is_empty() || !p.diagnostics.is_empty())
+        {
+            continue; // reported by lex_examples / parse_examples
+        }
+        let input: Vec<_> = parses
+            .iter()
+            .zip(&sources)
+            .map(|(p, s)| (p, s.as_str()))
+            .collect();
+        for (f, diags) in files.iter().zip(rootplc_sema::check_project(&input)) {
+            for d in diags {
+                problems.push(format!(
+                    "{}: {} @{}: {}",
+                    f.display(),
+                    d.code,
+                    d.span.start,
+                    d.message
+                ));
+            }
+        }
+    }
+    Ok(problems)
+}
+
 /// Every `.st` file under `examples/` and the stdlib must parse without diagnostics.
 pub fn parse_examples(root: &Path) -> Result<Vec<String>, String> {
     let mut files = Vec::new();

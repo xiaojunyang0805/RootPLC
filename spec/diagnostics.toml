@@ -218,3 +218,17 @@ severity = "error"
 summary = "unknown type name"
 spec = "types.derived.alias"
 stage = "sema"
+
+[[code]]
+id = "RP0203"
+severity = "error"
+summary = "unknown name"
+spec = "variables.resolution"
+stage = "sema"
+
+[[code]]
+id = "RP0204"
+severity = "error"
+summary = "name declared twice in the same POU"
+spec = "variables.unique"
+stage = "sema"

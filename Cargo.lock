@@ -10,6 +10,7 @@ version = "0.0.0"
 name = "rootplc-cli"
 version = "0.0.0"
 dependencies = [
+ "rootplc-diag",
  "rootplc-driver",
  "rootplc-mcp",
 ]
@@ -27,6 +28,7 @@ name = "rootplc-conformance"
 version = "0.0.0"
 dependencies = [
  "rootplc-diag",
+ "rootplc-sema",
  "rootplc-syntax",
 ]
 

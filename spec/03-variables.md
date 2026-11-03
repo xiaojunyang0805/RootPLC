@@ -2,8 +2,8 @@
 
 *Status: draft v0.1 (syntax). Normative. Diagnostic range RP0200–RP0299 (shared with 04).*
 
-This chapter defines how variables are declared. Semantic rules (scope,
-retain behaviour, initial-value checking) follow in a later revision.
+This chapter defines how variables are declared and how names are resolved.
+Retain behaviour follows in a later revision.
 Grammar notation: `[x]` optional, `{x}` zero or more, `|` alternative,
 `'…'` a literal token.
 
@@ -41,3 +41,32 @@ initializer  = expression
 ```
 
 `type_spec` is defined in spec/04-pous.md [pous.type-spec].
+
+## Names and scope
+
+**[variables.unique]** Within one POU, every variable name is declared once,
+across all its sections. Names compare case-insensitively
+([lexical.identifier.case]). Likewise, every type and POU name is declared once
+in a project. A second declaration is error RP0204, reported at the second
+one. A user POU may replace a standard function block (spec/08-stdlib.md).
+
+**[variables.resolution]** A name used in a statement or initial value
+resolves, in this order, to:
+
+1. a variable of the enclosing POU (in a `FUNCTION`, the function name is
+   also the variable holding the result);
+2. a value of an enumeration type, if exactly one enumeration has it
+   ([types.derived.enum]);
+3. a POU or standard function or function block (spec/08-stdlib.md), when
+   the name is called.
+
+A name that resolves to none of these is error RP0203. So is a member that
+the structure or function-block instance does not have (`p.z`, `tmr.QQ`).
+Members of a function-block or program instance that can be accessed from
+outside are its `VAR_INPUT`, `VAR_OUTPUT` and `VAR_IN_OUT` variables.
+
+**[variables.initializer.check]** An initial value must be assignable to the
+declared type under the same rules as an assignment (spec/02-types.md). An
+array initializer gives the elements in order; a structure initializer names
+members of the structure.
+

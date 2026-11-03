@@ -1,4 +1,4 @@
-//! Spec, diagnostic registry, code table, cases, lexer and parser must agree.
+//! Spec, diagnostic registry, code table, cases, lexer, parser and checker must agree.
 
 use rootplc_conformance as rc;
 
@@ -40,4 +40,14 @@ fn parser_meets_parse_stage_expectations() {
 #[test]
 fn examples_and_stdlib_parse_cleanly() {
     assert_clean("examples parse", rc::parse_examples(&rc::repo_root()));
+}
+
+#[test]
+fn checker_meets_sema_stage_expectations() {
+    assert_clean("sema stage", rc::run_sema_stage(&rc::repo_root()));
+}
+
+#[test]
+fn examples_and_stdlib_check_cleanly() {
+    assert_clean("examples check", rc::check_examples(&rc::repo_root()));
 }
