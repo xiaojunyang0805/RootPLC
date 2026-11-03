@@ -89,11 +89,20 @@ $("tiles").innerHTML = tiles.map(([v, l, s]) => `<div class="tile"><b>${v}</b><s
 // coverage: 100% stacked bars
 (function () {
   const svg = $("cov"), rowH = 24, gap = 10, labelW = 190, valW = 64, W = 720, barW = W - labelW - valW;
-  const H = P.length * (rowH + gap);
+  // the 15 largest projects, then one bar for the rest; the table lists all
+  const TOP = 15, rest = P.slice(TOP);
+  const rows = P.slice(0, TOP);
+  if (rest.length) {
+    const sum = k => rest.reduce((a, p) => a + p[k], 0);
+    rows.push({ name: `${rest.length} other projects`, units: sum("units"), syntax_ok: sum("syntax_ok"), clean: sum("clean"), licence: "various" });
+  }
+  const H = rows.length * (rowH + gap);
   svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
-  P.forEach((p, i) => {
+  rows.forEach((p, i) => {
     const y = i * (rowH + gap);
-    el("text", { x: 0, y: y + rowH / 2 + 4, class: "strong" }, svg, p.name);
+    const label = p.name.length > 27 ? p.name.slice(0, 26) + "…" : p.name;
+    const t = el("text", { x: 0, y: y + rowH / 2 + 4, class: "strong" }, svg, label);
+    if (label !== p.name) hover(t, `<b>${p.name}</b>`);
     const segs = [["clean", p.clean, "type-checks clean"], ["parse", p.syntax_ok - p.clean, "parses only"], ["blocked", p.units - p.syntax_ok, "blocked"]];
     let x = labelW;
     segs.forEach(([k, n, label], j) => {
@@ -128,7 +137,7 @@ $("tiles").innerHTML = tiles.map(([v, l, s]) => `<div class="tile"><b>${v}</b><s
 (function () {
   const H = DATA.history, svg = $("trend"), W = 460, h = 120, padL = 34, padB = 22;
   if (H.length < 2) { $("trendnote").textContent = `Baseline set on ${DATA.date}: ${pct(S, U)}% parse, ${pct(C, U)}% clean. The line appears from the next analysis run; each extractor or dialect feature should move it up.`; svg.remove(); return; }
-  $("trendnote").textContent = "Parse and clean rate at each analysis run.";
+  $("trendnote").textContent = "Parse and clean rate at each analysis run. The corpus grows between runs (from 2,221 to " + fmt(U) + " units on 3 Nov 2026), so a drop can mean new kinds of code, not a regression.";
   svg.setAttribute("viewBox", `0 0 ${W} ${h}`);
   for (const v of [0, 50, 100]) { const y = h - padB - (h - padB - 8) * v / 100; el("line", { x1: padL, x2: W, y1: y, y2: y, stroke: "var(--grid)" }, svg); el("text", { x: padL - 6, y: y + 4, "text-anchor": "end" }, svg, v + "%"); }
   const xs = i => padL + 8 + (W - padL - 16) * i / (H.length - 1);

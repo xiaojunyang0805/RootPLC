@@ -117,7 +117,7 @@ def run_agent(task: Task, host: dict, mode: str, ws: Path, timeout: int) -> tupl
     if host.get("model"):
         args += host.get("model_flag", ["--model"]) + [host["model"]]
     try:
-        p = subprocess.run(resolve_command(args), cwd=ws, env=agent_env(mode), capture_output=True, text=True,
+        p = subprocess.run(resolve_command(args), cwd=ws, stdin=subprocess.DEVNULL, env=agent_env(mode), capture_output=True, text=True,
                            encoding="utf-8", errors="replace", timeout=timeout)
         out, code = p.stdout + "\n" + p.stderr, p.returncode
     except subprocess.TimeoutExpired as e:

@@ -1,12 +1,15 @@
 # OpenAI Codex CLI, non-interactive (codex exec). Command lines written for
 # codex-cli 0.166.0; set `verified` once a run succeeds. Login: `codex login`.
 # The MCP server is passed with -c so the user's own config is not changed.
+# Sandbox off (founder's decision, 2026-11-03): on Windows, workspace-write
+# silently falls back to read-only and the unelevated sandbox crashes. Runs
+# happen only in the harness's fresh temp workspaces.
 name = "codex"
 ecosystem = "western"
-verified = "no"
+verified = "2026-11-03, codex-cli 0.166.0 (Windows, sandbox off)"
 model = ""
 model_flag = ["-m"]
 
-command_with = ["codex", "exec", "--skip-git-repo-check", "--json", "--sandbox", "workspace-write",
+command_with = ["codex", "exec", "--skip-git-repo-check", "--json", "--dangerously-bypass-approvals-and-sandbox",
   "-c", "mcp_servers.rootplc.command=\"rootplc\"", "-c", "mcp_servers.rootplc.args=[\"mcp\"]", "{prompt}"]
-command_without = ["codex", "exec", "--skip-git-repo-check", "--json", "--sandbox", "workspace-write", "{prompt}"]
+command_without = ["codex", "exec", "--skip-git-repo-check", "--json", "--dangerously-bypass-approvals-and-sandbox", "{prompt}"]

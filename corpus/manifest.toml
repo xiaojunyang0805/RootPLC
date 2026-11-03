@@ -156,3 +156,1745 @@ redistribute = true
 format = "binary"
 note = "CODESYS .project file only"
 kind = "application"
+
+# ---------------------------------------------------------------------------
+# Added 3 Nov 2026 from GitHub search (topics twincat, codesys, structured-text,
+# iec-61131-3, beckhoff, oscat, plc-programming; name/description search).
+# Only licensed, non-fork repositories whose tree contains PLC source files.
+# Repositories without a licence are not listed. Re-run discovery to extend.
+
+[[project]]
+name = "tcopengroup-tcopen"
+url = "https://github.com/TcOpenGroup/TcOpen"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "johannespettersson80-trust-platform"
+url = "https://github.com/johannesPettersson80/trust-platform"
+licence = "Apache License 2.0"
+redistribute = true
+format = "st"
+kind = "discovered"
+
+[[project]]
+name = "thorstenbrach-srci"
+url = "https://github.com/ThorstenBrach/SRCI"
+licence = "MIT License"
+redistribute = true
+format = "st"
+kind = "discovered"
+
+[[project]]
+name = "tomookay-toast"
+url = "https://github.com/tomookay/TOAST"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "lorenz-software-tc3unittest"
+url = "https://github.com/Lorenz-Software/Tc3UnitTest"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "haud-ba-plc-motion-layer"
+url = "https://github.com/haud-ba/PLC_MOTION_LAYER"
+licence = "other (see repository)"
+redistribute = false
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "mihaiginta-tcoscatbasic"
+url = "https://github.com/mihaiginta/TcOscatBasic"
+licence = "other (see repository)"
+redistribute = false
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "trofimich-twincat-openframework"
+url = "https://github.com/trofimich/TwinCAT.OpenFramework"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "tkucic-unitest"
+url = "https://github.com/tkucic/UniTest"
+licence = "MIT License"
+redistribute = true
+format = "st"
+kind = "discovered"
+
+[[project]]
+name = "inxton-axsharp"
+url = "https://github.com/Inxton/axsharp"
+licence = "MIT License"
+redistribute = true
+format = "st"
+kind = "discovered"
+
+[[project]]
+name = "tchaxx-protobuf"
+url = "https://github.com/TcHaxx/protobuf"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "babe-kimr-tc1200-plc-sample-oop-design-patterns-plc"
+url = "https://github.com/BABE-KimR/TC1200-PLC.sample.OOP_Design_Patterns.plc"
+licence = "BSD 2-Clause \"Simplified\" License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "pcdshub-lcls-twincat-vacuum"
+url = "https://github.com/pcdshub/lcls-twincat-vacuum"
+licence = "other (see repository)"
+redistribute = false
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "pcdshub-lcls-twincat-motion"
+url = "https://github.com/pcdshub/lcls-twincat-motion"
+licence = "other (see repository)"
+redistribute = false
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "eponce00-tcforge"
+url = "https://github.com/eponce00/TcForge"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "fisothemes-fisothemes-common-library-for-twincat"
+url = "https://github.com/fisothemes/FisoThemes-Common-Library-for-TwinCAT"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "beckhoff-tf6310-samples"
+url = "https://github.com/Beckhoff/TF6310_Samples"
+licence = "other (see repository)"
+redistribute = false
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "haud-ba-xts-transport-layer"
+url = "https://github.com/haud-ba/XTS_TRANSPORT_LAYER"
+licence = "other (see repository)"
+redistribute = false
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "intecre-twincat-utils"
+url = "https://github.com/Intecre/twincat-utils"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "pcdshub-lcls-twincat-pmps"
+url = "https://github.com/pcdshub/lcls-twincat-pmps"
+licence = "other (see repository)"
+redistribute = false
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "pierredantas-esbmc-plc-benchmark-suite"
+url = "https://github.com/pierredantas/esbmc-plc-benchmark-suite"
+licence = "Creative Commons Attribution 4.0 International"
+redistribute = false
+format = "st"
+kind = "discovered"
+
+[[project]]
+name = "ironplc-ironplc"
+url = "https://github.com/ironplc/ironplc"
+licence = "MIT License"
+redistribute = true
+format = "st"
+kind = "discovered"
+
+[[project]]
+name = "mbc-engineering-log4tc"
+url = "https://github.com/mbc-engineering/log4TC"
+licence = "Apache License 2.0"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "dergraph-conveyorcontrol-with-plc"
+url = "https://github.com/derGraph/ConveyorControl-with-PLC"
+licence = "GNU General Public License v3.0"
+redistribute = false
+format = "st"
+kind = "discovered"
+
+[[project]]
+name = "qubernetic-flowforge"
+url = "https://github.com/qubernetic/FlowForge"
+licence = "GNU Affero General Public License v3.0"
+redistribute = false
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "beckhoff-tf7xxx-samples"
+url = "https://github.com/Beckhoff/TF7xxx_Samples"
+licence = "BSD Zero Clause License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "ahuca-tcbase"
+url = "https://github.com/ahuca/TcBase"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "diyplc-lib-plc"
+url = "https://github.com/DIYPLC/LIB_PLC"
+licence = "GNU General Public License v2.0"
+redistribute = false
+format = "st"
+kind = "discovered"
+
+[[project]]
+name = "pcdshub-lcls-twincat-general"
+url = "https://github.com/pcdshub/lcls-twincat-general"
+licence = "other (see repository)"
+redistribute = false
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "beckhoff-tf6100-samples"
+url = "https://github.com/Beckhoff/TF6100_Samples"
+licence = "other (see repository)"
+redistribute = false
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "controlforge-systems-controlforge-structured-text"
+url = "https://github.com/ControlForge-Systems/controlforge-structured-text"
+licence = "MIT License"
+redistribute = true
+format = "st"
+kind = "discovered"
+
+[[project]]
+name = "pcdshub-lcls-twincat-common-components"
+url = "https://github.com/pcdshub/lcls-twincat-common-components"
+licence = "other (see repository)"
+redistribute = false
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "sa1ntsinner-rung"
+url = "https://github.com/sa1ntsinner/rung"
+licence = "other (see repository)"
+redistribute = false
+format = "st"
+kind = "discovered"
+
+[[project]]
+name = "codepiercertechnology-tctidier"
+url = "https://github.com/CodePiercerTechnology/TcTidier"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "sionverhoef-twincat-st"
+url = "https://github.com/SionVerhoef/twincat-st"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "burksengineering-tcmatrix"
+url = "https://github.com/BurksEngineering/TcMatrix"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "fisothemes-twincat-dynamic-string-kit"
+url = "https://github.com/fisothemes/TwinCAT-Dynamic-String-Kit"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "roald87-twincattutorials"
+url = "https://github.com/Roald87/TwincatTutorials"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "krystian-l-lis-stage"
+url = "https://github.com/Krystian-L-Lis/Stage"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "siyka-au-mobject-ext"
+url = "https://github.com/siyka-au/mobject-ext"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "fisothemes-twincat-retentive-timers"
+url = "https://github.com/fisothemes/TwinCAT-Retentive-Timers"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "fisothemes-fisothemes-controller-toolbox-library-for-twincat"
+url = "https://github.com/fisothemes/FisoThemes-Controller-Toolbox-Library-for-TwinCAT"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "karishmapremnath4-plc-st-bug-detector-ml"
+url = "https://github.com/karishmapremnath4/plc-st-bug-detector-ml"
+licence = "MIT License"
+redistribute = true
+format = "st"
+kind = "discovered"
+
+[[project]]
+name = "malgaroshy-maker-factoryforge"
+url = "https://github.com/malgaroshy-maker/factoryforge"
+licence = "MIT License"
+redistribute = true
+format = "st"
+kind = "discovered"
+
+[[project]]
+name = "visualplc-blocklyplc"
+url = "https://github.com/VisualPLC/BlocklyPLC"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "teodorapetrovska02-twincat3-plc-projects"
+url = "https://github.com/teodorapetrovska02/twincat3-plc-projects"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "georgeturneruk-tckit"
+url = "https://github.com/georgeturneruk/tckit"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "beckhoff-tf6701-samples"
+url = "https://github.com/Beckhoff/TF6701_Samples"
+licence = "other (see repository)"
+redistribute = false
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "peterzerlauth-tc3-unittest"
+url = "https://github.com/PeterZerlauth/Tc3_UnitTest"
+licence = "GNU General Public License v3.0"
+redistribute = false
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "fisothemes-labview-twincat-ads"
+url = "https://github.com/fisothemes/LabVIEW-TwinCAT-ADS"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "sarparslan-ev-charging-controller"
+url = "https://github.com/sarparslan/ev-charging-controller"
+licence = "MIT License"
+redistribute = true
+format = "st"
+kind = "discovered"
+
+[[project]]
+name = "pcdshub-lcls-twincat-vacuum-serialdrivers"
+url = "https://github.com/pcdshub/lcls-twincat-vacuum-serialdrivers"
+licence = "other (see repository)"
+redistribute = false
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "peterzerlauth-tc3-logging"
+url = "https://github.com/PeterZerlauth/Tc3_Logging"
+licence = "GNU General Public License v3.0"
+redistribute = false
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "babe-kimr-tc1200-plc-training-oop-plc"
+url = "https://github.com/BABE-KimR/TC1200-PLC.training.OOP.plc"
+licence = "BSD Zero Clause License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "beckhoff-te2000-client-samples"
+url = "https://github.com/Beckhoff/TE2000_Client_Samples"
+licence = "other (see repository)"
+redistribute = false
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "andyp01-gdt-utilities-library"
+url = "https://github.com/AndyP01/gdt-utilities-library"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "milanlazov-twincat-dual-axis-coordinator"
+url = "https://github.com/milanlazov/twincat-dual-axis-coordinator"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "tchaxx-rplc"
+url = "https://github.com/TcHaxx/rplc"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "tchaxx-snappy"
+url = "https://github.com/TcHaxx/snappy"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "undort-st2cpp"
+url = "https://github.com/undoRT/st2cpp"
+licence = "GNU General Public License v3.0"
+redistribute = false
+format = "st"
+kind = "discovered"
+
+[[project]]
+name = "pcdshub-lcls-twincat-optics"
+url = "https://github.com/pcdshub/lcls-twincat-optics"
+licence = "other (see repository)"
+redistribute = false
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "bengeisler-tclog"
+url = "https://github.com/bengeisler/TcLog"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "ldnano-o-fn"
+url = "https://github.com/ldnano/o-fn"
+licence = "GNU General Public License v3.0"
+redistribute = false
+format = "st"
+kind = "discovered"
+
+[[project]]
+name = "roald87-tcblack"
+url = "https://github.com/Roald87/TcBlack"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "fisothemes-fisothemes-error-library-for-twincat"
+url = "https://github.com/fisothemes/FisoThemes-Error-Library-for-TwinCAT"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "adamfisher-plcinfo"
+url = "https://github.com/adamfisher/plcinfo"
+licence = "GNU General Public License v3.0"
+redistribute = false
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "felipehornink-hplc"
+url = "https://github.com/FelipeHornink/HPLC"
+licence = "other (see repository)"
+redistribute = false
+format = "st"
+kind = "discovered"
+
+[[project]]
+name = "burksengineering-tctransform"
+url = "https://github.com/BurksEngineering/TcTransform"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "fisothemes-twincat-abstract-data-structures"
+url = "https://github.com/fisothemes/TwinCAT-Abstract-Data-Structures"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "arthurkax-plc-browser-io"
+url = "https://github.com/ArthurkaX/plc-browser-io"
+licence = "MIT License"
+redistribute = true
+format = "st"
+kind = "discovered"
+
+[[project]]
+name = "iswunistuttgart-rtnnigen"
+url = "https://github.com/iswunistuttgart/rtnnigen"
+licence = "GNU General Public License v3.0"
+redistribute = false
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "arthurkax-cds-text-sync"
+url = "https://github.com/ArthurkaX/cds-text-sync"
+licence = "MIT License"
+redistribute = true
+format = "st"
+kind = "discovered"
+
+[[project]]
+name = "fisothemes-fisothemes-time-library-for-twincat"
+url = "https://github.com/fisothemes/FisoThemes-Time-Library-for-TwinCAT"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "klauer-blark"
+url = "https://github.com/klauer/blark"
+licence = "GNU General Public License v2.0"
+redistribute = false
+format = "st"
+kind = "discovered"
+
+[[project]]
+name = "cristianmori-morifixplc"
+url = "https://github.com/CristianMori/MoriFixPlc"
+licence = "Apache License 2.0"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "beckhoff-tc3eventlogger-samples"
+url = "https://github.com/Beckhoff/Tc3Eventlogger_Samples"
+licence = "BSD Zero Clause License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "rassrollers-tctcpudprt"
+url = "https://github.com/rassrollers/TcTcpUdpRT"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "stefanhenneken-blog-2014-01-iec61131-interfaces-sample01"
+url = "https://github.com/StefanHenneken/Blog-2014-01-IEC61131-Interfaces-Sample01"
+licence = "BSD 2-Clause \"Simplified\" License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "beckhoff-tf6000-ads-dotnet-v5-samples"
+url = "https://github.com/Beckhoff/TF6000_ADS_DOTNET_V5_Samples"
+licence = "BSD Zero Clause License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "technical-software-solutions-twincat-tools"
+url = "https://github.com/Technical-Software-Solutions/twincat-tools"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "heytalepazguato-plc-st-review"
+url = "https://github.com/HeytalePazguato/plc-st-review"
+licence = "MIT License"
+redistribute = true
+format = "st"
+kind = "discovered"
+
+[[project]]
+name = "fisothemes-tcads-rs"
+url = "https://github.com/fisothemes/tcads-rs"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "beckhoff-tf6760-samples"
+url = "https://github.com/Beckhoff/TF6760_Samples"
+licence = "other (see repository)"
+redistribute = false
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "cgainsworks-plc-cip-batch-control"
+url = "https://github.com/CGainsWorks/plc-cip-batch-control"
+licence = "MIT License"
+redistribute = true
+format = "st"
+kind = "discovered"
+
+[[project]]
+name = "roald87-tcerror"
+url = "https://github.com/Roald87/TcError"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "heytalepazguato-tree-sitter-iec61131-3-st"
+url = "https://github.com/HeytalePazguato/tree-sitter-iec61131-3-st"
+licence = "MIT License"
+redistribute = true
+format = "st"
+kind = "discovered"
+
+[[project]]
+name = "pneutronic-ptc-xae-mcp"
+url = "https://github.com/Pneutronic/ptc-xae-mcp"
+licence = "Apache License 2.0"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "fisothemes-twincat-hashing-algorithms"
+url = "https://github.com/fisothemes/TwinCAT-Hashing-Algorithms"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "stefanhenneken-blog-2016-04-iec61131-command-sample02"
+url = "https://github.com/StefanHenneken/Blog-2016-04-IEC61131-Command-Sample02"
+licence = "BSD 2-Clause \"Simplified\" License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "yaskawaeurope-mlx-examples"
+url = "https://github.com/YaskawaEurope/mlx-examples"
+licence = "MIT License"
+redistribute = true
+format = "st"
+kind = "discovered"
+
+[[project]]
+name = "loupeteam-tcpiper"
+url = "https://github.com/loupeteam/TcPiper"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "stefanhenneken-blog-2016-04-iec61131-command-sample03"
+url = "https://github.com/StefanHenneken/Blog-2016-04-IEC61131-Command-Sample03"
+licence = "BSD 2-Clause \"Simplified\" License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "stefanhenneken-blog-2016-04-iec61131-command-sample01"
+url = "https://github.com/StefanHenneken/Blog-2016-04-IEC61131-Command-Sample01"
+licence = "BSD 2-Clause \"Simplified\" License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "jozefchmelar-beckhoff-examples"
+url = "https://github.com/jozefchmelar/Beckhoff-Examples"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "benhar-dev-tc3-oop-serial"
+url = "https://github.com/benhar-dev/tc3-oop-serial"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "ptku-tc-prober"
+url = "https://github.com/PTKu/tc.prober"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "ninjamonkeytutorials-functions-part-two"
+url = "https://github.com/NinjaMonkeyTutorials/functions-part-two"
+licence = "Apache License 2.0"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "controltheplant-pid-controller"
+url = "https://github.com/controltheplant/PID-controller"
+licence = "other (see repository)"
+redistribute = false
+format = "st"
+kind = "discovered"
+
+[[project]]
+name = "stefanhenneken-blog-2022-04-iec61131-lsp-sample01"
+url = "https://github.com/StefanHenneken/Blog-2022-04-IEC61131-LSP-Sample01"
+licence = "BSD 2-Clause \"Simplified\" License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "arthurkax-netflux"
+url = "https://github.com/ArthurkaX/netflux"
+licence = "MIT License"
+redistribute = true
+format = "st"
+kind = "discovered"
+
+[[project]]
+name = "stefanhenneken-blog-2022-04-iec61131-lsp-sample03"
+url = "https://github.com/StefanHenneken/Blog-2022-04-IEC61131-LSP-Sample03"
+licence = "BSD 2-Clause \"Simplified\" License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "loupeteam-tccommando"
+url = "https://github.com/loupeteam/TcCommando"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "sulemanali5760-twincat3-pickplace-framework"
+url = "https://github.com/sulemanali5760/twincat3-pickplace-framework"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "ptku-tcopen-examples"
+url = "https://github.com/PTKu/TcOpen-Examples"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "stefanhenneken-blog-2022-02-iec61131-srp-sample01"
+url = "https://github.com/StefanHenneken/Blog-2022-02-IEC61131-SRP-Sample01"
+licence = "BSD 2-Clause \"Simplified\" License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "ignacbrychta-smarthouseiot"
+url = "https://github.com/IgnacBrychta/SmartHouseIOT"
+licence = "MIT License"
+redistribute = true
+format = "st"
+kind = "discovered"
+
+[[project]]
+name = "ignacbrychta-elevatorsim-plc"
+url = "https://github.com/IgnacBrychta/ElevatorSIM_PLC"
+licence = "MIT License"
+redistribute = true
+format = "st"
+kind = "discovered"
+
+[[project]]
+name = "osologic-platform"
+url = "https://github.com/OSOlogic/platform"
+licence = "GNU Affero General Public License v3.0"
+redistribute = false
+format = "st"
+kind = "discovered"
+
+[[project]]
+name = "fbarresi-twincatadstool"
+url = "https://github.com/fbarresi/TwinCatAdsTool"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "fbarresi-beckhoffhttpclient"
+url = "https://github.com/fbarresi/BeckhoffHttpClient"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "stefanbesler-twinson"
+url = "https://github.com/stefanbesler/Twinson"
+licence = "GNU General Public License v3.0"
+redistribute = false
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "codepiercertechnology-tcview"
+url = "https://github.com/CodePiercerTechnology/TcView"
+licence = "MIT License"
+redistribute = true
+format = "st"
+kind = "discovered"
+
+[[project]]
+name = "benhar-dev-tc3-data-logger"
+url = "https://github.com/benhar-dev/tc3-data-logger"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "dalageo-twincat-virtual-elevator"
+url = "https://github.com/Dalageo/twincat-virtual-elevator"
+licence = "other (see repository)"
+redistribute = false
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "dalageo-twincat-virtual-agv"
+url = "https://github.com/Dalageo/twincat-virtual-agv"
+licence = "other (see repository)"
+redistribute = false
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "dalageo-twincat-virtual-tram"
+url = "https://github.com/Dalageo/twincat-virtual-tram"
+licence = "other (see repository)"
+redistribute = false
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "zhugongzhugongzhugong-xz-pickplace-codesys"
+url = "https://github.com/zhugongzhugongzhugong/XZ-PickPlace-CODESYS"
+licence = "other (see repository)"
+redistribute = false
+format = "st"
+kind = "discovered"
+
+[[project]]
+name = "stefanhenneken-blog-2014-03-iec61131-abstractfactory-sample03"
+url = "https://github.com/StefanHenneken/Blog-2014-03-IEC61131-AbstractFactory-Sample03"
+licence = "BSD 2-Clause \"Simplified\" License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "cristianmori-mori-escaflow"
+url = "https://github.com/CristianMori/Mori.EscaFlow"
+licence = "Apache License 2.0"
+redistribute = true
+format = "st"
+kind = "discovered"
+
+[[project]]
+name = "agenticcontrolio-twincat-validator-mcp"
+url = "https://github.com/agenticcontrolio/twincat-validator-mcp"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "roald87-twincateventloggerexample"
+url = "https://github.com/Roald87/TwinCatEventLoggerExample"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "wayan123-multi-plc-agent"
+url = "https://github.com/Wayan123/multi-plc-agent"
+licence = "Apache License 2.0"
+redistribute = true
+format = "st"
+kind = "discovered"
+
+[[project]]
+name = "ottomeister-siemens-tia-portal-pid-controller"
+url = "https://github.com/OttoMeister/Siemens-Tia-Portal-PID-Controller"
+licence = "Do What The F*ck You Want To Public License"
+redistribute = false
+format = "st"
+kind = "discovered"
+
+[[project]]
+name = "stefanhenneken-blog-2021-05-iec61131-dip-sample01"
+url = "https://github.com/StefanHenneken/Blog-2021-05-IEC61131-DIP-Sample01"
+licence = "BSD 2-Clause \"Simplified\" License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "flhofer-iec-61131-3-testlib"
+url = "https://github.com/flhofer/IEC_61131-3_TestLib"
+licence = "GNU General Public License v3.0"
+redistribute = false
+format = "st"
+kind = "discovered"
+
+[[project]]
+name = "stefanhenneken-blog-2021-05-iec61131-dip-sample02"
+url = "https://github.com/StefanHenneken/Blog-2021-05-IEC61131-DIP-Sample02"
+licence = "BSD 2-Clause \"Simplified\" License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "stefanhenneken-blog-2018-08-iec61131-decoratorpattern-sample03"
+url = "https://github.com/StefanHenneken/Blog-2018-08-IEC61131-DecoratorPattern-Sample03"
+licence = "BSD 2-Clause \"Simplified\" License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "tommy-berg-simpleplc"
+url = "https://github.com/tommy-berg/SimplePLC"
+licence = "MIT License"
+redistribute = true
+format = "st"
+kind = "discovered"
+
+[[project]]
+name = "eclipse-4diac-4diac-ide"
+url = "https://github.com/eclipse-4diac/4diac-ide"
+licence = "Eclipse Public License 2.0"
+redistribute = false
+format = "st"
+kind = "discovered"
+
+[[project]]
+name = "logohere-rustplc"
+url = "https://github.com/logohere/rustplc"
+licence = "other (see repository)"
+redistribute = false
+format = "st"
+kind = "discovered"
+
+[[project]]
+name = "stefanbesler-twingrind"
+url = "https://github.com/stefanbesler/twingrind"
+licence = "GNU General Public License v3.0"
+redistribute = false
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "stefanhenneken-blog-2018-06-iec61131-statepattern-sample03"
+url = "https://github.com/StefanHenneken/Blog-2018-06-IEC61131-StatePattern-Sample03"
+licence = "BSD 2-Clause \"Simplified\" License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "nikvoronin-tc3-pcspeaker"
+url = "https://github.com/nikvoronin/Tc3_PcSpeaker"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "stefanhenneken-blog-2018-02-iec61131-observerpattern-sample02"
+url = "https://github.com/StefanHenneken/Blog-2018-02-IEC61131-ObserverPattern-Sample02"
+licence = "BSD 2-Clause \"Simplified\" License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "ufukefekaya-tr-delta-plc-agent"
+url = "https://github.com/ufukefekaya-tr/delta-plc-agent"
+licence = "MIT License"
+redistribute = true
+format = "st"
+kind = "discovered"
+
+[[project]]
+name = "stefanhenneken-blog-2023-06-iec61131-lod-sample01"
+url = "https://github.com/StefanHenneken/Blog-2023-06-IEC61131-LoD-Sample01"
+licence = "BSD 2-Clause \"Simplified\" License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "hopperpop-tclinkedlist"
+url = "https://github.com/Hopperpop/TcLinkedList"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "loupeteam-tcsequencer"
+url = "https://github.com/loupeteam/TcSequencer"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "barteling-twincat-meets-project-euler"
+url = "https://github.com/Barteling/TwinCAT-Meets-Project-Euler"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "dalageo-twincat-virtual-washer"
+url = "https://github.com/Dalageo/twincat-virtual-washer"
+licence = "other (see repository)"
+redistribute = false
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "stefanhenneken-blog-2019-04-iec61131-fbinit-sample01"
+url = "https://github.com/StefanHenneken/Blog-2019-04-IEC61131-FBinit-Sample01"
+licence = "BSD 2-Clause \"Simplified\" License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "peterzerlauth-tc3-state"
+url = "https://github.com/PeterZerlauth/Tc3_State"
+licence = "GNU General Public License v2.0"
+redistribute = false
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "stefanhenneken-blog-2016-06-iec61131-namespaces-sample01"
+url = "https://github.com/StefanHenneken/Blog-2016-06-IEC61131-Namespaces-Sample01"
+licence = "BSD 2-Clause \"Simplified\" License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "stefanhenneken-blog-2014-03-iec61131-abstractfactory-sample01"
+url = "https://github.com/StefanHenneken/Blog-2014-03-IEC61131-AbstractFactory-Sample01"
+licence = "BSD 2-Clause \"Simplified\" License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "hafizul-husni-plc-fundamentals"
+url = "https://github.com/hafizul-husni/plc-fundamentals"
+licence = "MIT License"
+redistribute = true
+format = "st"
+kind = "discovered"
+
+[[project]]
+name = "svroonland-twinrx"
+url = "https://github.com/svroonland/TwinRx"
+licence = "Apache License 2.0"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "beckhoff-adstojava"
+url = "https://github.com/Beckhoff/AdsToJava"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "greenforge-labs-codescribe"
+url = "https://github.com/greenforge-labs/codescribe"
+licence = "Apache License 2.0"
+redistribute = true
+format = "st"
+kind = "discovered"
+
+[[project]]
+name = "stefanhenneken-blog-2020-03-iec61131-abstract-sample03"
+url = "https://github.com/StefanHenneken/Blog-2020-03-IEC61131-Abstract-Sample03"
+licence = "BSD 2-Clause \"Simplified\" License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "stefanhenneken-blog-2017-08-iec61131-unittests-sample01"
+url = "https://github.com/StefanHenneken/Blog-2017-08-IEC61131-UnitTests-Sample01"
+licence = "BSD 2-Clause \"Simplified\" License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "stefanhenneken-blog-2018-02-iec61131-observerpattern-sample01"
+url = "https://github.com/StefanHenneken/Blog-2018-02-IEC61131-ObserverPattern-Sample01"
+licence = "BSD 2-Clause \"Simplified\" License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "stefanhenneken-blog-2010-04-lightsample-tc3"
+url = "https://github.com/StefanHenneken/Blog-2010-04-LightSample_Tc3"
+licence = "BSD 2-Clause \"Simplified\" License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "andreas-schwenk-st2cc"
+url = "https://github.com/andreas-schwenk/st2cc"
+licence = "GNU General Public License v3.0"
+redistribute = false
+format = "st"
+kind = "discovered"
+
+[[project]]
+name = "esinbegumkaya-plcflow"
+url = "https://github.com/esinbegumkaya/PLCFlow"
+licence = "MIT License"
+redistribute = true
+format = "st"
+kind = "discovered"
+
+[[project]]
+name = "stefanhenneken-blog-2020-03-iec61131-abstract-sample01"
+url = "https://github.com/StefanHenneken/Blog-2020-03-IEC61131-Abstract-Sample01"
+licence = "BSD 2-Clause \"Simplified\" License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "czarnak-tia-portal-mcp"
+url = "https://github.com/Czarnak/tia-portal-mcp"
+licence = "MIT License"
+redistribute = true
+format = "st"
+kind = "discovered"
+
+[[project]]
+name = "lmyhit-ubuntu-twincat-adscommunication"
+url = "https://github.com/lmyhit/Ubuntu-Twincat-ADSCommunication"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "opcfoundation-ua-edgetranslator"
+url = "https://github.com/OPCFoundation/UA-EdgeTranslator"
+licence = "MIT License"
+redistribute = true
+format = "st"
+kind = "discovered"
+
+[[project]]
+name = "jozefchmelar-streaming-plc-grafana"
+url = "https://github.com/jozefchmelar/Streaming-PLC-Grafana"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "stiana-sarutils"
+url = "https://github.com/stiana/SARUtils"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "serhioromano-vscode-st"
+url = "https://github.com/Serhioromano/vscode-st"
+licence = "MIT License"
+redistribute = true
+format = "st"
+kind = "discovered"
+
+[[project]]
+name = "benhar-dev-ads-xbox-controller"
+url = "https://github.com/benhar-dev/ads-xbox-controller"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "ptku-tc-prober-examples"
+url = "https://github.com/PTKu/Tc.Prober.Examples"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "jadehuang-realplc-agent"
+url = "https://github.com/JadeHuang/RealPLC-Agent"
+licence = "other (see repository)"
+redistribute = false
+format = "st"
+kind = "discovered"
+
+[[project]]
+name = "stefanhenneken-blog-2018-06-iec61131-statepattern-sample01"
+url = "https://github.com/StefanHenneken/Blog-2018-06-IEC61131-StatePattern-Sample01"
+licence = "BSD 2-Clause \"Simplified\" License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "stefanhenneken-blog-2017-01-iec61131-methods-sample01"
+url = "https://github.com/StefanHenneken/Blog-2017-01-IEC61131-Methods-Sample01"
+licence = "BSD 2-Clause \"Simplified\" License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "stefanhenneken-blog-2018-06-iec61131-statepattern-sample02"
+url = "https://github.com/StefanHenneken/Blog-2018-06-IEC61131-StatePattern-Sample02"
+licence = "BSD 2-Clause \"Simplified\" License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "radfar-building-irrigation-scada"
+url = "https://github.com/Radfar/building-irrigation-scada"
+licence = "MIT License"
+redistribute = true
+format = "st"
+kind = "discovered"
+
+[[project]]
+name = "islammdmajharul116-hue-omron-plc-kiln-conveyor-control"
+url = "https://github.com/islammdmajharul116-hue/OMRON-PLC-Kiln-Conveyor-Control"
+licence = "MIT License"
+redistribute = true
+format = "st"
+kind = "discovered"
+
+[[project]]
+name = "sm1820-matiec"
+url = "https://github.com/sm1820/matiec"
+licence = "GNU General Public License v3.0"
+redistribute = false
+format = "st"
+kind = "discovered"
+
+[[project]]
+name = "stefanhenneken-blog-2018-08-iec61131-decoratorpattern-sample01"
+url = "https://github.com/StefanHenneken/Blog-2018-08-IEC61131-DecoratorPattern-Sample01"
+licence = "BSD 2-Clause \"Simplified\" License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "fortiphyd-grficsv2"
+url = "https://github.com/Fortiphyd/GRFICSv2"
+licence = "GNU General Public License v3.0"
+redistribute = false
+format = "st"
+kind = "discovered"
+
+[[project]]
+name = "jarmocluyse-ads-go"
+url = "https://github.com/JarmoCluyse/ads-go"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "evanmj-tcjoy"
+url = "https://github.com/evanmj/TcJoy"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "zeugwerk-twinpack"
+url = "https://github.com/Zeugwerk/Twinpack"
+licence = "GNU General Public License v3.0"
+redistribute = false
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "fbarresi-beckhoffs7client"
+url = "https://github.com/fbarresi/BeckhoffS7Client"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "stefanhenneken-blog-2017-08-iec61131-unittests-tcunit"
+url = "https://github.com/StefanHenneken/Blog-2017-08-IEC61131-UnitTests-TcUnit"
+licence = "BSD 2-Clause \"Simplified\" License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "stefanhenneken-blog-2016-03-iec61131-arrays-sample04"
+url = "https://github.com/StefanHenneken/Blog-2016-03-IEC61131-Arrays-Sample04"
+licence = "BSD 2-Clause \"Simplified\" License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "stefanhenneken-blog-2016-03-iec61131-arrays-sample02"
+url = "https://github.com/StefanHenneken/Blog-2016-03-IEC61131-Arrays-Sample02"
+licence = "BSD 2-Clause \"Simplified\" License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "cdilga-ladder-logic-editor"
+url = "https://github.com/cdilga/ladder-logic-editor"
+licence = "MIT License"
+redistribute = true
+format = "st"
+kind = "discovered"
+
+[[project]]
+name = "hhirsch-sps-buddy"
+url = "https://github.com/hhirsch/sps-buddy"
+licence = "GNU General Public License v3.0"
+redistribute = false
+format = "st"
+kind = "discovered"
+
+[[project]]
+name = "1337leets-automated-assembly-line-control-system-openplc"
+url = "https://github.com/1337leets/Automated-Assembly-Line-Control-System-OpenPLC"
+licence = "BSD 3-Clause \"New\" or \"Revised\" License"
+redistribute = true
+format = "st"
+kind = "discovered"
+
+[[project]]
+name = "rongxuan-zhou-multi-robot-assembly-cell"
+url = "https://github.com/Rongxuan-Zhou/multi-robot-assembly-cell"
+licence = "Apache License 2.0"
+redistribute = true
+format = "st"
+kind = "discovered"
+
+[[project]]
+name = "mkamel7-virtual-production-cell"
+url = "https://github.com/MKamel7/virtual-production-cell"
+licence = "MIT License"
+redistribute = true
+format = "st"
+kind = "discovered"
+
+[[project]]
+name = "lian-automation-plc-robot-integration"
+url = "https://github.com/lian-automation/PLC-Robot-Integration"
+licence = "MIT License"
+redistribute = true
+format = "st"
+kind = "discovered"
+
+[[project]]
+name = "serenaptd-sahel-smart-shield"
+url = "https://github.com/SerenaPTD/sahel-smart-shield"
+licence = "MIT License"
+redistribute = true
+format = "st"
+kind = "discovered"
+
+[[project]]
+name = "smailg-plc-programming"
+url = "https://github.com/SmailG/plc-programming"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "celikgo-salman"
+url = "https://github.com/celikgo/salman"
+licence = "Apache License 2.0"
+redistribute = true
+format = "st"
+kind = "discovered"
+
+[[project]]
+name = "stefanhenneken-blog-2019-06-iec61131-trycatch-sample01"
+url = "https://github.com/StefanHenneken/Blog-2019-06-IEC61131-TryCatch-Sample01"
+licence = "BSD 2-Clause \"Simplified\" License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "stefanhenneken-blog-2016-03-iec61131-arrays-sample01"
+url = "https://github.com/StefanHenneken/Blog-2016-03-IEC61131-Arrays-Sample01"
+licence = "BSD 2-Clause \"Simplified\" License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "rileyphillips802-cursor-plc-demo"
+url = "https://github.com/rileyphillips802/cursor-plc-demo"
+licence = "MIT License"
+redistribute = true
+format = "st"
+kind = "discovered"
+
+[[project]]
+name = "nikvoronin-adsremote"
+url = "https://github.com/nikvoronin/AdsRemote"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "philippleidig-twincat-productivitytools"
+url = "https://github.com/philippleidig/TwinCAT.ProductivityTools"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "sagatowski-tcstaticanalysisloader"
+url = "https://github.com/sagatowski/TcStaticAnalysisLoader"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "rruiter87-tctemplate"
+url = "https://github.com/rruiter87/TcTemplate"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "benhar-dev-tc3-guid"
+url = "https://github.com/benhar-dev/tc3-guid"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "michielvanwelsenaere-homeautomation-codesys3"
+url = "https://github.com/MichielVanwelsenaere/HomeAutomation.CoDeSys3"
+licence = "MIT License"
+redistribute = true
+format = "st"
+kind = "discovered"
+
+[[project]]
+name = "mrlostintheinternet-fluidpyplc"
+url = "https://github.com/MrLostInTheInternet/FluidPyPLC"
+licence = "GNU General Public License v3.0"
+redistribute = false
+format = "st"
+kind = "discovered"
+
+[[project]]
+name = "jubnzv-iec-vim"
+url = "https://github.com/jubnzv/IEC.vim"
+licence = "MIT License"
+redistribute = true
+format = "st"
+kind = "discovered"
+
+[[project]]
+name = "highlightjs-highlightjs-structured-text"
+url = "https://github.com/highlightjs/highlightjs-structured-text"
+licence = "BSD 3-Clause \"New\" or \"Revised\" License"
+redistribute = true
+format = "st"
+kind = "discovered"
+
+[[project]]
+name = "alex-hahn-plcforge"
+url = "https://github.com/alex-hahn/plcforge"
+licence = "other (see repository)"
+redistribute = false
+format = "st"
+kind = "discovered"
+
+[[project]]
+name = "yuzui-best-rl-mar"
+url = "https://github.com/yuzui-best/RL_MAR"
+licence = "other (see repository)"
+redistribute = false
+format = "st"
+kind = "discovered"
+
+[[project]]
+name = "1337leets-pmdc-motor-pid-control-modbus-hmi-openplc"
+url = "https://github.com/1337leets/PMDC-Motor-PID-Control-Modbus-HMI-OpenPLC"
+licence = "Apache License 2.0"
+redistribute = true
+format = "st"
+kind = "discovered"
+
+[[project]]
+name = "feelautom-tia-connect-vscode"
+url = "https://github.com/feelautom/tia-connect-vscode"
+licence = "other (see repository)"
+redistribute = false
+format = "st"
+kind = "discovered"
+
+[[project]]
+name = "basheeraltawil-fuzzy-greenhouse-climate-control"
+url = "https://github.com/basheeraltawil/fuzzy-greenhouse-climate-control"
+licence = "MIT License"
+redistribute = true
+format = "st"
+kind = "discovered"
+
+[[project]]
+name = "brandons-cs-codesys-migrator"
+url = "https://github.com/brandons-cs/codesys-migrator"
+licence = "MIT License"
+redistribute = true
+format = "st"
+kind = "discovered"
+
+[[project]]
+name = "yuri-fernando-industrial-control-lab"
+url = "https://github.com/Yuri-Fernando/Industrial-Control-Lab"
+licence = "MIT License"
+redistribute = true
+format = "st"
+kind = "discovered"
+
+[[project]]
+name = "fatinnihal532-hub-plc-pump-station"
+url = "https://github.com/fatinnihal532-hub/plc-pump-station"
+licence = "MIT License"
+redistribute = true
+format = "st"
+kind = "discovered"
+
+[[project]]
+name = "taborbachelor-controllab"
+url = "https://github.com/taborbachelor/controllab"
+licence = "MIT License"
+redistribute = true
+format = "st"
+kind = "discovered"
+
+[[project]]
+name = "yongjunmun-plc-vision-production-cell"
+url = "https://github.com/yongjunmun/PLC-Vision-Production-Cell"
+licence = "MIT License"
+redistribute = true
+format = "st"
+kind = "discovered"
+
+[[project]]
+name = "masscry-deci-vm"
+url = "https://github.com/masscry/deci.vm"
+licence = "MIT License"
+redistribute = true
+format = "st"
+kind = "discovered"
+
+[[project]]
+name = "radevgit-plc"
+url = "https://github.com/radevgit/plc"
+licence = "MIT License"
+redistribute = true
+format = "st"
+kind = "discovered"
+
+[[project]]
+name = "beckhoff-ads"
+url = "https://github.com/Beckhoff/ADS"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+
+[[project]]
+name = "teozocchi-tank-level-control"
+url = "https://github.com/teozocchi/tank-level-control"
+licence = "MIT License"
+redistribute = true
+format = "st"
+kind = "discovered"
+
+[[project]]
+name = "jessalguacil-solidmotorexamplest"
+url = "https://github.com/JessAlguacil/SolidMotorExampleST"
+licence = "MIT License"
+redistribute = true
+format = "st"
+kind = "discovered"
+
+[[project]]
+name = "ntufar-c2st"
+url = "https://github.com/ntufar/c2st"
+licence = "MIT License"
+redistribute = true
+format = "st"
+kind = "discovered"
+
+[[project]]
+name = "lilkiddy007-twincat3-plc-motion-control"
+url = "https://github.com/LilKiddy007/twincat3-plc-motion-control"
+licence = "other (see repository)"
+redistribute = false
+format = "st"
+kind = "discovered"

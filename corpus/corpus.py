@@ -1,15 +1,17 @@
 """Real-world PLC code corpus: fetch, extract and analyse with rootplc.
 
+    python corpus/corpus.py sync       # fetch PLC sources only, extract, delete the clone (disk-light)
     python corpus/corpus.py fetch      # shallow-clone every project into corpus/.cache
     python corpus/corpus.py analyse    # extract ST, run rootplc check, write the report + dashboard
     python corpus/corpus.py dashboard  # rebuild corpus/dashboard.html from the last analysis
 
-Writes corpus/REPORT.md and corpus/.cache/analysis.json. Code is never
+Writes corpus/REPORT.md and <cache>/analysis.json (cache: $ROOTPLC_CORPUS_CACHE or corpus/.cache). Code is never
 copied into the repository (see manifest.toml).
 """
 from __future__ import annotations
 
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -22,7 +24,9 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parent
-CACHE = HERE / ".cache"
+# Where code is cloned and extracted; set ROOTPLC_CORPUS_CACHE to keep it on
+# another disk (it grows with the corpus). Default: corpus/.cache.
+CACHE = Path(os.environ.get("ROOTPLC_CORPUS_CACHE") or HERE / ".cache")
 SYNTAX_CODES = {f"RP{n:04d}" for n in list(range(1, 17)) + [201, 202, 301]}
 
 # Constructs that matter for dialect coverage (counted in extracted code).
@@ -59,7 +63,65 @@ def fetch() -> None:
         print(("fetch " if r.returncode == 0 else "FAIL  ") + p["name"] + (" " + r.stderr.strip()[:100] if r.returncode else ""))
 
 
+# Files each format needs; sync checks out only these (sparse, blobless clone).
+SOURCES = {
+    "twincat": ["*.TcPOU", "*.TcDUT", "*.TcGVL", "*.TcIO"],
+    "brx": ["*.st", "*.fun", "*.typ", "*.var"],
+    "st": ["*.st"],
+}
+
+
+def sync() -> None:
+    """Fetch only the PLC source files of each project, extract the units and
+    delete the clone, so the cache holds just the extracted text. Projects
+    already extracted are skipped; clones left by `fetch` are pruned."""
+    CACHE.mkdir(exist_ok=True)
+    for p in projects():
+        if p["format"] in ("binary", "none"):
+            continue
+        base = CACHE / p["name"]
+        repo, done = base / "repo", base / "extracted"
+        if done.exists():
+            if repo.exists():  # a clone left by fetch or an interrupted sync
+                shutil.rmtree(repo, onexc=_force_remove)
+            continue
+        if not repo.exists():
+            base.mkdir(parents=True, exist_ok=True)
+            steps = [
+                ["git", "clone", "--depth", "1", "--filter=blob:none", "--no-checkout", "--quiet", p["url"], str(repo)],
+                ["git", "-C", str(repo), "sparse-checkout", "set", "--no-cone", *SOURCES[p["format"]]],
+                ["git", "-C", str(repo), "checkout", "--quiet"],
+            ]
+            err = ""
+            for cmd in steps:
+                r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
+                if r.returncode:
+                    err = r.stderr.strip()[:120]
+                    break
+            if err:
+                print(f"FAIL  {p['name']}: {err}", flush=True)
+                shutil.rmtree(repo, onexc=_force_remove)
+                continue
+        n = len(list(extract(p).glob("*.st")))
+        shutil.rmtree(repo, onexc=_force_remove)
+        print(f"sync  {p['name']:44} {n:5} units", flush=True)
+
+
+def _force_remove(func, path, _exc):
+    """Git marks pack files read-only on Windows; clear the flag and retry."""
+    import os
+    import stat
+    os.chmod(path, stat.S_IWRITE)
+    func(path)
+
+
 # ----------------------------------------------------------------- extraction
+
+def files(root: Path, pattern: str) -> list[Path]:
+    """Files under root matching pattern; directories named like files
+    (e.g. an Eclipse plugin folder `...debug.st`) are skipped."""
+    return sorted(f for f in root.rglob(pattern) if f.is_file())
+
 
 def text_of(el) -> str:
     return (el.text or "") if el is not None else ""
@@ -106,13 +168,13 @@ def brx_units(repo: Path) -> list[tuple[str, str]]:
     """B&R: types from .typ, function declarations from .fun joined with bodies from .st."""
     decls: dict[str, str] = {}
     out = []
-    for f in repo.rglob("*.fun"):
+    for f in files(repo, "*.fun"):
         text = f.read_text(encoding="utf-8", errors="replace")
         for m in re.finditer(r"(?is)\b(FUNCTION_BLOCK|FUNCTION)\s+(\w+)(.*?)\bEND_\1\b", text):
             decls[m.group(2).upper()] = m.group(0)[: -len("END_" + m.group(1))]
-    for f in repo.rglob("*.typ"):
+    for f in files(repo, "*.typ"):
         out.append((f"TYPE_{f.stem}", f.read_text(encoding="utf-8", errors="replace")))
-    for f in repo.rglob("*.st"):
+    for f in files(repo, "*.st"):
         text = f.read_text(encoding="utf-8", errors="replace")
         for m in re.finditer(r"(?is)\b(FUNCTION_BLOCK|FUNCTION)\s+(\w+)(.*?)\bEND_\1\b", text):
             name = m.group(2).upper()
@@ -131,13 +193,13 @@ def extract(p: dict) -> Path:
     dst.mkdir(parents=True)
     units: list[tuple[str, str]] = []
     if p["format"] == "twincat":
-        for f in sorted(repo.rglob("*")):
+        for f in sorted(files(repo, "*")):
             if f.suffix in (".TcPOU", ".TcDUT", ".TcGVL", ".TcIO"):
                 units += twincat_units(f)
     elif p["format"] == "brx":
         units = brx_units(repo)
     else:
-        for f in sorted(repo.rglob("*.st")):
+        for f in sorted(files(repo, "*.st")):
             units.append((f.stem, f.read_text(encoding="utf-8", errors="replace")))
     seen = Counter()
     for name, src in units:
@@ -164,10 +226,13 @@ def analyse() -> None:
     for p in projects():
         if p["format"] in ("binary", "none"):
             continue
-        if not (CACHE / p["name"] / "repo").exists():
+        if (CACHE / p["name"] / "extracted").exists():
+            d = CACHE / p["name"] / "extracted"
+        elif (CACHE / p["name"] / "repo").exists():
+            d = extract(p)
+        else:
             print(f"skip {p['name']} (not fetched)")
             continue
-        d = extract(p)
         files = sorted(d.glob("*.st"))
         feats = Counter()
         lines = 0
@@ -284,7 +349,9 @@ def dashboard() -> None:
 
 if __name__ == "__main__":
     cmd = sys.argv[1] if len(sys.argv) > 1 else ""
-    if cmd == "fetch":
+    if cmd == "sync":
+        sync()
+    elif cmd == "fetch":
         fetch()
     elif cmd in ("analyse", "analyze"):
         analyse()
