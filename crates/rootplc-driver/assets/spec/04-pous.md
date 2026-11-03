@@ -54,7 +54,8 @@ member         = method | property
 ```
 
 Methods and properties may stand before or after the body (IEC 61131-3 puts
-them before it, TwinCAT exports them after it). A PROGRAM may have members too.
+them before it, TwinCAT exports them after it). A `;` after a declaration header
+(`METHOD M : INT;`) is accepted, as TwinCAT does. A PROGRAM may have members too.
 
 ## Object orientation
 

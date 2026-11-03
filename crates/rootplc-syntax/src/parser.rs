@@ -209,6 +209,7 @@ impl<'a> Parser<'a> {
                 self.nth_kind(1),
                 Some(TokenKind::LParen | TokenKind::Assign | TokenKind::Dot | TokenKind::Semicolon)
             )
+            || (self.at_kw("TEST") && self.nth_is_kw(1, "REF"))
     }
 
     /// At the start of a method or property, or at a word closing one.
@@ -573,6 +574,8 @@ impl<'a> Parser<'a> {
                 self.expect(TokenKind::Colon, "':' and the return type");
             }
         }
+        // TwinCAT accepts a ';' after the declaration header
+        self.eat(TokenKind::Semicolon);
         while self.at_section() {
             self.var_section();
         }
@@ -766,6 +769,7 @@ impl<'a> Parser<'a> {
         if self.eat(TokenKind::Colon) {
             self.type_spec();
         }
+        self.eat(TokenKind::Semicolon);
         while self.at_section() {
             self.var_section();
         }
@@ -827,6 +831,7 @@ impl<'a> Parser<'a> {
         if self.expect(TokenKind::Colon, "':' and the property type") {
             self.type_spec();
         }
+        self.eat(TokenKind::Semicolon);
         while self.at_section() {
             self.var_section();
         }
