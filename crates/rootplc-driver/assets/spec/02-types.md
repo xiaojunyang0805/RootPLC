@@ -144,7 +144,9 @@ simulator; in generated C the check can be switched off per build.
 **[types.derived.enum]** `TYPE Mode : (Off, Manual, Auto); END_TYPE`, or with
 a base type and values: `TYPE Mode : INT (Off := 0, Auto := 10); END_TYPE`.
 Without explicit values the base type is `INT` and the values are 0, 1, 2...
-in order. The default is the first value. `Mode#Auto` names a value; plain `Auto` is
+in order. The CODESYS and TwinCAT spelling with the base type after the
+values, `(Off := 0, Auto := 10) UINT`, means the same and is accepted with
+warning RP0115. The default is the first value. `Mode#Auto` names a value; plain `Auto` is
 allowed when exactly one enumeration in scope has it, otherwise error RP0106.
 Enumerations do not convert implicitly to integers (RP0103); use `TO_INT`.
 

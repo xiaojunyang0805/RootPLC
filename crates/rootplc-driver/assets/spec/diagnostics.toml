@@ -220,6 +220,13 @@ spec = "types.derived.string"
 stage = "sema"
 
 [[code]]
+id = "RP0115"
+severity = "warning"
+summary = "enumeration base type after the values (not portable); write UINT (...)"
+spec = "types.derived.enum"
+stage = "parse"
+
+[[code]]
 id = "RP0114"
 severity = "error"
 summary = "a VAR_IN_OUT argument must be a variable"

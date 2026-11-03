@@ -202,6 +202,7 @@ pub mod codes {
         STRING_LENGTH_IN_PARENS = 112, Warning;
         FUNCTION_WITHOUT_RESULT = 113, Warning;
         IN_OUT_NOT_VARIABLE = 114, Error;
+        ENUM_BASE_TYPE_AFTER = 115, Warning;
     }
 
     /// Severity of a code, if the code exists.

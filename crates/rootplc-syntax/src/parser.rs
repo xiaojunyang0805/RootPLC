@@ -632,6 +632,16 @@ impl<'a> Parser<'a> {
                 }
             }
             self.expect(TokenKind::RParen, "')'");
+            // [types.derived.enum]: CODESYS/TwinCAT write the base type after the list
+            if self.at(TokenKind::TypeName) {
+                let span = self.span_here();
+                let name = self.nth_index(0).map(|i| self.text_at(i)).unwrap_or("");
+                let msg = format!(
+                    "base type after the values is a vendor spelling; IEC 61131-3 writes {name} (...)"
+                );
+                self.bump();
+                self.error(codes::ENUM_BASE_TYPE_AFTER, msg, span);
+            }
             self.b.finish();
         } else {
             self.bump(); // (

@@ -37,6 +37,7 @@ Codes RP00xx are lexical, RP01xx types, RP02xx names and structure, RP03xx synta
 | [RP0108](#rp0108) | error | invalid bounds or length |
 | [RP0109](#rp0109) | error | constant array index out of bounds |
 | [RP0110](#rp0110) | warning | string literal longer than declared length; it will be truncated |
+| [RP0115](#rp0115) | warning | enumeration base type after the values (not portable); write UINT (...) |
 | [RP0114](#rp0114) | error | a VAR_IN_OUT argument must be a variable |
 | [RP0113](#rp0113) | warning | FUNCTION without a result type (not portable); call it as a statement |
 | [RP0112](#rp0112) | warning | STRING(n) length in parentheses (not portable); write STRING[n] |
@@ -401,7 +402,9 @@ Rule `types.derived.enum` in `spec/02-types.md`:
 **[types.derived.enum]** `TYPE Mode : (Off, Manual, Auto); END_TYPE`, or with
 a base type and values: `TYPE Mode : INT (Off := 0, Auto := 10); END_TYPE`.
 Without explicit values the base type is `INT` and the values are 0, 1, 2...
-in order. The default is the first value. `Mode#Auto` names a value; plain `Auto` is
+in order. The CODESYS and TwinCAT spelling with the base type after the
+values, `(Off := 0, Auto := 10) UINT`, means the same and is accepted with
+warning RP0115. The default is the first value. `Mode#Auto` names a value; plain `Auto` is
 allowed when exactly one enumeration in scope has it, otherwise error RP0106.
 Enumerations do not convert implicitly to integers (RP0103); use `TO_INT`.
 
@@ -452,6 +455,21 @@ same and is accepted with warning RP0112, because real code uses it widely;
 the portable spelling is `STRING[n]`. Assigning a longer string truncates it to n characters.
 A string literal longer than n in a declaration or constant assignment is
 warning RP0110.
+
+## RP0115
+
+warning: enumeration base type after the values (not portable); write UINT (...)
+
+Rule `types.derived.enum` in `spec/02-types.md`:
+
+**[types.derived.enum]** `TYPE Mode : (Off, Manual, Auto); END_TYPE`, or with
+a base type and values: `TYPE Mode : INT (Off := 0, Auto := 10); END_TYPE`.
+Without explicit values the base type is `INT` and the values are 0, 1, 2...
+in order. The CODESYS and TwinCAT spelling with the base type after the
+values, `(Off := 0, Auto := 10) UINT`, means the same and is accepted with
+warning RP0115. The default is the first value. `Mode#Auto` names a value; plain `Auto` is
+allowed when exactly one enumeration in scope has it, otherwise error RP0106.
+Enumerations do not convert implicitly to integers (RP0103); use `TO_INT`.
 
 ## RP0114
 
