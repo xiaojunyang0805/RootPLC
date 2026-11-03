@@ -39,6 +39,8 @@ Codes RP00xx are lexical, RP01xx types, RP02xx names and structure, RP03xx synta
 | [RP0110](#rp0110) | warning | string literal longer than declared length; it will be truncated |
 | [RP0116](#rp0116) | warning | POINTER TO is read as REF_TO (not portable; no pointer arithmetic) |
 | [RP0117](#rp0117) | warning | ADR(x) is read as REF(x) (not portable; no pointer arithmetic) |
+| [RP0118](#rp0118) | warning | REFERENCE TO declares an alias (not portable) |
+| [RP0119](#rp0119) | warning | FB_init arguments in a declaration are accepted but not run |
 | [RP0115](#rp0115) | warning | enumeration base type after the values (not portable); write UINT (...) |
 | [RP0114](#rp0114) | error | a VAR_IN_OUT argument must be a variable |
 | [RP0113](#rp0113) | warning | FUNCTION without a result type (not portable); call it as a statement |
@@ -472,8 +474,7 @@ reference. Dereferencing `NULL` raises the fault `NULL_REF`. CODESYS
 `POINTER TO T` is read as `REF_TO T` with warning RP0116, and `ADR(x)` as
 `REF(x)` with warning RP0117; pointer arithmetic is not supported (an
 arithmetic operator on a reference is RP0103). `POINTER TO` is not part of
-the language. The importer maps it to `REF_TO`
-where it can and reports the rest.
+the language.
 
 ## RP0117
 
@@ -487,8 +488,33 @@ reference. Dereferencing `NULL` raises the fault `NULL_REF`. CODESYS
 `POINTER TO T` is read as `REF_TO T` with warning RP0116, and `ADR(x)` as
 `REF(x)` with warning RP0117; pointer arithmetic is not supported (an
 arithmetic operator on a reference is RP0103). `POINTER TO` is not part of
-the language. The importer maps it to `REF_TO`
+the language.
+
+## RP0118
+
+warning: REFERENCE TO declares an alias (not portable)
+
+Rule `types.reference.alias` in `spec/02-types.md`:
+
+**[types.reference.alias]** CODESYS `REFERENCE TO T` declares an alias,
+accepted with warning RP0118: the variable holds a reference, but every use
+of it reads or writes the target. `r REF= x` makes `r` refer to `x`, and
+`__ISVALIDREF(r)` is TRUE when `r` refers to something. Using an alias that
+refers to nothing is the fault `NULL_REF`. The importer maps it to `REF_TO`
 where it can and reports the rest.
+
+## RP0119
+
+warning: FB_init arguments in a declaration are accepted but not run
+
+Rule `variables.init-arguments` in `spec/03-variables.md`:
+
+**[variables.init-arguments]** A function-block instance may be declared
+with arguments, `fb : FB_Buffer(size := 10);`, which CODESYS and TwinCAT
+pass to the block's `FB_init` method. RootPLC accepts the form with warning
+RP0119 but does not run `FB_init` yet.
+
+`type_spec` is defined in spec/04-pous.md [pous.type-spec].
 
 ## RP0115
 

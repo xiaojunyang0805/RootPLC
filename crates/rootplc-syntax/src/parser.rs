@@ -172,6 +172,11 @@ impl<'a> Parser<'a> {
         }
     }
 
+    /// `TEST(` inside a body is a call (TcUnit's TEST function), not a test block.
+    fn at_test_call(&self) -> bool {
+        self.at_kw("TEST") && self.nth_kind(1) == Some(TokenKind::LParen)
+    }
+
     /// At the start of a method or property, or at a word closing one.
     fn at_member_boundary(&self) -> bool {
         if self.at_kw("METHOD") || self.at_word("PROPERTY") || self.at_word("END_PROPERTY") {
@@ -670,6 +675,9 @@ impl<'a> Parser<'a> {
         self.b.start(N::Interface);
         let open_span = self.span_here();
         self.bump();
+        while self.at_any_kw(MODIFIER_KWS) {
+            self.bump();
+        }
         self.name();
         self.extends_implements();
         self.members("END_INTERFACE");
@@ -697,6 +705,9 @@ impl<'a> Parser<'a> {
         while !self.at_eof() && !self.at_kw("END_TYPE") && !self.at_any_kw(POU_KWS) {
             let before = self.pos;
             self.b.start(N::TypeDecl);
+            while self.at_any_kw(MODIFIER_KWS) {
+                self.bump();
+            }
             let named = self.name();
             if named {
                 // [types.derived.struct]: TYPE B EXTENDS A : STRUCT … END_STRUCT
@@ -778,6 +789,16 @@ impl<'a> Parser<'a> {
         }
         if self.expect(TokenKind::Colon, "':' and a type") {
             self.type_spec();
+            if self.at(TokenKind::LParen) {
+                // [variables.init-arguments]: fb : FB_X(arg := v) passes FB_init arguments
+                let span = self.span_here();
+                self.arg_list();
+                self.error(
+                    codes::INIT_ARGUMENTS_IGNORED,
+                    "FB_init arguments are accepted but not run yet".into(),
+                    span,
+                );
+            }
             if self.eat(TokenKind::Assign) {
                 self.initializer();
             }
@@ -829,6 +850,18 @@ impl<'a> Parser<'a> {
                 self.error(
                     codes::POINTER_TYPE,
                     "POINTER TO is a vendor type; RootPLC reads it as REF_TO (no pointer arithmetic)".into(),
+                    span,
+                );
+                self.type_spec();
+            }
+            // [types.reference.alias]: CODESYS REFERENCE TO T
+            Some(TokenKind::Ident) if self.at_word("REFERENCE") && self.nth_is_kw(1, "TO") => {
+                let span = self.span_here();
+                self.bump();
+                self.bump();
+                self.error(
+                    codes::REFERENCE_TYPE,
+                    "REFERENCE TO is a vendor type; uses read and write its target".into(),
                     span,
                 );
                 self.type_spec();
@@ -988,7 +1021,7 @@ impl<'a> Parser<'a> {
         while !self.at_eof()
             && !self.at_any_kw(LIST_END_KWS)
             && !self.at_any_kw(extra_end)
-            && !self.at_any_kw(POU_KWS)
+            && !(self.at_any_kw(POU_KWS) && !self.at_test_call())
             && !self.at_member_boundary()
         {
             let before = self.pos;
@@ -1026,6 +1059,7 @@ impl<'a> Parser<'a> {
             self.simple_kw_stmt(N::ReturnStmt);
         } else if matches!(self.kind(), Some(TokenKind::Ident))
             || self.at_any_kw(&["THIS", "SUPER"])
+            || self.at_test_call()
         {
             self.assign_or_call();
         } else {
@@ -1046,9 +1080,13 @@ impl<'a> Parser<'a> {
     fn assign_or_call(&mut self) {
         let cp = self.b.checkpoint();
         self.postfix_expr();
-        if self.at(TokenKind::Assign) || self.at(TokenKind::AssignAttempt) {
+        let ref_assign = self.at_kw("REF") && self.nth_kind(1) == Some(TokenKind::Eq);
+        if self.at(TokenKind::Assign) || self.at(TokenKind::AssignAttempt) || ref_assign {
             self.b.start_at(cp, N::AssignStmt);
             self.bump();
+            if ref_assign {
+                self.bump(); // the '=' of REF=
+            }
             if self.expr_start() {
                 self.expr();
             } else {
@@ -1241,6 +1279,7 @@ impl<'a> Parser<'a> {
             ) => true,
             Some(TokenKind::Keyword) => {
                 self.at_any_kw(&["NOT", "TRUE", "FALSE", "NULL", "REF", "THIS", "SUPER"])
+                    || self.at_test_call()
             }
             _ => false,
         }
@@ -1399,8 +1438,10 @@ impl<'a> Parser<'a> {
                 self.b.finish();
                 true
             }
-            // [pous.oop.this]: THIS and SUPER, dereferenced with ^
-            Some(TokenKind::Keyword) if self.at_any_kw(&["THIS", "SUPER"]) => {
+            // [pous.oop.this]: THIS and SUPER, dereferenced with ^; TEST(...) is a call
+            Some(TokenKind::Keyword)
+                if self.at_any_kw(&["THIS", "SUPER"]) || self.at_test_call() =>
+            {
                 self.b.start(N::NameRef);
                 self.bump();
                 self.b.finish();

@@ -205,6 +205,8 @@ pub mod codes {
         ENUM_BASE_TYPE_AFTER = 115, Warning;
         POINTER_TYPE = 116, Warning;
         ADR_FUNCTION = 117, Warning;
+        REFERENCE_TYPE = 118, Warning;
+        INIT_ARGUMENTS_IGNORED = 119, Warning;
     }
 
     /// Severity of a code, if the code exists.

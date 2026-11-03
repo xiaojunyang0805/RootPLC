@@ -373,7 +373,7 @@ mod tests {
             ),
             (
                 PathBuf::from("b.st"),
-                "PROGRAM b VAR p : REFERENCE TO INT; END_VAR END_PROGRAM".into(),
+                "PROGRAM b VAR u : UNION a : INT; END_UNION; END_VAR END_PROGRAM".into(),
             ),
             (
                 PathBuf::from("c.st"),
@@ -391,7 +391,7 @@ mod tests {
         let r = coverage_sources(vec![
             (
                 PathBuf::from("lib.st"),
-                "FUNCTION_BLOCK FB_Lib\nVAR p : REFERENCE TO INT; END_VAR\nEND_FUNCTION_BLOCK"
+                "FUNCTION_BLOCK FB_Lib\nVAR u : UNION a : INT; END_UNION; END_VAR\nEND_FUNCTION_BLOCK"
                     .into(),
             ),
             (

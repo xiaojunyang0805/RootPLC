@@ -40,6 +40,11 @@ initializer  = expression
              | '(' name ':=' initializer { ',' name ':=' initializer } ')' (* structure *)
 ```
 
+**[variables.init-arguments]** A function-block instance may be declared
+with arguments, `fb : FB_Buffer(size := 10);`, which CODESYS and TwinCAT
+pass to the block's `FB_init` method. RootPLC accepts the form with warning
+RP0119 but does not run `FB_init` yet.
+
 `type_spec` is defined in spec/04-pous.md [pous.type-spec].
 
 ## Names and scope

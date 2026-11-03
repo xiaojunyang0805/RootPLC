@@ -234,6 +234,20 @@ spec = "types.reference"
 stage = "sema"
 
 [[code]]
+id = "RP0118"
+severity = "warning"
+summary = "REFERENCE TO declares an alias (not portable)"
+spec = "types.reference.alias"
+stage = "parse"
+
+[[code]]
+id = "RP0119"
+severity = "warning"
+summary = "FB_init arguments in a declaration are accepted but not run"
+spec = "variables.init-arguments"
+stage = "parse"
+
+[[code]]
 id = "RP0115"
 severity = "warning"
 summary = "enumeration base type after the values (not portable); write UINT (...)"

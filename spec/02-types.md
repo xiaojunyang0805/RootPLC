@@ -176,5 +176,11 @@ reference. Dereferencing `NULL` raises the fault `NULL_REF`. CODESYS
 `POINTER TO T` is read as `REF_TO T` with warning RP0116, and `ADR(x)` as
 `REF(x)` with warning RP0117; pointer arithmetic is not supported (an
 arithmetic operator on a reference is RP0103). `POINTER TO` is not part of
-the language. The importer maps it to `REF_TO`
+the language.
+
+**[types.reference.alias]** CODESYS `REFERENCE TO T` declares an alias,
+accepted with warning RP0118: the variable holds a reference, but every use
+of it reads or writes the target. `r REF= x` makes `r` refer to `x`, and
+`__ISVALIDREF(r)` is TRUE when `r` refers to something. Using an alias that
+refers to nothing is the fault `NULL_REF`. The importer maps it to `REF_TO`
 where it can and reports the rest.

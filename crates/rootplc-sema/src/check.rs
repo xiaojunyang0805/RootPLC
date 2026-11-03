@@ -49,6 +49,8 @@ struct Var<'a> {
     section: Section,
     span: Span,
     init: Option<&'a Node>,
+    /// Declared REFERENCE TO: uses go to the target, [types.reference.alias].
+    alias: bool,
 }
 
 #[derive(Clone)]
@@ -218,6 +220,8 @@ pub(crate) struct Checker<'a> {
     abstract_fbs: HashSet<usize>,
     /// Structure -> (base structure, number of inherited members).
     struct_base: HashMap<usize, (usize, usize)>,
+    /// While set, a REFERENCE TO variable denotes the reference itself.
+    raw_alias: bool,
     /// Diagnostics with the index of their file.
     pub(crate) diags: Vec<(usize, Diagnostic)>,
 }
@@ -281,6 +285,7 @@ impl<'a> Checker<'a> {
             implements: HashMap::new(),
             abstract_fbs: HashSet::new(),
             struct_base: HashMap::new(),
+            raw_alias: false,
             diags: Vec::new(),
         };
         // [stdlib.fbs]
@@ -328,6 +333,7 @@ impl<'a> Checker<'a> {
             section,
             span: Span::new(0, 0),
             init: None,
+            alias: false,
         };
         let mut vars: Vec<Var<'a>> = inputs.iter().map(|x| var(x, Section::Input)).collect();
         vars.extend(outputs.iter().map(|x| var(x, Section::Output)));
@@ -599,11 +605,13 @@ impl<'a> Checker<'a> {
             match n.kind {
                 N::TypeBlock => {
                     for d in self.child_nodes(n, N::TypeDecl) {
-                        if let Some(Item::Tok(t)) = self.items(d).first().copied() {
-                            if self.tkind(t) == T::Ident {
-                                let span = self.tok_span(t);
-                                self.add_def(self.text(t), Kind::Pending, Some(d), span);
-                            }
+                        let name = self.items(d).into_iter().find_map(|i| match i {
+                            Item::Tok(t) if self.tkind(t) != T::Keyword => Some(t),
+                            _ => None,
+                        });
+                        if let Some(t) = name.filter(|&t| self.tkind(t) == T::Ident) {
+                            let span = self.tok_span(t);
+                            self.add_def(self.text(t), Kind::Pending, Some(d), span);
                         }
                     }
                 }
@@ -779,6 +787,36 @@ impl<'a> Checker<'a> {
             span,
             ExprKind::Ref(Box::new(inst)),
         )
+    }
+
+    /// The variable `name` of the current POU (or of block `fb`) is declared
+    /// REFERENCE TO.
+    fn is_alias(&self, name: &str, fb: Option<usize>) -> bool {
+        let Some(id) = fb.or(self.scope) else {
+            return false;
+        };
+        match &self.defs[id].kind {
+            Kind::Pou(p) => p
+                .vars
+                .iter()
+                .any(|v| v.alias && v.name.eq_ignore_ascii_case(name)),
+            _ => false,
+        }
+    }
+
+    /// [types.reference.alias]: a use of a REFERENCE TO variable is a use of
+    /// its target, except in REF= and __ISVALIDREF.
+    fn alias_var(&self, v: V, alias: bool) -> V {
+        if !alias || self.raw_alias {
+            return v;
+        }
+        match v.ty.clone() {
+            Ty::Ref(t) => {
+                let span = v.span;
+                V::with(*t, span, ExprKind::Deref(Box::new(v.ir())))
+            }
+            _ => v,
+        }
     }
 
     /// `SUPER^` as the base of a call: the base method runs without dispatch.
@@ -1267,6 +1305,9 @@ impl<'a> Checker<'a> {
         if init.is_none() {
             init = spec.and_then(|s| self.type_default(s));
         }
+        let alias = spec.is_some_and(|s| {
+            matches!(self.items(s).first(), Some(Item::Tok(t)) if self.text(*t).eq_ignore_ascii_case("REFERENCE"))
+        });
         for t in names {
             out.push(Var {
                 name: self.text(t).to_string(),
@@ -1274,6 +1315,7 @@ impl<'a> Checker<'a> {
                 section,
                 span: self.tok_span(t),
                 init,
+                alias,
             });
         }
     }
@@ -1394,9 +1436,11 @@ impl<'a> Checker<'a> {
                 }
                 ty
             }
-            // [types.reference]: POINTER TO T is read as REF_TO T
+            // [types.reference]: POINTER TO T is read as REF_TO T; REFERENCE TO T too
+            // (its variables are aliases, see `alias_var`)
             Item::Tok(i)
-                if self.text(i).eq_ignore_ascii_case("POINTER")
+                if (self.text(i).eq_ignore_ascii_case("POINTER")
+                    || self.text(i).eq_ignore_ascii_case("REFERENCE"))
                     && matches!(its.get(1), Some(Item::Tok(t)) if self.is_kw(*t, "TO")) =>
             {
                 match its.get(2).copied() {
@@ -1766,6 +1810,25 @@ impl<'a> Checker<'a> {
     fn stmt(&mut self, n: &'a Node) -> Option<Stmt> {
         let its = self.items(n);
         match n.kind {
+            N::AssignStmt if matches!(its.get(1), Some(Item::Tok(t)) if self.is_kw(*t, "REF")) => {
+                // [types.reference.alias]: r REF= x makes r refer to x
+                let (Some(Item::Node(t)), Some(Item::Node(e))) =
+                    (its.first().copied(), its.get(3).copied())
+                else {
+                    return None;
+                };
+                self.raw_alias = true;
+                let target = self.expr(t);
+                self.raw_alias = false;
+                let value = self.expr(e);
+                let r = V::with(
+                    Ty::Ref(Box::new(value.ty.clone())),
+                    value.span,
+                    ExprKind::Ref(Box::new(value.ir())),
+                );
+                self.coerce(&target.ty, &r);
+                Some(Stmt::Assign(target.ir(), r.ir()))
+            }
             N::AssignStmt => {
                 let (Some(Item::Node(t)), Some(Item::Tok(op)), Some(Item::Node(e))) = (
                     its.first().copied(),
@@ -2276,11 +2339,13 @@ impl<'a> Checker<'a> {
                     }
                     let name = self.text(i);
                     if let Some((t, slot)) = self.lookup_var(name) {
-                        return V::with(t, span, ExprKind::Var(slot));
+                        let v = V::with(t, span, ExprKind::Var(slot));
+                        return self.alias_var(v, self.is_alias(name, None));
                     }
                     if let Some((t, slot, fb)) = self.lookup_owner_var(name) {
                         let inst = self.this_ir(fb, span);
-                        return V::with(t, span, ExprKind::Member(Box::new(inst), slot));
+                        let v = V::with(t, span, ExprKind::Member(Box::new(inst), slot));
+                        return self.alias_var(v, self.is_alias(name, Some(fb)));
                     }
                     if let Some((t, slot)) = self.lookup_global(name) {
                         let mut v = V::with(t, span, ExprKind::Global(slot));
@@ -2946,6 +3011,24 @@ impl<'a> Checker<'a> {
             }
         }
         let up = name.to_ascii_uppercase();
+        if up == "__ISVALIDREF" && args.len() == 1 && args[0].name.is_none() {
+            // [types.reference.alias]: the reference is set (not NULL)
+            self.raw_alias = true;
+            let v = self.expr(args[0].expr);
+            self.raw_alias = false;
+            let null = ir::Expr {
+                ty: Ty::Null,
+                kind: ExprKind::Null,
+                span,
+            };
+            let e = ExprKind::Binary {
+                op: BinOp::Ne,
+                opty: v.ty.clone(),
+                l: Box::new(v.ir()),
+                r: Box::new(null),
+            };
+            return V::with(Ty::Elem(Elem::Bool), span, e);
+        }
         if up == "ADR" && args.len() == 1 && args[0].name.is_none() {
             // [types.reference]: CODESYS ADR(x) is read as REF(x)
             self.diag(
