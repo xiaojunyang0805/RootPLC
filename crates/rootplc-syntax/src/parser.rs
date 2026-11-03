@@ -583,6 +583,15 @@ impl<'a> Parser<'a> {
             let before = self.pos;
             if self.at_any_kw(SECTION_KWS) {
                 self.var_section();
+            } else if self.at_kw("VAR_CONFIG") {
+                // [config.var-config]: instance paths with addresses; recorded only
+                self.b.start(N::VarSection);
+                self.bump();
+                while !self.at_eof() && !self.at_kw("END_VAR") && !self.at_kw(close) {
+                    self.bump();
+                }
+                self.expect_kw("END_VAR");
+                self.b.finish();
             } else if self.at_kw("RESOURCE") {
                 self.b.start(N::Resource);
                 let open_span = self.span_here();
@@ -896,7 +905,14 @@ impl<'a> Parser<'a> {
         self.b.start(N::VarSection);
         let open_span = self.span_here();
         self.bump();
-        let _ = self.eat_kw("CONSTANT") || self.eat_kw("RETAIN") || self.eat_kw("NON_RETAIN");
+        // [variables.section]: CONSTANT / RETAIN / NON_RETAIN, ed.3 access
+        // specifiers (VAR PUBLIC) and TwinCAT PERSISTENT, in any order
+        while self.at_any_kw(&["CONSTANT", "RETAIN", "NON_RETAIN"])
+            || self.at_any_kw(MODIFIER_KWS)
+            || self.at_word("PERSISTENT")
+        {
+            self.bump();
+        }
         while !self.at_eof() && !self.at_kw("END_VAR") && !self.at_any_kw(POU_KWS) {
             let before = self.pos;
             self.var_decl();

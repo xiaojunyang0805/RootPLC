@@ -1223,7 +1223,10 @@ impl<'a> Checker<'a> {
         for s in self.child_nodes(n, N::VarSection) {
             let its = self.items(s);
             let global = matches!(its.first(), Some(Item::Tok(t)) if self.is_kw(*t, "VAR_GLOBAL"));
-            let constant = matches!(its.get(1), Some(Item::Tok(t)) if self.is_kw(*t, "CONSTANT"));
+            let constant = its
+                .iter()
+                .take(5)
+                .any(|i| matches!(i, Item::Tok(t) if self.is_kw(*t, "CONSTANT")));
             if global {
                 self.global_sections.push((self.cur, s, constant));
             }
@@ -1500,6 +1503,14 @@ impl<'a> Checker<'a> {
                             "VAR_IN_OUT" => Section::InOut,
                             // [config.external]: names the global variable itself
                             "VAR_EXTERNAL" => continue,
+                            // [variables.section]: VAR PUBLIC is visible from outside
+                            "VAR"
+                                if self.items(n).iter().take(5).any(
+                                    |i| matches!(i, Item::Tok(t) if self.is_kw(*t, "PUBLIC")),
+                                ) =>
+                            {
+                                Section::Input
+                            }
                             _ => Section::Local,
                         },
                         _ => Section::Local,

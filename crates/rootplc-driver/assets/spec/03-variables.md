@@ -10,12 +10,17 @@ Grammar notation: `[x]` optional, `{x}` zero or more, `|` alternative,
 **[variables.section]** Declarations are grouped in sections:
 
 ```
-var_section  = section_kw [ 'CONSTANT' | 'RETAIN' | 'NON_RETAIN' ] { var_decl } 'END_VAR'
+var_section  = section_kw { 'CONSTANT' | 'RETAIN' | 'NON_RETAIN' | access | 'PERSISTENT' } { var_decl } 'END_VAR'
+access       = 'PUBLIC' | 'PRIVATE' | 'PROTECTED' | 'INTERNAL'
 section_kw   = 'VAR' | 'VAR_INPUT' | 'VAR_OUTPUT' | 'VAR_IN_OUT' | 'VAR_TEMP'
              | 'VAR_STAT' | 'VAR_GLOBAL' | 'VAR_EXTERNAL'
 ```
 
 A POU may contain any number of sections, in any order, before its body.
+Access specifiers (IEC 61131-3 ed.3) and TwinCAT `PERSISTENT` are accepted.
+Variables of a `VAR PUBLIC` section can be read and written from outside the
+block, like inputs; other access checks and persistence follow in a later
+revision.
 
 **[variables.declaration]** A declaration names one or more variables of one
 type, with an optional initial value, and ends with `;`:

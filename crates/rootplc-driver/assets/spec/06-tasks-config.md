@@ -40,6 +40,11 @@ config_item   = task | program_instance
 
 A missing `END_CONFIGURATION` or `END_RESOURCE` is error RP0202.
 
+**[config.var-config]** A `VAR_CONFIG … END_VAR` section in a configuration
+assigns addresses to variables of program instances by their path
+(`Main.fb.start AT %IX0.0 : BOOL;`). It is accepted and recorded; the
+addresses are not applied yet.
+
 **[config.task]** A task names a schedule for program instances:
 
 ```
