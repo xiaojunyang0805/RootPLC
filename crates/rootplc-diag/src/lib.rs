@@ -121,6 +121,9 @@ pub mod codes {
         UNKNOWN_LITERAL_TYPE = 14, Error;
         UNTERMINATED_PRAGMA = 15, Error;
         MALFORMED_DIRECT_VARIABLE = 16, Error;
+        SYNTAX_ERROR = 201, Error;
+        MISSING_END = 202, Error;
+        MISSING_SEMICOLON = 301, Error;
         CONSTANT_OVERFLOW = 101, Error;
         LITERAL_OUT_OF_RANGE = 102, Error;
         IMPLICIT_CONVERSION = 103, Error;

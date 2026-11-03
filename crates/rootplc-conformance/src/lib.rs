@@ -329,6 +329,88 @@ pub fn run_lex_stage(root: &Path) -> Result<Vec<String>, String> {
     Ok(problems)
 }
 
+/// Run every case through the parser. The tree must reproduce the source
+/// exactly (lossless). For cases without lexical errors, the set of parser
+/// codes must equal the expected codes whose registry stage is `parse`; cases
+/// with lexical errors are not graded here, to avoid cascades.
+pub fn run_parse_stage(root: &Path) -> Result<Vec<String>, String> {
+    let parse_codes: BTreeSet<String> = load_registry(root)?
+        .into_iter()
+        .filter(|e| e.stage == "parse")
+        .map(|e| e.id)
+        .collect();
+    let mut problems = Vec::new();
+    for c in load_cases(root)? {
+        let name = c
+            .path
+            .strip_prefix(root)
+            .unwrap_or(&c.path)
+            .display()
+            .to_string();
+        let p = rootplc_syntax::parse(&c.source);
+        if p.tree.text(&p.tokens, &c.source) != c.source {
+            problems.push(format!("{name}: syntax tree does not reproduce the source"));
+        }
+        let lex_error = p
+            .lex_diagnostics
+            .iter()
+            .any(|d| d.severity == rootplc_diag::Severity::Error);
+        if lex_error {
+            continue;
+        }
+        let got: BTreeSet<String> = p.diagnostics.iter().map(|d| d.code.to_string()).collect();
+        let want: BTreeSet<String> = match &c.expect {
+            Expect::Ok => BTreeSet::new(),
+            Expect::Error(l) | Expect::Warning(l) => l
+                .iter()
+                .filter(|x| parse_codes.contains(*x))
+                .cloned()
+                .collect(),
+        };
+        if got != want {
+            let detail: Vec<String> = p
+                .diagnostics
+                .iter()
+                .map(|d| format!("{} @{}: {}", d.code, d.span.start, d.message))
+                .collect();
+            problems.push(format!(
+                "{name}: parser reported {got:?}, expected {want:?} [{}]",
+                detail.join("; ")
+            ));
+        }
+    }
+    Ok(problems)
+}
+
+/// Every `.st` file under `examples/` and the stdlib must parse without diagnostics.
+pub fn parse_examples(root: &Path) -> Result<Vec<String>, String> {
+    let mut files = Vec::new();
+    for dir in ["examples", "crates/rootplc-stdlib/st"] {
+        collect_files(&root.join(dir), "st", &mut files).map_err(|e| e.to_string())?;
+    }
+    let mut problems = Vec::new();
+    for f in files {
+        let src = fs::read_to_string(&f).map_err(|e| e.to_string())?;
+        let p = rootplc_syntax::parse(&src);
+        if p.tree.text(&p.tokens, &src) != src {
+            problems.push(format!(
+                "{}: syntax tree does not reproduce the source",
+                f.display()
+            ));
+        }
+        for d in p.diagnostics {
+            problems.push(format!(
+                "{}: {} @{}: {}",
+                f.display(),
+                d.code,
+                d.span.start,
+                d.message
+            ));
+        }
+    }
+    Ok(problems)
+}
+
 /// Every `.st` file under `examples/` and the stdlib must lex without diagnostics.
 pub fn lex_examples(root: &Path) -> Result<Vec<String>, String> {
     let mut files = Vec::new();

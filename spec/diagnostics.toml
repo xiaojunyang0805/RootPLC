@@ -122,6 +122,27 @@ spec = "lexical.direct-variable"
 stage = "lex"
 
 [[code]]
+id = "RP0201"
+severity = "error"
+summary = "syntax error: unexpected token"
+spec = "syntax.general"
+stage = "parse"
+
+[[code]]
+id = "RP0202"
+severity = "error"
+summary = "block is never closed: missing END keyword"
+spec = "pous.end"
+stage = "parse"
+
+[[code]]
+id = "RP0301"
+severity = "error"
+summary = "missing ';' at end of statement or declaration"
+spec = "statements.terminator"
+stage = "parse"
+
+[[code]]
 id = "RP0101"
 severity = "error"
 summary = "overflow or division by zero in constant expression"

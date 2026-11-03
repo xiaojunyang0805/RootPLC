@@ -32,8 +32,17 @@ exactly the case's expected codes of that stage, and nothing else.
 3. Every rule ID in the spec is cited by at least one case.
 4. Every diagnostic code in the registry is expected by at least one case.
 
-Implemented stages: **lex**. Parse, sema and `run`/`assert` execution are
-added as the front end and VM land.
+Implemented stages: **lex** and **parse**. Sema and `run`/`assert` execution
+are added as the front end and VM land.
+
+- **lex:** every case. The tokens must reproduce the source byte for byte.
+- **parse:** the syntax tree must reproduce the source byte for byte in every
+  case. Codes are graded only for cases without lexical *errors* (lexical
+  warnings do not count), so one lexical error does not cascade into a pile
+  of parse errors that the case never claimed. An `ok` case must parse with
+  no diagnostics.
+- Every `.st` file in `examples/` and the stdlib must lex and parse with no
+  diagnostics.
 
 | Folder | Spec chapter |
 |---|---|
