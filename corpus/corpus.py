@@ -1,6 +1,7 @@
 """Real-world PLC code corpus: fetch, extract and analyse with rootplc.
 
     python corpus/corpus.py sync       # fetch PLC sources only, extract, delete the clone (disk-light)
+    python corpus/corpus.py sync --refresh=twincat   # re-fetch + re-extract one format (or =all)
     python corpus/corpus.py fetch      # shallow-clone every project into corpus/.cache
     python corpus/corpus.py analyse    # extract ST, run rootplc check, write the report + dashboard
     python corpus/corpus.py dashboard  # rebuild corpus/dashboard.html from the last analysis
@@ -71,40 +72,49 @@ SOURCES = {
 }
 
 
-def sync() -> None:
+def sync(refresh: str = "") -> None:
     """Fetch only the PLC source files of each project, extract the units and
     delete the clone, so the cache holds just the extracted text. Projects
-    already extracted are skipped; clones left by `fetch` are pruned."""
+    already extracted are skipped; clones left by `fetch` are pruned.
+    refresh="all" or a format name ("twincat") re-fetches and re-extracts
+    those projects, e.g. after an extractor fix. Clones go to a local temp
+    folder (git refuses repositories on exFAT disks); the extracted units are
+    replaced only when a new extraction succeeded."""
+    import tempfile
     CACHE.mkdir(exist_ok=True)
+    tmp_root = Path(os.environ.get("ROOTPLC_CORPUS_TMP") or tempfile.gettempdir()) / "rootplc-corpus-clones"
+    tmp_root.mkdir(parents=True, exist_ok=True)
     for p in projects():
         if p["format"] in ("binary", "none"):
             continue
         base = CACHE / p["name"]
-        repo, done = base / "repo", base / "extracted"
-        if done.exists():
-            if repo.exists():  # a clone left by fetch or an interrupted sync
-                shutil.rmtree(repo, onexc=_force_remove)
+        old_repo, done = base / "repo", base / "extracted"
+        if old_repo.exists():  # a clone left by fetch or an interrupted sync
+            shutil.rmtree(old_repo, onexc=_force_remove)
+        if done.exists() and refresh not in ("all", p["format"]):
             continue
-        if not repo.exists():
+        repo = tmp_root / p["name"]
+        if repo.exists():
+            shutil.rmtree(repo, onexc=_force_remove)
+        steps = [
+            ["git", "clone", "--depth", "1", "--filter=blob:none", "--no-checkout", "--quiet", p["url"], str(repo)],
+            ["git", "-C", str(repo), "sparse-checkout", "set", "--no-cone", *SOURCES[p["format"]]],
+            ["git", "-C", str(repo), "checkout", "--quiet"],
+        ]
+        err = ""
+        for cmd in steps:
+            r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
+            if r.returncode:
+                err = r.stderr.strip()[:120]
+                break
+        if err:
+            print(f"FAIL  {p['name']}: {err}", flush=True)
+        else:
             base.mkdir(parents=True, exist_ok=True)
-            steps = [
-                ["git", "clone", "--depth", "1", "--filter=blob:none", "--no-checkout", "--quiet", p["url"], str(repo)],
-                ["git", "-C", str(repo), "sparse-checkout", "set", "--no-cone", *SOURCES[p["format"]]],
-                ["git", "-C", str(repo), "checkout", "--quiet"],
-            ]
-            err = ""
-            for cmd in steps:
-                r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
-                if r.returncode:
-                    err = r.stderr.strip()[:120]
-                    break
-            if err:
-                print(f"FAIL  {p['name']}: {err}", flush=True)
-                shutil.rmtree(repo, onexc=_force_remove)
-                continue
-        n = len(list(extract(p).glob("*.st")))
-        shutil.rmtree(repo, onexc=_force_remove)
-        print(f"sync  {p['name']:44} {n:5} units", flush=True)
+            n = len(list(extract(p, repo).glob("*.st")))
+            print(f"sync  {p['name']:44} {n:5} units", flush=True)
+        if repo.exists():
+            shutil.rmtree(repo, onexc=_force_remove)
 
 
 def _force_remove(func, path, _exc):
@@ -152,7 +162,10 @@ def twincat_units(path: Path) -> list[tuple[str, str]]:
                         parts.append(text_of(a.find("Implementation/ST")).strip())
                 parts.append("END_PROPERTY")
             if kind == "POU":
-                first = decl.split(None, 1)[0].upper() if decl else ""
+                # the declaration may start with comments or {attribute} pragmas
+                code = re.sub(r"\(\*.*?\*\)|/\*.*?\*/|//[^\n]*|\{[^}]*\}", " ", decl, flags=re.S)
+                m = re.match(r"\s*(FUNCTION_BLOCK|FUNCTION|PROGRAM)\b", code, re.I)
+                first = m.group(1).upper() if m else ""
                 end = {"PROGRAM": "END_PROGRAM", "FUNCTION": "END_FUNCTION",
                        "FUNCTION_BLOCK": "END_FUNCTION_BLOCK"}.get(first, "")
                 parts.insert(1, body)
@@ -186,9 +199,13 @@ def brx_units(repo: Path) -> list[tuple[str, str]]:
     return out
 
 
-def extract(p: dict) -> Path:
-    repo = CACHE / p["name"] / "repo"
-    dst = CACHE / p["name"] / "extracted"
+def extract(p: dict, repo: Path | None = None) -> Path:
+    """Extract the units of a cloned project into <cache>/<name>/extracted.
+    Writes to a new folder first and swaps it in, so a failure never leaves
+    the project without its previous units."""
+    repo = repo or CACHE / p["name"] / "repo"
+    final = CACHE / p["name"] / "extracted"
+    dst = CACHE / p["name"] / "extracted.new"
     shutil.rmtree(dst, ignore_errors=True)
     dst.mkdir(parents=True)
     units: list[tuple[str, str]] = []
@@ -207,7 +224,9 @@ def extract(p: dict) -> Path:
         seen[safe] += 1
         fname = safe + (f"_{seen[safe]}" if seen[safe] > 1 else "") + ".st"
         (dst / fname).write_text(src, encoding="utf-8")
-    return dst
+    shutil.rmtree(final, ignore_errors=True)
+    dst.rename(final)
+    return final
 
 
 # ----------------------------------------------------------------- analysis
@@ -350,7 +369,7 @@ def dashboard() -> None:
 if __name__ == "__main__":
     cmd = sys.argv[1] if len(sys.argv) > 1 else ""
     if cmd == "sync":
-        sync()
+        sync(sys.argv[2].removeprefix("--refresh=") if len(sys.argv) > 2 else "")
     elif cmd == "fetch":
         fetch()
     elif cmd in ("analyse", "analyze"):

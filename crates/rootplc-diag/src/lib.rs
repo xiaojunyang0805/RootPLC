@@ -199,6 +199,9 @@ pub mod codes {
         CONSTANT_INDEX_OUT_OF_BOUNDS = 109, Error;
         STRING_LITERAL_TOO_LONG = 110, Warning;
         UNKNOWN_TYPE = 111, Error;
+        STRING_LENGTH_IN_PARENS = 112, Warning;
+        FUNCTION_WITHOUT_RESULT = 113, Warning;
+        IN_OUT_NOT_VARIABLE = 114, Error;
     }
 
     /// Severity of a code, if the code exists.

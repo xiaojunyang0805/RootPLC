@@ -36,6 +36,9 @@ pub enum Section {
 pub struct Program {
     /// Every declared type and POU; `Ty::Named(i)` indexes this list.
     pub defs: Vec<Def>,
+    /// The definition holding the global variables (instantiated once per
+    /// VM), if the project declares any, [config.global-list].
+    pub globals: Option<usize>,
 }
 
 impl Program {
@@ -156,6 +159,8 @@ pub enum ExprKind {
     Const(Const),
     /// Slot of the current frame.
     Var(usize),
+    /// Global variable `slot`, [config.global-list].
+    Global(usize),
     /// Member `index` of a structure or instance.
     Member(Box<Expr>, usize),
     /// Bit `n` of an integer or bit string.

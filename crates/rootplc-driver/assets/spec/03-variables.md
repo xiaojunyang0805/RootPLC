@@ -55,9 +55,10 @@ resolves, in this order, to:
 
 1. a variable of the enclosing POU (in a `FUNCTION`, the function name is
    also the variable holding the result);
-2. a value of an enumeration type, if exactly one enumeration has it
+2. a global variable ([config.global-list]);
+3. a value of an enumeration type, if exactly one enumeration has it
    ([types.derived.enum]);
-3. a POU or standard function or function block (spec/08-stdlib.md), when
+4. a POU or standard function or function block (spec/08-stdlib.md), when
    the name is called.
 
 A name that resolves to none of these is error RP0203. So is a member that

@@ -17,6 +17,16 @@ pub enum NodeKind {
     Test,
     TypeBlock,
     TypeDecl,
+    /// A `VAR_GLOBAL … END_VAR` list outside any POU, [config.global-list].
+    GlobalVarList,
+    /// `CONFIGURATION … END_CONFIGURATION`, [config.configuration].
+    Configuration,
+    /// `RESOURCE … END_RESOURCE`, [config.configuration].
+    Resource,
+    /// `TASK name(…);`, [config.task].
+    TaskConfig,
+    /// `PROGRAM inst WITH task : type;`, [config.program-instance].
+    ProgramConfig,
     VarSection,
     VarDecl,
     TypeSpec,

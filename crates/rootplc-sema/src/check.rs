@@ -179,6 +179,14 @@ struct DefIr {
     body: Vec<Stmt>,
 }
 
+/// A global variable: where it is declared and, for a CONSTANT, its value.
+#[derive(Clone)]
+struct GlobalVar {
+    file: usize,
+    name: String,
+    value: Option<i128>,
+}
+
 pub(crate) struct Checker<'a> {
     /// Source text and tokens of every file in the project.
     files: Vec<(&'a str, &'a [Token])>,
@@ -188,6 +196,14 @@ pub(crate) struct Checker<'a> {
     types: HashMap<String, usize>,
     scope: Option<usize>,
     irs: HashMap<usize, DefIr>,
+    /// `VAR_GLOBAL` sections outside POUs: (file, section, CONSTANT?), [config.global-list].
+    global_sections: Vec<(usize, &'a Node, bool)>,
+    /// Global variables in slot order; their types live in `defs[globals_def]`.
+    globals: Vec<GlobalVar>,
+    /// The synthetic definition holding every global variable.
+    globals_def: Option<usize>,
+    /// CONFIGURATION blocks: (file, node), [config.configuration].
+    configs: Vec<(usize, &'a Node)>,
     /// Diagnostics with the index of their file.
     pub(crate) diags: Vec<(usize, Diagnostic)>,
 }
@@ -242,6 +258,10 @@ impl<'a> Checker<'a> {
             types: HashMap::new(),
             scope: None,
             irs: HashMap::new(),
+            global_sections: Vec::new(),
+            globals: Vec::new(),
+            globals_def: None,
+            configs: Vec::new(),
             diags: Vec::new(),
         };
         // [stdlib.fbs]
@@ -331,6 +351,11 @@ impl<'a> Checker<'a> {
             self.cur = f;
             self.collect(root);
         }
+        if !self.global_sections.is_empty() {
+            let id = self.add_def("<globals>", Kind::Pending, None, Span::new(0, 0));
+            self.globals_def = Some(id);
+            self.resolve_globals(id);
+        }
         for id in 0..self.defs.len() {
             self.resolve(id);
         }
@@ -338,6 +363,8 @@ impl<'a> Checker<'a> {
         for id in 0..self.defs.len() {
             self.check_def(id);
         }
+        self.check_globals();
+        self.check_configs();
     }
 
     /// The typed IR of the project.
@@ -387,7 +414,10 @@ impl<'a> Checker<'a> {
                 kind,
             });
         }
-        ir::Program { defs }
+        ir::Program {
+            defs,
+            globals: self.globals_def,
+        }
     }
 
     // ---------------------------------------------------------------- tree access
@@ -516,8 +546,152 @@ impl<'a> Checker<'a> {
                         }
                     }
                 }
+                N::GlobalVarList => self.collect_global_sections(n),
+                N::Configuration => {
+                    self.configs.push((self.cur, n));
+                    self.collect_global_sections(n);
+                }
                 _ => {}
             }
+        }
+    }
+
+    /// VAR_GLOBAL sections of a global list, a configuration or its resources.
+    fn collect_global_sections(&mut self, n: &'a Node) {
+        for s in self.child_nodes(n, N::VarSection) {
+            let its = self.items(s);
+            let global = matches!(its.first(), Some(Item::Tok(t)) if self.is_kw(*t, "VAR_GLOBAL"));
+            let constant = matches!(its.get(1), Some(Item::Tok(t)) if self.is_kw(*t, "CONSTANT"));
+            if global {
+                self.global_sections.push((self.cur, s, constant));
+            }
+        }
+        for r in self.child_nodes(n, N::Resource) {
+            self.collect_global_sections(r);
+        }
+    }
+
+    /// Types and constant values of the global variables, in declaration order,
+    /// so a constant can use the constants declared before it.
+    fn resolve_globals(&mut self, id: usize) {
+        let saved = self.cur;
+        let mut vars = Vec::new();
+        for (file, sec, constant) in self.global_sections.clone() {
+            self.cur = file;
+            for d in self.child_nodes(sec, N::VarDecl) {
+                let start = vars.len();
+                self.var_decl(d, Section::Local, &mut vars);
+                for v in &vars[start..] {
+                    let value = if constant {
+                        v.init
+                            .and_then(|i| self.first_node(i))
+                            .and_then(|e| self.const_int(e))
+                    } else {
+                        None
+                    };
+                    self.globals.push(GlobalVar {
+                        file,
+                        name: v.name.clone(),
+                        value,
+                    });
+                }
+            }
+        }
+        self.cur = saved;
+        self.defs[id].kind = Kind::Pou(Pou {
+            kind: PouKind::FunctionBlock,
+            vars,
+            ret: None,
+        });
+    }
+
+    /// Initial values and unique names of the global variables, [config.global-list].
+    fn check_globals(&mut self) {
+        let Some(id) = self.globals_def else { return };
+        let Kind::Pou(p) = self.defs[id].kind.clone() else {
+            return;
+        };
+        let saved = self.cur;
+        self.scope = None;
+        let mut out = DefIr::default();
+        let mut seen = HashSet::new();
+        for (k, v) in p.vars.iter().enumerate() {
+            self.cur = self.globals[k].file;
+            if !seen.insert(v.name.to_ascii_lowercase()) {
+                let msg = format!("'{}' is already declared as a global variable", v.name);
+                self.diag(codes::DUPLICATE_NAME, msg, v.span, None);
+            }
+            let init = v.init.and_then(|i| self.initializer(&v.ty, i));
+            out.var_inits.push(init);
+        }
+        self.cur = saved;
+        self.irs.insert(id, out);
+    }
+
+    /// Program instances name a PROGRAM and a declared task, [config.program-instance].
+    fn check_configs(&mut self) {
+        let saved = self.cur;
+        for (file, node) in self.configs.clone() {
+            self.cur = file;
+            self.check_config_scope(node);
+        }
+        self.cur = saved;
+    }
+
+    fn check_config_scope(&mut self, node: &'a Node) {
+        let tasks: Vec<String> = self
+            .child_nodes(node, N::TaskConfig)
+            .into_iter()
+            .filter_map(|t| {
+                self.items(t).iter().find_map(|i| match i {
+                    Item::Tok(k) if self.tkind(*k) == T::Ident => {
+                        Some(self.text(*k).to_ascii_lowercase())
+                    }
+                    _ => None,
+                })
+            })
+            .collect();
+        for pc in self.child_nodes(node, N::ProgramConfig) {
+            let its = self.items(pc);
+            let (mut task, mut ty, mut after_with, mut after_colon) = (None, None, false, false);
+            for it in &its {
+                if let Item::Tok(t) = *it {
+                    if self.is_kw(t, "WITH") {
+                        after_with = true;
+                    } else if self.tkind(t) == T::Colon {
+                        after_colon = true;
+                    } else if self.tkind(t) == T::Ident {
+                        if after_colon && ty.is_none() {
+                            ty = Some(t);
+                        } else if after_with && task.is_none() && !after_colon {
+                            task = Some(t);
+                        }
+                    }
+                }
+            }
+            if let Some(t) = ty {
+                let name = self.text(t);
+                let is_program = self.types.get(&name.to_ascii_lowercase()).is_some_and(
+                    |&id| matches!(&self.defs[id].kind, Kind::Pou(p) if p.kind == PouKind::Program),
+                );
+                if !is_program {
+                    let span = self.tok_span(t);
+                    let msg = format!("unknown program '{name}'");
+                    let hint =
+                        Some("a program instance needs a PROGRAM declared in the project".into());
+                    self.diag(codes::UNKNOWN_NAME, msg, span, hint);
+                }
+            }
+            if let Some(t) = task {
+                if !tasks.contains(&self.text(t).to_ascii_lowercase()) {
+                    let span = self.tok_span(t);
+                    let msg = format!("unknown task '{}'", self.text(t));
+                    self.diag(codes::UNKNOWN_NAME, msg, span, None);
+                }
+            }
+        }
+        for r in self.child_nodes(node, N::Resource) {
+            self.check_config_scope(r);
         }
     }
 
@@ -570,6 +744,8 @@ impl<'a> Checker<'a> {
                             "VAR_INPUT" => Section::Input,
                             "VAR_OUTPUT" => Section::Output,
                             "VAR_IN_OUT" => Section::InOut,
+                            // [config.external]: names the global variable itself
+                            "VAR_EXTERNAL" => continue,
                             _ => Section::Local,
                         },
                         _ => Section::Local,
@@ -672,7 +848,10 @@ impl<'a> Checker<'a> {
                 let mut k = 1;
                 while k < its.len() {
                     match its[k] {
-                        Item::Tok(t) if self.tkind(t) == T::LBracket => {
+                        Item::Tok(t)
+                            if self.tkind(t) == T::LBracket
+                                || (self.tkind(t) == T::LParen && matches!(ty, Ty::Str { .. })) =>
+                        {
                             if let (Some(Item::Node(e)), Ty::Str { wide, .. }) =
                                 (its.get(k + 1).copied(), ty.clone())
                             {
@@ -850,6 +1029,16 @@ impl<'a> Checker<'a> {
                 _ => None,
             },
             N::ParenExpr => self.const_int(self.first_node(n)?),
+            N::NameRef => match its.first().copied() {
+                Some(Item::Tok(i)) if self.lookup_var(self.text(i)).is_none() => {
+                    let name = self.text(i);
+                    self.globals
+                        .iter()
+                        .find(|g| g.name.eq_ignore_ascii_case(name))
+                        .and_then(|g| g.value)
+                }
+                _ => None,
+            },
             N::UnaryExpr => match (its.first().copied(), its.get(1).copied()) {
                 (Some(Item::Tok(op)), Some(Item::Node(x))) => match self.tkind(op) {
                     T::Minus => self.const_int(x).map(|v| -v),
@@ -1278,6 +1467,35 @@ impl<'a> Checker<'a> {
         None
     }
 
+    /// [pous.call.in-out]: the argument of a VAR_IN_OUT parameter must be a variable.
+    fn check_in_out_arg(&mut self, section: Section, name: &str, arg: &ir::Expr) {
+        use ir::ExprKind as K;
+        let is_var = matches!(
+            arg.kind,
+            K::Var(_) | K::Global(_) | K::Member(..) | K::Index(..) | K::Deref(_) | K::Invalid
+        );
+        if section == Section::InOut && !is_var {
+            self.diag(
+                codes::IN_OUT_NOT_VARIABLE,
+                format!("VAR_IN_OUT parameter '{name}' needs a variable, not a value"),
+                arg.span,
+                None,
+            );
+        }
+    }
+
+    /// A global variable: type and slot, [variables.resolution].
+    fn lookup_global(&self, name: &str) -> Option<(Ty, usize)> {
+        let slot = self
+            .globals
+            .iter()
+            .position(|g| g.name.eq_ignore_ascii_case(name))?;
+        match &self.defs[self.globals_def?].kind {
+            Kind::Pou(p) => Some((p.vars.get(slot)?.ty.clone(), slot)),
+            _ => None,
+        }
+    }
+
     fn scope_kind(&self) -> Option<PouKind> {
         match &self.defs[self.scope?].kind {
             Kind::Pou(p) => Some(p.kind),
@@ -1527,6 +1745,12 @@ impl<'a> Checker<'a> {
                     let name = self.text(i);
                     if let Some((t, slot)) = self.lookup_var(name) {
                         return V::with(t, span, ExprKind::Var(slot));
+                    }
+                    if let Some((t, slot)) = self.lookup_global(name) {
+                        let mut v = V::with(t, span, ExprKind::Global(slot));
+                        // a CONSTANT global with a known value is a constant
+                        v.k = self.globals[slot].value.map(K::Int);
+                        return v;
                     }
                     if let Some(v) = self.enum_value(name, span) {
                         return v;
@@ -2183,7 +2407,9 @@ impl<'a> Checker<'a> {
                         Some(s) => {
                             let val = self.expr(a.expr);
                             self.coerce(&p.vars[s].ty, &val);
-                            inputs.push((s, val.ir()));
+                            let ir = val.ir();
+                            self.check_in_out_arg(p.vars[s].section, &p.vars[s].name, &ir);
+                            inputs.push((s, ir));
                         }
                         None => {
                             let what = if out { "output" } else { "input" };
@@ -2202,7 +2428,9 @@ impl<'a> Checker<'a> {
                     let val = self.expr(a.expr);
                     if let Some(&s) = input_slots.get(pos) {
                         self.coerce(&p.vars[s].ty, &val);
-                        inputs.push((s, val.ir()));
+                        let ir = val.ir();
+                        self.check_in_out_arg(p.vars[s].section, &p.vars[s].name, &ir);
+                        inputs.push((s, ir));
                     }
                 }
             }

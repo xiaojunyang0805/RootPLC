@@ -41,12 +41,21 @@ program      = 'PROGRAM' name { var_section } statement_list 'END_PROGRAM'
 **[pous.function]**
 ```
 function     = 'FUNCTION' name ':' type_spec { var_section } statement_list 'END_FUNCTION'
-```
+``` A function without a
+result type (`FUNCTION F` followed directly by its variable sections or body)
+is accepted with warning RP0113, because CODESYS and TwinCAT code uses it; it
+is called as a statement and has no value.
 
 **[pous.function-block]**
 ```
 function_block = 'FUNCTION_BLOCK' name { var_section } statement_list 'END_FUNCTION_BLOCK'
 ```
+
+**[pous.call.in-out]** A `VAR_IN_OUT` parameter refers to the caller's
+variable: changes made by the called function or function block are visible
+in that variable after the call. RootPLC copies the value in before the call
+and back after it. The argument must be a variable, an element or a member
+(RP0114); a constant or an expression is an error.
 
 **[pous.test]** A TEST block is a POU that only the test runner executes
 (semantics: spec/07-test-blocks.md):

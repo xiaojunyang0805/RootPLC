@@ -11,7 +11,8 @@
 
 use rootplc_diag::Span;
 use rootplc_sema::ir::{
-    BinOp, Call, CallTarget, Const, DefKind, Expr, ExprKind, ForLoop, Init, Program, Stmt, UnOp,
+    BinOp, Call, CallTarget, Const, DefKind, Expr, ExprKind, ForLoop, Init, Program, Section, Stmt,
+    UnOp,
 };
 use rootplc_sema::{Elem, Ty};
 
@@ -127,6 +128,8 @@ pub struct Vm<'p> {
     pub failures: Vec<AssertFailure>,
     steps: u64,
     file: usize,
+    /// Root holding the global variables, [config.global-list].
+    globals: Option<usize>,
 }
 
 fn truthy(v: &Value) -> bool {
@@ -249,14 +252,19 @@ fn compare(a: &Value, b: &Value) -> Option<std::cmp::Ordering> {
 impl<'p> Vm<'p> {
     /// A machine for one program.
     pub fn new(prog: &'p Program) -> Self {
-        Vm {
+        let mut vm = Vm {
             prog,
             roots: Vec::new(),
             now_ns: 0,
             failures: Vec::new(),
             steps: 0,
             file: 0,
+            globals: None,
+        };
+        if let Some(g) = prog.globals {
+            vm.globals = Some(vm.instantiate(g));
         }
+        vm
     }
 
     fn fault(&self, kind: FaultKind, span: Span, message: impl Into<String>) -> Fault {
@@ -679,6 +687,10 @@ impl<'p> Vm<'p> {
     fn place(&mut self, e: &Expr, cx: &Ctx) -> R<Loc> {
         match &e.kind {
             ExprKind::Var(i) => Ok(cx.this.child(*i)),
+            ExprKind::Global(i) => Ok(Loc {
+                root: self.globals.unwrap_or(0),
+                path: vec![*i as u32],
+            }),
             ExprKind::Member(b, i) => Ok(self.place(b, cx)?.child(*i)),
             ExprKind::Index(b, idx) => {
                 let dims = match self.strip(&b.ty) {
@@ -725,7 +737,11 @@ impl<'p> Vm<'p> {
         match &e.kind {
             ExprKind::Const(c) => Ok(const_value(c)),
             ExprKind::Null => Ok(Value::Ref(None)),
-            ExprKind::Var(_) | ExprKind::Member(..) | ExprKind::Index(..) | ExprKind::Deref(_) => {
+            ExprKind::Var(_)
+            | ExprKind::Global(_)
+            | ExprKind::Member(..)
+            | ExprKind::Index(..)
+            | ExprKind::Deref(_) => {
                 let loc = self.place(e, cx)?;
                 Ok(self.get(&loc, e.span)?.clone())
             }
@@ -860,6 +876,36 @@ impl<'p> Vm<'p> {
 
     // ---------------------------------------------------------------- calls
 
+    /// [pous.call.in-out]: copy each VAR_IN_OUT parameter back to the
+    /// caller's variable after the call (copy-in, copy-out).
+    fn write_back_in_out(
+        &mut self,
+        c: &Call,
+        pou: &rootplc_sema::ir::Pou,
+        frame: &Loc,
+        span: Span,
+        cx: &Ctx,
+    ) -> R<()> {
+        for (slot, ex) in &c.inputs {
+            if pou.vars[*slot].section != Section::InOut
+                || !matches!(
+                    ex.kind,
+                    ExprKind::Var(_)
+                        | ExprKind::Global(_)
+                        | ExprKind::Member(..)
+                        | ExprKind::Index(..)
+                        | ExprKind::Deref(_)
+                )
+            {
+                continue;
+            }
+            let v = self.get(&frame.child(*slot), span)?.clone();
+            let target = self.place(ex, cx)?;
+            self.store(&target, v, &ex.ty, ex.span)?;
+        }
+        Ok(())
+    }
+
     fn call(&mut self, c: &Call, e: &Expr, cx: &Ctx) -> R<Value> {
         let prog = self.prog;
         match &c.target {
@@ -880,6 +926,7 @@ impl<'p> Vm<'p> {
                     self.exec_block(&pou.body, &Ctx { this: loc.clone() })?;
                     self.file = saved;
                 }
+                self.write_back_in_out(c, pou, &loc, e.span, cx)?;
                 for (slot, target) in &c.outputs {
                     let v = self.get(&loc.child(*slot), e.span)?.clone();
                     let tl = self.place(target, cx)?;
@@ -916,6 +963,7 @@ impl<'p> Vm<'p> {
                 self.file = prog.defs[*id].file;
                 self.exec_block(&pou.body, &Ctx { this: floc.clone() })?;
                 self.file = saved;
+                self.write_back_in_out(c, pou, &floc, e.span, cx)?;
                 let result = if pou.ret.is_some() {
                     self.get(&floc.child(pou.vars.len() - 1), e.span)?.clone()
                 } else {

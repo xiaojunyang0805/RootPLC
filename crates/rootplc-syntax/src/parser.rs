@@ -317,11 +317,22 @@ impl<'a> Parser<'a> {
                 self.pou(N::Test, "TEST", "END_TEST", false);
             } else if self.at_kw("TYPE") {
                 self.type_block();
+            } else if self.at_kw("VAR_GLOBAL") {
+                self.b.start(N::GlobalVarList);
+                self.var_section();
+                self.b.finish();
+            } else if self.at_kw("CONFIGURATION") {
+                self.configuration();
             } else {
-                self.unexpected("PROGRAM, FUNCTION, FUNCTION_BLOCK, TYPE or TEST");
+                self.unexpected(
+                    "PROGRAM, FUNCTION, FUNCTION_BLOCK, TYPE, TEST, VAR_GLOBAL or CONFIGURATION",
+                );
                 self.b.start(N::Error);
                 self.bump();
-                while !self.at_eof() && !self.at_any_kw(POU_KWS) {
+                while !self.at_eof()
+                    && !self.at_any_kw(POU_KWS)
+                    && !self.at_any_kw(&["VAR_GLOBAL", "CONFIGURATION"])
+                {
                     self.bump();
                 }
                 self.b.finish();
@@ -336,8 +347,21 @@ impl<'a> Parser<'a> {
         let open_span = self.span_here();
         self.bump();
         self.name();
-        if has_type && self.expect(TokenKind::Colon, "':' and the return type") {
-            self.type_spec();
+        if has_type {
+            if self.eat(TokenKind::Colon) {
+                self.type_spec();
+            } else if self.at_any_kw(SECTION_KWS) || self.at_kw(close) {
+                // [pous.function]: CODESYS and TwinCAT allow a function without a result
+                let sp = self.span_prev_end();
+                self.error(
+                    codes::FUNCTION_WITHOUT_RESULT,
+                    "FUNCTION without a result type is a vendor extension; call it as a statement"
+                        .into(),
+                    sp,
+                );
+            } else {
+                self.expect(TokenKind::Colon, "':' and the return type");
+            }
         }
         while self.at_any_kw(SECTION_KWS) {
             self.var_section();
@@ -355,6 +379,92 @@ impl<'a> Parser<'a> {
             }
         }
         self.b.finish();
+    }
+
+    /// [config.configuration]: `CONFIGURATION name … END_CONFIGURATION`.
+    fn configuration(&mut self) {
+        self.b.start(N::Configuration);
+        let open_span = self.span_here();
+        self.bump();
+        self.name();
+        self.config_items("END_CONFIGURATION");
+        self.close_config("CONFIGURATION", "END_CONFIGURATION", open_span);
+        self.b.finish();
+    }
+
+    /// Global sections, resources, tasks and program instances up to `close`.
+    fn config_items(&mut self, close: &str) {
+        const STOP: &[&str] = &[
+            "FUNCTION",
+            "FUNCTION_BLOCK",
+            "TYPE",
+            "TEST",
+            "CONFIGURATION",
+        ];
+        while !self.at_eof() && !self.at_kw(close) && !self.at_any_kw(STOP) {
+            let before = self.pos;
+            if self.at_any_kw(SECTION_KWS) {
+                self.var_section();
+            } else if self.at_kw("RESOURCE") {
+                self.b.start(N::Resource);
+                let open_span = self.span_here();
+                self.bump();
+                self.name();
+                if self.expect_kw("ON") {
+                    self.name();
+                }
+                self.config_items("END_RESOURCE");
+                self.close_config("RESOURCE", "END_RESOURCE", open_span);
+                self.b.finish();
+            } else if self.at_kw("TASK") {
+                // [config.task]
+                self.b.start(N::TaskConfig);
+                self.bump();
+                self.name();
+                if self.at(TokenKind::LParen) {
+                    self.arg_list();
+                }
+                self.terminator();
+                self.b.finish();
+            } else if self.at_kw("PROGRAM") {
+                // [config.program-instance]
+                self.b.start(N::ProgramConfig);
+                self.bump();
+                let _ = self.eat_kw("RETAIN") || self.eat_kw("NON_RETAIN");
+                self.name();
+                if self.eat_kw("WITH") {
+                    self.name();
+                }
+                if self.expect(TokenKind::Colon, "':' and the program type") {
+                    self.name();
+                }
+                if self.at(TokenKind::LParen) {
+                    self.arg_list();
+                }
+                self.terminator();
+                self.b.finish();
+            } else {
+                self.unexpected("VAR_GLOBAL, RESOURCE, TASK or PROGRAM");
+                self.recover(&[close, "RESOURCE", "TASK"]);
+            }
+            if self.pos == before {
+                self.bump();
+            }
+        }
+    }
+
+    fn close_config(&mut self, open: &str, close: &str, open_span: Span) {
+        if !self.eat_kw(close) {
+            if self.at_eof() {
+                self.error(
+                    codes::MISSING_END,
+                    format!("{open} is never closed: missing {close}"),
+                    open_span,
+                );
+            } else {
+                self.unexpected(&format!("'{close}'"));
+            }
+        }
     }
 
     /// [pous.type-block].
@@ -456,10 +566,29 @@ impl<'a> Parser<'a> {
         self.b.start(N::TypeSpec);
         match self.kind() {
             Some(TokenKind::TypeName) => {
+                let is_string = self.nth_index(0).is_some_and(|i| {
+                    let t = self.text_at(i);
+                    t.eq_ignore_ascii_case("STRING") || t.eq_ignore_ascii_case("WSTRING")
+                });
                 self.bump();
                 if self.eat(TokenKind::LBracket) {
                     self.expr();
                     self.expect(TokenKind::RBracket, "']'");
+                } else if is_string && self.at(TokenKind::LParen) {
+                    // [types.derived.string]: the CODESYS/TwinCAT spelling STRING(n)
+                    let start = self.span_here();
+                    self.bump();
+                    self.expr();
+                    if self.expect(TokenKind::RParen, "')'") {
+                        let end = self.span_prev_end();
+                        self.error(
+                            codes::STRING_LENGTH_IN_PARENS,
+                            "STRING(n) is a vendor spelling; IEC 61131-3 writes STRING[n]".into(),
+                            Span::new(start.start as usize, end.end as usize),
+                        );
+                    }
+                    self.b.finish();
+                    return;
                 }
                 if self.at(TokenKind::LParen) {
                     self.subrange_or_enum();

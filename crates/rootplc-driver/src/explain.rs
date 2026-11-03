@@ -25,6 +25,10 @@ pub const SPEC: &[(&str, &str)] = &[
         include_str!("../assets/spec/05-statements.md"),
     ),
     (
+        "spec/06-tasks-config.md",
+        include_str!("../assets/spec/06-tasks-config.md"),
+    ),
+    (
         "spec/07-test-blocks.md",
         include_str!("../assets/spec/07-test-blocks.md"),
     ),

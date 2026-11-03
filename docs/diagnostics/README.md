@@ -37,6 +37,9 @@ Codes RP00xx are lexical, RP01xx types, RP02xx names and structure, RP03xx synta
 | [RP0108](#rp0108) | error | invalid bounds or length |
 | [RP0109](#rp0109) | error | constant array index out of bounds |
 | [RP0110](#rp0110) | warning | string literal longer than declared length; it will be truncated |
+| [RP0114](#rp0114) | error | a VAR_IN_OUT argument must be a variable |
+| [RP0113](#rp0113) | warning | FUNCTION without a result type (not portable); call it as a statement |
+| [RP0112](#rp0112) | warning | STRING(n) length in parentheses (not portable); write STRING[n] |
 | [RP0111](#rp0111) | error | unknown type name |
 | [RP0203](#rp0203) | error | unknown name |
 | [RP0204](#rp0204) | error | name declared twice in the same POU |
@@ -444,7 +447,48 @@ warning: string literal longer than declared length; it will be truncated
 Rule `types.derived.string` in `spec/02-types.md`:
 
 **[types.derived.string]** `STRING[n]` and `WSTRING[n]` with 1 <= n <= 65535
-(otherwise RP0108). Assigning a longer string truncates it to n characters.
+(otherwise RP0108). The CODESYS and TwinCAT spelling `STRING(n)` means the
+same and is accepted with warning RP0112, because real code uses it widely;
+the portable spelling is `STRING[n]`. Assigning a longer string truncates it to n characters.
+A string literal longer than n in a declaration or constant assignment is
+warning RP0110.
+
+## RP0114
+
+error: a VAR_IN_OUT argument must be a variable
+
+Rule `pous.call.in-out` in `spec/04-pous.md`:
+
+**[pous.call.in-out]** A `VAR_IN_OUT` parameter refers to the caller's
+variable: changes made by the called function or function block are visible
+in that variable after the call. RootPLC copies the value in before the call
+and back after it. The argument must be a variable, an element or a member
+(RP0114); a constant or an expression is an error.
+
+## RP0113
+
+warning: FUNCTION without a result type (not portable); call it as a statement
+
+Rule `pous.function` in `spec/04-pous.md`:
+
+**[pous.function]**
+```
+function     = 'FUNCTION' name ':' type_spec { var_section } statement_list 'END_FUNCTION'
+``` A function without a
+result type (`FUNCTION F` followed directly by its variable sections or body)
+is accepted with warning RP0113, because CODESYS and TwinCAT code uses it; it
+is called as a statement and has no value.
+
+## RP0112
+
+warning: STRING(n) length in parentheses (not portable); write STRING[n]
+
+Rule `types.derived.string` in `spec/02-types.md`:
+
+**[types.derived.string]** `STRING[n]` and `WSTRING[n]` with 1 <= n <= 65535
+(otherwise RP0108). The CODESYS and TwinCAT spelling `STRING(n)` means the
+same and is accepted with warning RP0112, because real code uses it widely;
+the portable spelling is `STRING[n]`. Assigning a longer string truncates it to n characters.
 A string literal longer than n in a declaration or constant assignment is
 warning RP0110.
 
@@ -469,9 +513,10 @@ resolves, in this order, to:
 
 1. a variable of the enclosing POU (in a `FUNCTION`, the function name is
    also the variable holding the result);
-2. a value of an enumeration type, if exactly one enumeration has it
+2. a global variable ([config.global-list]);
+3. a value of an enumeration type, if exactly one enumeration has it
    ([types.derived.enum]);
-3. a POU or standard function or function block (spec/08-stdlib.md), when
+4. a POU or standard function or function block (spec/08-stdlib.md), when
    the name is called.
 
 A name that resolves to none of these is error RP0203. So is a member that

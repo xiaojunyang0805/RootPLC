@@ -160,7 +160,9 @@ raises the fault `INDEX`. `ARRAY[*]` is allowed only for `VAR_IN_OUT`
 parameters.
 
 **[types.derived.string]** `STRING[n]` and `WSTRING[n]` with 1 <= n <= 65535
-(otherwise RP0108). Assigning a longer string truncates it to n characters.
+(otherwise RP0108). The CODESYS and TwinCAT spelling `STRING(n)` means the
+same and is accepted with warning RP0112, because real code uses it widely;
+the portable spelling is `STRING[n]`. Assigning a longer string truncates it to n characters.
 A string literal longer than n in a declaration or constant assignment is
 warning RP0110.
 

@@ -220,6 +220,27 @@ spec = "types.derived.string"
 stage = "sema"
 
 [[code]]
+id = "RP0114"
+severity = "error"
+summary = "a VAR_IN_OUT argument must be a variable"
+spec = "pous.call.in-out"
+stage = "sema"
+
+[[code]]
+id = "RP0113"
+severity = "warning"
+summary = "FUNCTION without a result type (not portable); call it as a statement"
+spec = "pous.function"
+stage = "parse"
+
+[[code]]
+id = "RP0112"
+severity = "warning"
+summary = "STRING(n) length in parentheses (not portable); write STRING[n]"
+spec = "types.derived.string"
+stage = "parse"
+
+[[code]]
 id = "RP0111"
 severity = "error"
 summary = "unknown type name"
