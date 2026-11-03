@@ -1,13 +1,20 @@
 # PLC-Agent-Bench
 
-The first open benchmark for AI agents writing PLC programs. v0 has about 200
-tasks (Phase 1), v1 about 1,000 with simulation and formal properties (Phase 2).
-Published on GitHub and Hugging Face with a public leaderboard.
+An open, executable, vendor-neutral benchmark for AI agents writing PLC
+programs. Tasks run headless with `rootplc`, so anyone can reproduce the
+scores without a vendor IDE or licence.
+
+**Sizes:**
+- v0: about 100 tasks.
+- v1: more tasks, adding simulation and formal properties.
+
+**Publication:** GitHub and Hugging Face, with a public leaderboard that
+scores agents both with and without RootPLC.
 
 ## Task layout
 ```
 tasks/<id>/
-  task.toml        metadata, difficulty, scoring weights
+  task.toml        metadata, difficulty, scoring weights, source + licence
   prompt.md        what the agent is given
   scenario.toml    plant model and stimulus for simulation (optional)
   properties.st    formal properties for rootplc verify (optional)
@@ -15,5 +22,28 @@ tasks/<id>/
   reference/       a reference solution (never shown to the agent)
 ```
 
-Scoring: compiles, then passes visible tests, then hidden tests, then
-simulation scenario, then formal properties. Schema: `schema/task.schema.json`.
+## Scoring
+
+Each task is scored in this order:
+1. compiles;
+2. passes visible tests;
+3. passes hidden tests (**verified-correct**);
+4. **mutation score**: how many seeded faults the agent's tests catch
+   (`rootplc test --mutate`);
+5. simulation scenario;
+6. formal properties.
+
+Compile rate is reported but is not the headline metric. Schema:
+`schema/task.schema.json`.
+
+## Reuse of published datasets
+
+Tasks from published academic datasets are included **only where their
+licence allows it**. Each such task records its source and licence in
+`task.toml`. Where reuse isn't allowed, we compare against published numbers
+without copying the tasks.
+
+## Independence
+
+Scoring is equal for all tools. Some sets are held out. External researchers
+are invited as co-maintainers.

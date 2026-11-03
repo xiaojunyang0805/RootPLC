@@ -5,7 +5,7 @@ through each agent host, with and without RootPLC installed, and records:
 - **pick rate**: does the agent call `rootplc` unprompted?
 - **compile rate** and **verified-correct rate**
 
-Phase 0 gate: a baseline report of today's agents *without* RootPLC.
+Phase 0 gate: a baseline report of agents with and without RootPLC, across Western and Chinese agent hosts.
 
 | Path | Contents |
 |---|---|

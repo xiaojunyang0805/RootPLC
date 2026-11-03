@@ -1,0 +1,4 @@
+name = "deepseek-harness"
+# command = ""        # how to start the host non-interactively
+# model = ""
+# mcp_config = "../../agent/mcp/deepseek-harness.json"
