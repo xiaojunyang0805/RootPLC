@@ -43,7 +43,12 @@ initializer or a structure initializer:
 initializer  = expression
              | '[' initializer { ',' initializer } ']'                    (* array *)
              | '(' name ':=' initializer { ',' name ':=' initializer } ')' (* structure *)
+             | '(' ')'                                                    (* defaults *)
 ```
+
+A structure initializer may also set the variables of a function-block
+instance, `t : TON := (PT := T#1S);` (CODESYS and TwinCAT), and `()` keeps
+every default.
 
 **[variables.init-arguments]** A function-block instance may be declared
 with arguments, `fb : FB_Buffer(size := 10);`, which CODESYS and TwinCAT

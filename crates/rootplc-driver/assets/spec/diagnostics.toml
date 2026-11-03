@@ -278,7 +278,7 @@ stage = "sema"
 [[code]]
 id = "RP0124"
 severity = "warning"
-summary = "reserved word declared as a name (AT, ON, STEP, TASK, TRANSITION, INITIAL_STEP, WITH)"
+summary = "reserved word declared as a name (AT, ON, STEP, TASK, TRANSITION, INITIAL_STEP, WITH, OVERRIDE)"
 spec = "lexical.keywords.soft"
 stage = "parse"
 
@@ -329,4 +329,25 @@ id = "RP0204"
 severity = "error"
 summary = "name declared twice in the same POU"
 spec = "variables.unique"
+stage = "sema"
+
+[[code]]
+id = "RP0125"
+severity = "warning"
+summary = "chained assignment a := b := v (not portable)"
+spec = "statements.assignment.chain"
+stage = "sema"
+
+[[code]]
+id = "RP0126"
+severity = "warning"
+summary = "bit string used as a number, or bitwise operator on integers (not portable)"
+spec = "types.conversion.vendor"
+stage = "sema"
+
+[[code]]
+id = "RP0127"
+severity = "warning"
+summary = "integer literal 0 or 1 used as BOOL, or 0 as a reference (not portable)"
+spec = "types.conversion.vendor"
 stage = "sema"

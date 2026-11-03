@@ -233,6 +233,24 @@ impl<'a> Parser<'a> {
         kws.iter().any(|k| self.at_kw(k))
     }
 
+    /// A modifier (PUBLIC, OVERRIDE, ...) at the next token: a modifier word
+    /// followed by another word. `OVERRIDE` is a soft keyword, so
+    /// `FUNCTION OVERRIDE : REAL` and `Override : UINT` stay names.
+    fn at_modifier(&self) -> bool {
+        self.nth_index(0).is_some_and(|i| self.is_modifier_index(i))
+    }
+
+    fn is_modifier_index(&self, i: usize) -> bool {
+        matches!(self.toks[i].kind, TokenKind::Keyword | TokenKind::Ident)
+            && MODIFIER_KWS
+                .iter()
+                .any(|m| self.text_at(i).eq_ignore_ascii_case(m))
+            && self.toks[i + 1..]
+                .iter()
+                .find(|t| !is_trivia(t.kind))
+                .is_some_and(|t| matches!(t.kind, TokenKind::Ident | TokenKind::Keyword))
+    }
+
     /// Attach trivia, then the next significant token.
     fn bump(&mut self) {
         while self.pos < self.toks.len() && is_trivia(self.toks[self.pos].kind) {
@@ -534,12 +552,7 @@ impl<'a> Parser<'a> {
     /// Modifiers, then METHOD, PROPERTY or ACTION (truST style: `PUBLIC METHOD M`).
     fn at_modified_member(&self) -> bool {
         let mut k = 0;
-        while self.nth_index(k).is_some_and(|i| {
-            self.toks[i].kind == TokenKind::Keyword
-                && MODIFIER_KWS
-                    .iter()
-                    .any(|m| self.text_at(i).eq_ignore_ascii_case(m))
-        }) {
+        while self.nth_index(k).is_some_and(|i| self.is_modifier_index(i)) {
             k += 1;
         }
         k > 0
@@ -557,8 +570,9 @@ impl<'a> Parser<'a> {
         let open_span = self.span_here();
         self.bump();
         let oop = matches!(kind, N::FunctionBlock | N::Program);
-        if oop {
-            while self.at_any_kw(MODIFIER_KWS) {
+        // [pous.oop.modifiers]: FUNCTION INTERNAL F (TwinCAT library access)
+        if oop || kind == N::Function {
+            while self.at_modifier() {
                 self.bump();
             }
         }
@@ -733,12 +747,7 @@ impl<'a> Parser<'a> {
             let lead = self.at_modified_member();
             let mut k = 0;
             if lead {
-                while self.nth_index(k).is_some_and(|i| {
-                    self.toks[i].kind == TokenKind::Keyword
-                        && MODIFIER_KWS
-                            .iter()
-                            .any(|m| self.text_at(i).eq_ignore_ascii_case(m))
-                }) {
+                while self.nth_index(k).is_some_and(|i| self.is_modifier_index(i)) {
                     k += 1;
                 }
             }
@@ -768,11 +777,11 @@ impl<'a> Parser<'a> {
     fn method(&mut self) {
         self.b.start(N::Method);
         let open_span = self.span_here();
-        while self.at_any_kw(MODIFIER_KWS) {
+        while self.at_modifier() {
             self.bump();
         }
         self.bump();
-        while self.at_any_kw(MODIFIER_KWS) {
+        while self.at_modifier() {
             self.bump();
         }
         self.name();
@@ -802,7 +811,7 @@ impl<'a> Parser<'a> {
     fn action(&mut self) {
         self.b.start(N::Action);
         let open_span = self.span_here();
-        while self.at_any_kw(MODIFIER_KWS) {
+        while self.at_modifier() {
             self.bump();
         }
         self.bump();
@@ -830,11 +839,11 @@ impl<'a> Parser<'a> {
     fn property(&mut self) {
         self.b.start(N::Property);
         let open_span = self.span_here();
-        while self.at_any_kw(MODIFIER_KWS) {
+        while self.at_modifier() {
             self.bump();
         }
         self.bump();
-        while self.at_any_kw(MODIFIER_KWS) {
+        while self.at_modifier() {
             self.bump();
         }
         self.name();
@@ -855,7 +864,7 @@ impl<'a> Parser<'a> {
                 self.b.start(kind);
                 self.bump();
                 // [pous.oop.modifiers]: GET PUBLIC (TwinCAT access per accessor)
-                while self.at_any_kw(MODIFIER_KWS) {
+                while self.at_modifier() {
                     self.bump();
                 }
                 while self.at_section() {
@@ -888,7 +897,7 @@ impl<'a> Parser<'a> {
         self.b.start(N::Interface);
         let open_span = self.span_here();
         self.bump();
-        while self.at_any_kw(MODIFIER_KWS) {
+        while self.at_modifier() {
             self.bump();
         }
         self.name();
@@ -918,7 +927,7 @@ impl<'a> Parser<'a> {
         while !self.at_eof() && !self.at_kw("END_TYPE") && !self.at_any_kw(POU_KWS) {
             let before = self.pos;
             self.b.start(N::TypeDecl);
-            while self.at_any_kw(MODIFIER_KWS) {
+            while self.at_modifier() {
                 self.bump();
             }
             let named = self.name();
@@ -965,7 +974,7 @@ impl<'a> Parser<'a> {
         // [variables.section]: CONSTANT / RETAIN / NON_RETAIN, ed.3 access
         // specifiers (VAR PUBLIC) and TwinCAT PERSISTENT, in any order
         while self.at_any_kw(&["CONSTANT", "RETAIN", "NON_RETAIN"])
-            || self.at_any_kw(MODIFIER_KWS)
+            || self.at_modifier()
             || self.at_word("PERSISTENT")
         {
             self.bump();
@@ -1225,12 +1234,14 @@ impl<'a> Parser<'a> {
             self.expect(TokenKind::RBracket, "']'");
             self.b.finish();
         } else if self.at(TokenKind::LParen)
-            && self.nth_kind(1) == Some(TokenKind::Ident)
-            && self.nth_kind(2) == Some(TokenKind::Assign)
+            && (self.nth_kind(1) == Some(TokenKind::RParen)
+                || (self.nth_kind(1) == Some(TokenKind::Ident)
+                    && self.nth_kind(2) == Some(TokenKind::Assign)))
         {
             self.b.start(N::StructInit);
             self.bump();
-            loop {
+            // [variables.initializer]: `()` keeps every default
+            while !self.at(TokenKind::RParen) {
                 self.name();
                 self.expect(TokenKind::Assign, "':='");
                 self.initializer();
@@ -1327,7 +1338,7 @@ impl<'a> Parser<'a> {
                 self.bump(); // the '=' of REF=, S=, R=
             }
             if self.expr_start() {
-                self.expr();
+                self.assign_value();
             } else {
                 self.unexpected("an expression");
                 self.recover(&[]);
@@ -1339,6 +1350,19 @@ impl<'a> Parser<'a> {
         } else {
             self.b.start_at(cp, N::CallStmt);
             self.terminator();
+            self.b.finish();
+        }
+    }
+
+    /// The value of an assignment; `b := v` here makes a chain `a := b := v`
+    /// ([statements.assignment.chain], CODESYS / TwinCAT): a nested AssignStmt.
+    fn assign_value(&mut self) {
+        let cp = self.b.checkpoint();
+        self.expr();
+        if self.at(TokenKind::Assign) {
+            self.b.start_at(cp, N::AssignStmt);
+            self.bump();
+            self.assign_value();
             self.b.finish();
         }
     }
@@ -1523,6 +1547,11 @@ impl<'a> Parser<'a> {
                 | TokenKind::Minus
                 | TokenKind::Plus,
             ) => true,
+            // TIME() (TwinCAT_BuiltIns)
+            Some(TokenKind::TypeName) => {
+                self.nth_kind(1) == Some(TokenKind::LParen)
+                    && self.nth_kind(2) == Some(TokenKind::RParen)
+            }
             Some(TokenKind::Keyword) => self.at_any_kw(&[
                 "NOT", "TRUE", "FALSE", "NULL", "REF", "THIS", "SUPER", "TEST",
             ]),
@@ -1622,13 +1651,22 @@ impl<'a> Parser<'a> {
         if !self.at(TokenKind::RParen) {
             loop {
                 self.b.start(N::Arg);
-                if self.at(TokenKind::Ident)
+                // a parameter may be called TEST ([pous.test])
+                if (self.at(TokenKind::Ident) || self.at_kw("TEST"))
                     && matches!(self.nth_kind(1), Some(TokenKind::Assign | TokenKind::Arrow))
                 {
+                    let output = self.nth_kind(1) == Some(TokenKind::Arrow);
                     self.bump();
                     self.bump();
+                    // [pous.call.output]: `Done =>` with no variable ignores the output
+                    if !(output
+                        && matches!(self.kind(), Some(TokenKind::Comma | TokenKind::RParen)))
+                    {
+                        self.expr();
+                    }
+                } else {
+                    self.expr();
                 }
-                self.expr();
                 self.b.finish();
                 if !self.eat(TokenKind::Comma) {
                     break;
@@ -1683,8 +1721,13 @@ impl<'a> Parser<'a> {
                 self.b.finish();
                 true
             }
-            // an elementary type name as a call argument: SIZEOF(INT)
-            Some(TokenKind::TypeName) if self.nth_kind(1) == Some(TokenKind::RParen) => {
+            // an elementary type name as a call argument: SIZEOF(INT); TIME()
+            // (TwinCAT_BuiltIns) is a call
+            Some(TokenKind::TypeName)
+                if self.nth_kind(1) == Some(TokenKind::RParen)
+                    || (self.nth_kind(1) == Some(TokenKind::LParen)
+                        && self.nth_kind(2) == Some(TokenKind::RParen)) =>
+            {
                 self.b.start(N::NameRef);
                 self.bump();
                 self.b.finish();

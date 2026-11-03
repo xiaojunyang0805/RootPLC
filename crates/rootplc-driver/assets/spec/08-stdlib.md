@@ -93,6 +93,10 @@ declares `MEMCPY`, `MEMMOVE`, `MEMSET` and `MEMCMP` with their documented
 parameters; they are declared only (RP0120), since RootPLC models addresses
 as typed references.
 
+**[stdlib.compat.intrinsics]** `TwinCAT_BuiltIns` also enables `__POUNAME()`,
+a STRING constant with the name of the POU it is written in, and `TIME()`,
+the time since the PLC started (the virtual clock of the VM).
+
 **[stdlib.compat.sizeof]** A library may enable compiler operators;
 `TwinCAT_BuiltIns` enables `SIZEOF(x)` and `XSIZEOF(x)`: the size in bytes
 of a variable or type, a constant, with TwinCAT's 64-bit layout and default

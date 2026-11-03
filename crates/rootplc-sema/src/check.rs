@@ -816,12 +816,26 @@ impl<'a> Checker<'a> {
     /// keyword and any modifiers.
     fn decl_name(&self, n: &'a Node) -> Option<usize> {
         // modifiers and keywords (including PROPERTY, a plain word) come first;
-        // TEST after the keyword is a name ([pous.test])
-        self.items(n)
-            .into_iter()
+        // TEST after the keyword is a name ([pous.test]); OVERRIDE, a soft
+        // keyword, is a modifier when another word follows it
+        let its = self.items(n);
+        let next_ident = |k: usize| {
+            its[k + 1..]
+                .iter()
+                .find_map(|i| match i {
+                    Item::Tok(t) => Some(*t),
+                    Item::Node(_) => None,
+                })
+                .is_some_and(|t| self.tkind(t) == T::Ident)
+        };
+        its.iter()
+            .copied()
             .enumerate()
             .find_map(|(k, i)| match i {
                 Item::Tok(t) if k > 0 && self.is_kw(t, "TEST") => Some(t),
+                Item::Tok(t) if self.text(t).eq_ignore_ascii_case("OVERRIDE") && next_ident(k) => {
+                    None
+                }
                 Item::Tok(t)
                     if self.tkind(t) != T::Keyword
                         && !(n.kind == N::Property
@@ -2288,14 +2302,23 @@ impl<'a> Checker<'a> {
                 Some(Init::Array(items))
             }
             N::StructInit => {
+                // [variables.initializer]: a function-block instance takes the
+                // same form for its variables (TON := (PT := T#1S)), CODESYS /
+                // TwinCAT; `()` keeps every default
                 let members = match ty {
                     Ty::Named(i) => match &self.defs[*i].kind {
                         Kind::Struct(m) => m.clone(),
+                        Kind::Pou(p) if p.kind == PouKind::FunctionBlock => p.vars.clone(),
                         _ => Vec::new(),
                     },
                     Ty::Unknown => return None,
                     _ => Vec::new(),
                 };
+                let structured = matches!(ty, Ty::Named(i)
+                    if matches!(&self.defs[*i].kind, Kind::Struct(_) | Kind::Pou(_)));
+                if structured && self.child_nodes(inner, N::Initializer).is_empty() {
+                    return Some(Init::Struct(Vec::new()));
+                }
                 if members.is_empty() {
                     let msg = format!(
                         "structure initializer for a value of type {}",
@@ -2348,12 +2371,44 @@ impl<'a> Checker<'a> {
         let mut out = Vec::new();
         for it in self.items(n) {
             if let Item::Node(s) = it {
-                if let Some(st) = self.stmt(s) {
-                    out.push(st);
-                }
+                self.stmt_into(s, &mut out);
             }
         }
         out
+    }
+
+    /// One statement; a chain `a := b := v` ([statements.assignment.chain])
+    /// becomes `b := v; a := b;`.
+    fn stmt_into(&mut self, s: &'a Node, out: &mut Vec<Stmt>) {
+        let its = self.items(s);
+        if let (N::AssignStmt, Some(Item::Node(t)), Some(Item::Tok(op)), Some(Item::Node(inner))) = (
+            s.kind,
+            its.first().copied(),
+            its.get(1).copied(),
+            its.get(2).copied(),
+        ) {
+            if self.tkind(op) == T::Assign && inner.kind == N::AssignStmt {
+                let span = self.span(s);
+                self.diag(
+                    codes::CHAINED_ASSIGNMENT,
+                    "chained assignment is a vendor form; IEC 61131-3 writes one assignment per statement".into(),
+                    span,
+                    None,
+                );
+                self.stmt_into(inner, out);
+                let Some(Item::Node(source)) = self.items(inner).first().copied() else {
+                    return;
+                };
+                let target = self.expr(t);
+                let value = self.expr(source);
+                let value = self.adapt(&target.ty, value);
+                out.push(Stmt::Assign(target.ir(), value));
+                return;
+            }
+        }
+        if let Some(st) = self.stmt(s) {
+            out.push(st);
+        }
     }
 
     fn stmt(&mut self, n: &'a Node) -> Option<Stmt> {
@@ -2835,6 +2890,18 @@ impl<'a> Checker<'a> {
                             return false;
                         }
                         self.in_range(to, n, range, v.span)
+                    }
+                    // CODESYS / TwinCAT: 0 / 1 as BOOL, 0 as a null reference;
+                    // warning RP0127
+                    Ty::Elem(Elem::Bool) if matches!(v.k, Some(K::Int(0 | 1))) => {
+                        let msg = "integer literal used as BOOL; IEC 61131-3 writes FALSE or TRUE";
+                        self.diag(codes::INTEGER_AS_BOOL_OR_NULL, msg.into(), v.span, None);
+                        true
+                    }
+                    Ty::Ref(_) if v.k == Some(K::Int(0)) => {
+                        let msg = "0 used as a reference; IEC 61131-3 writes NULL";
+                        self.diag(codes::INTEGER_AS_BOOL_OR_NULL, msg.into(), v.span, None);
+                        true
                     }
                     _ => {
                         self.mismatch(to, v);
@@ -3410,6 +3477,24 @@ impl<'a> Checker<'a> {
             Cls::Cmp => true,
             Cls::Logic => matches!(st, Ty::IntLit) || matches!(st, Ty::Elem(e) if e.is_bit()),
         };
+        // CODESYS / TwinCAT: arithmetic on bit strings (DWORD + 1) and
+        // bitwise operators on integers; warning RP0126
+        let vendor = !ok
+            && match cls {
+                Cls::Arith | Cls::Mod => {
+                    matches!(st, Ty::Elem(e) if e.is_bit() && e != Elem::Bool)
+                }
+                Cls::Logic => matches!(st, Ty::Elem(e) if e.is_int()),
+                _ => false,
+            };
+        if vendor {
+            let msg = format!(
+                "operator {what} on {} is a vendor extension; IEC 61131-3 converts first",
+                self.ty_name(&ty)
+            );
+            self.diag(codes::BIT_STRING_AS_NUMBER, msg, span, None);
+        }
+        let ok = ok || vendor;
         if !ok {
             let msg = format!("operator {what} is not defined for {}", self.ty_name(&ty));
             self.diag(codes::IMPLICIT_CONVERSION, msg, span, None);
@@ -3599,7 +3684,16 @@ impl<'a> Checker<'a> {
                 let st = self.strip(&v.ty);
                 let ok = matches!(st, Ty::IntLit | Ty::Unknown)
                     || matches!(st, Ty::Elem(e) if e.is_int());
-                if !ok {
+                // CODESYS / TwinCAT index with BYTE, WORD, ...: warning RP0126
+                let bits = matches!(st, Ty::Elem(e) if e.is_bit() && e != Elem::Bool);
+                if bits {
+                    let msg = format!(
+                        "array index of type {} is a vendor extension; IEC 61131-3 indexes with integers",
+                        self.ty_name(&st)
+                    );
+                    self.diag(codes::BIT_STRING_AS_NUMBER, msg, self.span(e), None);
+                }
+                if !ok && !bits {
                     let msg = format!(
                         "array index must be an integer, found {}",
                         self.ty_name(&v.ty)
@@ -3633,7 +3727,9 @@ impl<'a> Checker<'a> {
         for a in self.child_nodes(list, N::Arg) {
             let its = self.items(a);
             let name = match (its.first().copied(), its.get(1).copied()) {
-                (Some(Item::Tok(n)), Some(Item::Tok(op))) if self.tkind(n) == T::Ident => {
+                (Some(Item::Tok(n)), Some(Item::Tok(op)))
+                    if self.tkind(n) == T::Ident || self.is_kw(n, "TEST") =>
+                {
                     match self.tkind(op) {
                         T::Assign => Some((n, false)),
                         T::Arrow => Some((n, true)),
@@ -3710,6 +3806,31 @@ impl<'a> Checker<'a> {
             }
         }
         let up = name.to_ascii_uppercase();
+        // [stdlib.compat.intrinsics]: __POUNAME() is the name of the POU it
+        // is written in; TIME() the time since the PLC started (VM clock)
+        if args.is_empty() && self.intrinsics.contains(&up) && up == "__POUNAME" {
+            let name = self
+                .scope
+                .map(|d| self.defs[d].name.clone())
+                .unwrap_or_default();
+            let ty = Ty::Str {
+                wide: false,
+                len: crate::types::DEFAULT_STRING_LEN.max(name.len() as u32),
+            };
+            return V::with(ty, span, ExprKind::Const(Const::Str(name)));
+        }
+        if args.is_empty() && self.intrinsics.contains(&up) && up == "TIME" {
+            let call = ir::Call {
+                target: CallTarget::Builtin {
+                    name: "TIME".into(),
+                    ty: None,
+                },
+                inputs: Vec::new(),
+                outputs: Vec::new(),
+                args: Vec::new(),
+            };
+            return V::with(Ty::Elem(Elem::Time), span, ExprKind::Call(Box::new(call)));
+        }
         if (up == "SIZEOF" || up == "XSIZEOF")
             && self.intrinsics.contains(&up)
             && args.len() == 1

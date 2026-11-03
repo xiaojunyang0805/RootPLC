@@ -84,9 +84,11 @@ a function block without a body, with variables, methods and properties.
 
 **[pous.oop.modifiers]** `PUBLIC`, `PRIVATE`, `PROTECTED`, `INTERNAL`,
 `ABSTRACT`, `FINAL` and, on methods, `OVERRIDE` may precede the name of a
-function block, program, method or property (some toolchains write them
-before METHOD or PROPERTY; that order is accepted too), and an access
-modifier may follow `GET` or `SET` of a property. They are accepted and recorded;
+function block, program, function, method or property (some toolchains
+write them before METHOD or PROPERTY; that order is accepted too), and an
+access modifier may follow `GET` or `SET` of a property. A modifier word is a
+modifier only when a name follows it, so `OVERRIDE` may also be a name
+([lexical.keywords.soft]). They are accepted and recorded;
 access checks and the rules for abstract and final blocks follow in a later
 revision.
 

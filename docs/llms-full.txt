@@ -525,7 +525,7 @@ Codes RP00xx are lexical, RP01xx types, RP02xx names and structure, RP03xx synta
 | [RP0121](#rp0121) | error | SIZEOF of a value whose size is not known (function-block instance, open array) |
 | [RP0122](#rp0122) | warning | enumeration value written E.V (not portable); write E#V |
 | [RP0123](#rp0123) | warning | set/reset assignment S= or R= (not portable); write IF ... THEN ... END_IF |
-| [RP0124](#rp0124) | warning | reserved word declared as a name (AT, ON, STEP, TASK, TRANSITION, INITIAL_STEP, WITH) |
+| [RP0124](#rp0124) | warning | reserved word declared as a name (AT, ON, STEP, TASK, TRANSITION, INITIAL_STEP, WITH, OVERRIDE) |
 | [RP0115](#rp0115) | warning | enumeration base type after the values (not portable); write UINT (...) |
 | [RP0114](#rp0114) | error | a VAR_IN_OUT argument must be a variable |
 | [RP0113](#rp0113) | warning | FUNCTION without a result type (not portable); call it as a statement |
@@ -533,6 +533,9 @@ Codes RP00xx are lexical, RP01xx types, RP02xx names and structure, RP03xx synta
 | [RP0111](#rp0111) | error | unknown type name |
 | [RP0203](#rp0203) | error | unknown name |
 | [RP0204](#rp0204) | error | name declared twice in the same POU |
+| [RP0125](#rp0125) | warning | chained assignment a := b := v (not portable) |
+| [RP0126](#rp0126) | warning | bit string used as a number, or bitwise operator on integers (not portable) |
+| [RP0127](#rp0127) | warning | integer literal 0 or 1 used as BOOL, or 0 as a reference (not portable) |
 
 ## RP0001
 
@@ -1068,14 +1071,14 @@ with warning RP0123.
 
 ## RP0124
 
-warning: reserved word declared as a name (AT, ON, STEP, TASK, TRANSITION, INITIAL_STEP, WITH)
+warning: reserved word declared as a name (AT, ON, STEP, TASK, TRANSITION, INITIAL_STEP, WITH, OVERRIDE)
 
 Rule `lexical.keywords.soft` in `spec/01-lexical.md`:
 
 **[lexical.keywords.soft]** `AT`, `ON`, `STEP`, `TASK`, `TRANSITION`,
-`INITIAL_STEP` and `WITH` start constructs only in a few places (a located
-variable, a configuration, SFC, which RootPLC does not parse), and CODESYS
-and TwinCAT code uses them as ordinary names. RootPLC reads them as names
+`INITIAL_STEP`, `WITH` and `OVERRIDE` start constructs only in a few places
+(a located variable, a configuration, SFC, which RootPLC does not parse, a
+method modifier), and CODESYS and TwinCAT code uses them as ordinary names. RootPLC reads them as names
 everywhere else; declaring one as a name is warning RP0124 instead of
 RP0004.
 
@@ -1182,6 +1185,41 @@ across all its sections. Names compare case-insensitively
 in a project. A second declaration is error RP0204, reported at the second
 one. A user POU may replace a standard function block (spec/08-stdlib.md).
 
+## RP0125
+
+warning: chained assignment a := b := v (not portable)
+
+Rule `statements.assignment.chain` in `spec/05-statements.md`:
+
+**[statements.assignment.chain]** `a := b := v;` (CODESYS and TwinCAT) means
+`b := v; a := b;`; it is accepted with warning RP0125.
+
+## RP0126
+
+warning: bit string used as a number, or bitwise operator on integers (not portable)
+
+Rule `types.conversion.vendor` in `spec/02-types.md`:
+
+**[types.conversion.vendor]** CODESYS and TwinCAT accept some mixes that
+IEC 61131-3 rejects; RootPLC accepts them with a warning: arithmetic on bit
+strings (`dw + 1`), bitwise operators on integers (`n AND 16#FF`) and bit
+strings as array indexes (`a[b]` with `b : BYTE`) are warning RP0126; the
+integer literals `0` and `1` as `BOOL` and `0` as a reference (`NULL`) are
+warning RP0127.
+
+## RP0127
+
+warning: integer literal 0 or 1 used as BOOL, or 0 as a reference (not portable)
+
+Rule `types.conversion.vendor` in `spec/02-types.md`:
+
+**[types.conversion.vendor]** CODESYS and TwinCAT accept some mixes that
+IEC 61131-3 rejects; RootPLC accepts them with a warning: arithmetic on bit
+strings (`dw + 1`), bitwise operators on integers (`n AND 16#FF`) and bit
+strings as array indexes (`a[b]` with `b : BYTE`) are warning RP0126; the
+integer literals `0` and `1` as `BOOL` and `0` as a reference (`NULL`) are
+warning RP0127.
+
 
 ======== Specification: spec/01-lexical.md ========
 
@@ -1263,9 +1301,9 @@ VAR_GLOBAL VAR_INPUT VAR_IN_OUT VAR_OUTPUT VAR_STAT VAR_TEMP WHILE WITH XOR
 Elementary type names (spec/02-types.md) are also reserved.
 
 **[lexical.keywords.soft]** `AT`, `ON`, `STEP`, `TASK`, `TRANSITION`,
-`INITIAL_STEP` and `WITH` start constructs only in a few places (a located
-variable, a configuration, SFC, which RootPLC does not parse), and CODESYS
-and TwinCAT code uses them as ordinary names. RootPLC reads them as names
+`INITIAL_STEP`, `WITH` and `OVERRIDE` start constructs only in a few places
+(a located variable, a configuration, SFC, which RootPLC does not parse, a
+method modifier), and CODESYS and TwinCAT code uses them as ordinary names. RootPLC reads them as names
 everywhere else; declaring one as a name is warning RP0124 instead of
 RP0004.
 
@@ -1559,6 +1597,13 @@ allowed.) `TYPE B EXTENDS A : STRUCT … END_STRUCT` (CODESYS and TwinCAT) gives
 B the members of A first, with A's initial values, then its own; the base
 must be a structure (RP0111).
 
+**[types.conversion.vendor]** CODESYS and TwinCAT accept some mixes that
+IEC 61131-3 rejects; RootPLC accepts them with a warning: arithmetic on bit
+strings (`dw + 1`), bitwise operators on integers (`n AND 16#FF`) and bit
+strings as array indexes (`a[b]` with `b : BYTE`) are warning RP0126; the
+integer literals `0` and `1` as `BOOL` and `0` as a reference (`NULL`) are
+warning RP0127.
+
 **[types.derived.union]** `UNION ... END_UNION` (CODESYS and TwinCAT) declares
 members that share one storage area; it is checked like a structure and its
 size (`SIZEOF`) is that of its largest member, rounded to its alignment. The
@@ -1641,7 +1686,12 @@ initializer or a structure initializer:
 initializer  = expression
              | '[' initializer { ',' initializer } ']'                    (* array *)
              | '(' name ':=' initializer { ',' name ':=' initializer } ')' (* structure *)
+             | '(' ')'                                                    (* defaults *)
 ```
+
+A structure initializer may also set the variables of a function-block
+instance, `t : TON := (PT := T#1S);` (CODESYS and TwinCAT), and `()` keeps
+every default.
 
 **[variables.init-arguments]** A function-block instance may be declared
 with arguments, `fb : FB_Buffer(size := 10);`, which CODESYS and TwinCAT
@@ -1768,9 +1818,11 @@ a function block without a body, with variables, methods and properties.
 
 **[pous.oop.modifiers]** `PUBLIC`, `PRIVATE`, `PROTECTED`, `INTERNAL`,
 `ABSTRACT`, `FINAL` and, on methods, `OVERRIDE` may precede the name of a
-function block, program, method or property (some toolchains write them
-before METHOD or PROPERTY; that order is accepted too), and an access
-modifier may follow `GET` or `SET` of a property. They are accepted and recorded;
+function block, program, function, method or property (some toolchains
+write them before METHOD or PROPERTY; that order is accepted too), and an
+access modifier may follow `GET` or `SET` of a property. A modifier word is a
+modifier only when a name follows it, so `OVERRIDE` may also be a name
+([lexical.keywords.soft]). They are accepted and recorded;
 access checks and the rules for abstract and final blocks follow in a later
 revision.
 
@@ -1924,6 +1976,9 @@ the statement. A lone `;` is an empty statement.
 assignment   = variable ':=' expression ';'
 ```
 
+**[statements.assignment.chain]** `a := b := v;` (CODESYS and TwinCAT) means
+`b := v; a := b;`; it is accepted with warning RP0125.
+
 **[statements.assignment.set-reset]** The CODESYS and TwinCAT set and reset
 assignments `x S= c;` and `x R= c;` mean `IF c THEN x := TRUE; END_IF` and
 `IF c THEN x := FALSE; END_IF`; `x` and `c` are `BOOL`. They are accepted
@@ -1936,6 +1991,8 @@ statement. Arguments are positional, or named with `:=` (input) and `=>`
 call_stmt    = variable '(' [ argument { ',' argument } ] ')' ';'
 argument     = [ name ( ':=' | '=>' ) ] expression
 ```
+An output binding may leave out the variable, `Done =>` (CODESYS and
+TwinCAT): the output is not read.
 
 **[statements.if]** `IF c THEN … {ELSIF c THEN …} [ELSE …] END_IF`
 evaluates the conditions in order and runs the statements of the first branch
@@ -2211,6 +2268,10 @@ to it implicitly, so `MEMCPY(ADR(a), ADR(b), SIZEOF(b))` checks. `Tc2_System`
 declares `MEMCPY`, `MEMMOVE`, `MEMSET` and `MEMCMP` with their documented
 parameters; they are declared only (RP0120), since RootPLC models addresses
 as typed references.
+
+**[stdlib.compat.intrinsics]** `TwinCAT_BuiltIns` also enables `__POUNAME()`,
+a STRING constant with the name of the POU it is written in, and `TIME()`,
+the time since the PLC started (the virtual clock of the VM).
 
 **[stdlib.compat.sizeof]** A library may enable compiler operators;
 `TwinCAT_BuiltIns` enables `SIZEOF(x)` and `XSIZEOF(x)`: the size in bytes

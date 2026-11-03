@@ -76,9 +76,9 @@ VAR_GLOBAL VAR_INPUT VAR_IN_OUT VAR_OUTPUT VAR_STAT VAR_TEMP WHILE WITH XOR
 Elementary type names (spec/02-types.md) are also reserved.
 
 **[lexical.keywords.soft]** `AT`, `ON`, `STEP`, `TASK`, `TRANSITION`,
-`INITIAL_STEP` and `WITH` start constructs only in a few places (a located
-variable, a configuration, SFC, which RootPLC does not parse), and CODESYS
-and TwinCAT code uses them as ordinary names. RootPLC reads them as names
+`INITIAL_STEP`, `WITH` and `OVERRIDE` start constructs only in a few places
+(a located variable, a configuration, SFC, which RootPLC does not parse, a
+method modifier), and CODESYS and TwinCAT code uses them as ordinary names. RootPLC reads them as names
 everywhere else; declaring one as a name is warning RP0124 instead of
 RP0004.
 

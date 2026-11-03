@@ -454,6 +454,12 @@ def analyse() -> None:
         clean = sum(1 for f in files if key_of[f] not in per_file)
         codes = Counter(x["code"] for xs in per_file.values() for x in xs)
         msgs = Counter(re.sub(r"'[^']*'", "'…'", x["message"]) for xs in per_file.values() for x in xs)
+        # exact messages with one example place (cache only, never published)
+        raw = Counter(f"{x['code']} {x['message']}" for xs in per_file.values() for x in xs)
+        where = {}
+        for k2, xs in per_file.items():
+            for x in xs:
+                where.setdefault(f"{x['code']} {x['message']}", f"{k2}:{x.get('line', 0)}")
         # which names are missing (cache only, to rank compatibility work)
         names = Counter(f"{x['code']} {m.group(1)}" for xs in per_file.values() for x in xs
                         if x["code"] in ("RP0201", "RP0111", "RP0203")
@@ -465,7 +471,8 @@ def analyse() -> None:
                         "kind": p.get("kind", ""), "units": len(files), "lines": lines, "syntax_ok": syntax_ok,
                         "clean": clean, "codes": codes.most_common(8), "messages": msgs.most_common(6),
                         "features": dict(feats), "names": names.most_common(60),
-                        "dialect": p.get("dialect", "")})
+                        "dialect": p.get("dialect", ""),
+                        "raw": [(m, c, where[m]) for m, c in raw.most_common(300)]})
         print(f"{p['name']:30} units {len(files):5}  syntax ok {syntax_ok:5}  clean {clean:5}")
     (CACHE / "analysis.json").write_text(json.dumps(results, indent=1), encoding="utf-8")
     record_history(results)

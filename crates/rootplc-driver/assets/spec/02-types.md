@@ -160,6 +160,13 @@ allowed.) `TYPE B EXTENDS A : STRUCT … END_STRUCT` (CODESYS and TwinCAT) gives
 B the members of A first, with A's initial values, then its own; the base
 must be a structure (RP0111).
 
+**[types.conversion.vendor]** CODESYS and TwinCAT accept some mixes that
+IEC 61131-3 rejects; RootPLC accepts them with a warning: arithmetic on bit
+strings (`dw + 1`), bitwise operators on integers (`n AND 16#FF`) and bit
+strings as array indexes (`a[b]` with `b : BYTE`) are warning RP0126; the
+integer literals `0` and `1` as `BOOL` and `0` as a reference (`NULL`) are
+warning RP0127.
+
 **[types.derived.union]** `UNION ... END_UNION` (CODESYS and TwinCAT) declares
 members that share one storage area; it is checked like a structure and its
 size (`SIZEOF`) is that of its largest member, rounded to its alignment. The

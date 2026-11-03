@@ -45,7 +45,7 @@ Codes RP00xx are lexical, RP01xx types, RP02xx names and structure, RP03xx synta
 | [RP0121](#rp0121) | error | SIZEOF of a value whose size is not known (function-block instance, open array) |
 | [RP0122](#rp0122) | warning | enumeration value written E.V (not portable); write E#V |
 | [RP0123](#rp0123) | warning | set/reset assignment S= or R= (not portable); write IF ... THEN ... END_IF |
-| [RP0124](#rp0124) | warning | reserved word declared as a name (AT, ON, STEP, TASK, TRANSITION, INITIAL_STEP, WITH) |
+| [RP0124](#rp0124) | warning | reserved word declared as a name (AT, ON, STEP, TASK, TRANSITION, INITIAL_STEP, WITH, OVERRIDE) |
 | [RP0115](#rp0115) | warning | enumeration base type after the values (not portable); write UINT (...) |
 | [RP0114](#rp0114) | error | a VAR_IN_OUT argument must be a variable |
 | [RP0113](#rp0113) | warning | FUNCTION without a result type (not portable); call it as a statement |
@@ -53,6 +53,9 @@ Codes RP00xx are lexical, RP01xx types, RP02xx names and structure, RP03xx synta
 | [RP0111](#rp0111) | error | unknown type name |
 | [RP0203](#rp0203) | error | unknown name |
 | [RP0204](#rp0204) | error | name declared twice in the same POU |
+| [RP0125](#rp0125) | warning | chained assignment a := b := v (not portable) |
+| [RP0126](#rp0126) | warning | bit string used as a number, or bitwise operator on integers (not portable) |
+| [RP0127](#rp0127) | warning | integer literal 0 or 1 used as BOOL, or 0 as a reference (not portable) |
 
 ## RP0001
 
@@ -588,14 +591,14 @@ with warning RP0123.
 
 ## RP0124
 
-warning: reserved word declared as a name (AT, ON, STEP, TASK, TRANSITION, INITIAL_STEP, WITH)
+warning: reserved word declared as a name (AT, ON, STEP, TASK, TRANSITION, INITIAL_STEP, WITH, OVERRIDE)
 
 Rule `lexical.keywords.soft` in `spec/01-lexical.md`:
 
 **[lexical.keywords.soft]** `AT`, `ON`, `STEP`, `TASK`, `TRANSITION`,
-`INITIAL_STEP` and `WITH` start constructs only in a few places (a located
-variable, a configuration, SFC, which RootPLC does not parse), and CODESYS
-and TwinCAT code uses them as ordinary names. RootPLC reads them as names
+`INITIAL_STEP`, `WITH` and `OVERRIDE` start constructs only in a few places
+(a located variable, a configuration, SFC, which RootPLC does not parse, a
+method modifier), and CODESYS and TwinCAT code uses them as ordinary names. RootPLC reads them as names
 everywhere else; declaring one as a name is warning RP0124 instead of
 RP0004.
 
@@ -701,3 +704,38 @@ across all its sections. Names compare case-insensitively
 ([lexical.identifier.case]). Likewise, every type and POU name is declared once
 in a project. A second declaration is error RP0204, reported at the second
 one. A user POU may replace a standard function block (spec/08-stdlib.md).
+
+## RP0125
+
+warning: chained assignment a := b := v (not portable)
+
+Rule `statements.assignment.chain` in `spec/05-statements.md`:
+
+**[statements.assignment.chain]** `a := b := v;` (CODESYS and TwinCAT) means
+`b := v; a := b;`; it is accepted with warning RP0125.
+
+## RP0126
+
+warning: bit string used as a number, or bitwise operator on integers (not portable)
+
+Rule `types.conversion.vendor` in `spec/02-types.md`:
+
+**[types.conversion.vendor]** CODESYS and TwinCAT accept some mixes that
+IEC 61131-3 rejects; RootPLC accepts them with a warning: arithmetic on bit
+strings (`dw + 1`), bitwise operators on integers (`n AND 16#FF`) and bit
+strings as array indexes (`a[b]` with `b : BYTE`) are warning RP0126; the
+integer literals `0` and `1` as `BOOL` and `0` as a reference (`NULL`) are
+warning RP0127.
+
+## RP0127
+
+warning: integer literal 0 or 1 used as BOOL, or 0 as a reference (not portable)
+
+Rule `types.conversion.vendor` in `spec/02-types.md`:
+
+**[types.conversion.vendor]** CODESYS and TwinCAT accept some mixes that
+IEC 61131-3 rejects; RootPLC accepts them with a warning: arithmetic on bit
+strings (`dw + 1`), bitwise operators on integers (`n AND 16#FF`) and bit
+strings as array indexes (`a[b]` with `b : BYTE`) are warning RP0126; the
+integer literals `0` and `1` as `BOOL` and `0` as a reference (`NULL`) are
+warning RP0127.

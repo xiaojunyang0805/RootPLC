@@ -212,6 +212,9 @@ pub mod codes {
         ENUM_DOT_VALUE = 122, Warning;
         SET_RESET_ASSIGN = 123, Warning;
         SOFT_KEYWORD_NAME = 124, Warning;
+        CHAINED_ASSIGNMENT = 125, Warning;
+        BIT_STRING_AS_NUMBER = 126, Warning;
+        INTEGER_AS_BOOL_OR_NULL = 127, Warning;
     }
 
     /// Severity of a code, if the code exists.

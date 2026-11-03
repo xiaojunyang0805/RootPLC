@@ -402,6 +402,8 @@ impl<'p> Vm<'p> {
     fn convert(&self, v: Value, ty: &Ty) -> Result<Value, FaultKind> {
         match ty {
             Ty::Elem(e) => Ok(conv_elem(v, *e)),
+            // 0 stored in a reference is NULL (CODESYS / TwinCAT, RP0127)
+            Ty::Ref(_) if matches!(v, Value::Int(0)) => Ok(Value::Ref(None)),
             Ty::Str { len, .. } => Ok(match v {
                 Value::Str(s) => Value::Str(s.chars().take(*len as usize).collect()),
                 Value::Int(c) => Value::Str(
@@ -492,9 +494,15 @@ impl<'p> Vm<'p> {
             Some(Init::Struct(fields)) => {
                 let mut d = self.default_value(ty);
                 if let (Value::Agg(slots), Ty::Named(i)) = (&mut d, ty) {
-                    if let DefKind::Struct(fs) = &self.prog.defs[*i].kind {
-                        for (k, it) in fields {
-                            slots[*k] = self.init_value(&fs[*k].ty, Some(it));
+                    // structure members, or a function-block instance's variables
+                    let tys: Vec<Ty> = match &self.prog.defs[*i].kind {
+                        DefKind::Struct(fs) => fs.iter().map(|f| f.ty.clone()).collect(),
+                        DefKind::Pou(p) => p.vars.iter().map(|v| v.ty.clone()).collect(),
+                        _ => Vec::new(),
+                    };
+                    for (k, it) in fields {
+                        if let (Some(t), true) = (tys.get(*k), *k < slots.len()) {
+                            slots[*k] = self.init_value(t, Some(it));
                         }
                     }
                 }
@@ -1021,8 +1029,6 @@ impl<'p> Vm<'p> {
 
     // ---------------------------------------------------------------- calls
 
-    /// [pous.call.in-out]: copy each VAR_IN_OUT parameter back to the
-    /// caller's variable after the call (copy-in, copy-out).
     /// The caller's variables behind the VAR_IN_OUT slots of a call, to
     /// register while it runs ([`Vm::aliases`]). Open-array parameters carry
     /// a bounds header and are not aliased.
@@ -1077,6 +1083,8 @@ impl<'p> Vm<'p> {
         }
     }
 
+    /// [pous.call.in-out]: copy each VAR_IN_OUT parameter back to the
+    /// caller's variable after the call (copy-in, copy-out).
     fn write_back_in_out(
         &mut self,
         c: &Call,
@@ -1283,6 +1291,8 @@ impl<'p> Vm<'p> {
                 .map_err(|k| vm.fault(k, e.span, "result outside the subrange"))
         };
         match name {
+            // [stdlib.compat.intrinsics]: time since start, ms (virtual clock)
+            "TIME" => Ok(Value::Int(self.now_ns / 1_000_000)),
             "ADVANCE" => {
                 // [tests.time]: TIME is in ms, LTIME in ns.
                 let n = int(&arg(0)).max(0);

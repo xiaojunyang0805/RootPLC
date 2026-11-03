@@ -20,6 +20,9 @@ the statement. A lone `;` is an empty statement.
 assignment   = variable ':=' expression ';'
 ```
 
+**[statements.assignment.chain]** `a := b := v;` (CODESYS and TwinCAT) means
+`b := v; a := b;`; it is accepted with warning RP0125.
+
 **[statements.assignment.set-reset]** The CODESYS and TwinCAT set and reset
 assignments `x S= c;` and `x R= c;` mean `IF c THEN x := TRUE; END_IF` and
 `IF c THEN x := FALSE; END_IF`; `x` and `c` are `BOOL`. They are accepted
@@ -32,6 +35,8 @@ statement. Arguments are positional, or named with `:=` (input) and `=>`
 call_stmt    = variable '(' [ argument { ',' argument } ] ')' ';'
 argument     = [ name ( ':=' | '=>' ) ] expression
 ```
+An output binding may leave out the variable, `Done =>` (CODESYS and
+TwinCAT): the output is not read.
 
 **[statements.if]** `IF c THEN … {ELSIF c THEN …} [ELSE …] END_IF`
 evaluates the conditions in order and runs the statements of the first branch

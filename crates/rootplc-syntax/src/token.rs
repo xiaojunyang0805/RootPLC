@@ -289,6 +289,7 @@ pub const SOFT_KEYWORDS: &[&str] = &[
     "ON",
     "WITH",
     "AT",
+    "OVERRIDE",
 ];
 
 /// Is `word` a soft keyword ([`SOFT_KEYWORDS`])? Case-insensitive.
