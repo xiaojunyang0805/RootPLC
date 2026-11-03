@@ -97,9 +97,9 @@ def sync(refresh: str = "") -> None:
         if repo.exists():
             shutil.rmtree(repo, onexc=_force_remove)
         steps = [
-            ["git", "clone", "--depth", "1", "--filter=blob:none", "--no-checkout", "--quiet", p["url"], str(repo)],
-            ["git", "-C", str(repo), "sparse-checkout", "set", "--no-cone", *SOURCES[p["format"]]],
-            ["git", "-C", str(repo), "checkout", "--quiet"],
+            ["git", "-c", "core.longpaths=true", "clone", "--depth", "1", "--filter=blob:none", "--no-checkout", "--quiet", p["url"], str(repo)],
+            ["git", "-C", str(repo), "-c", "core.longpaths=true", "sparse-checkout", "set", "--no-cone", *SOURCES[p["format"]]],
+            ["git", "-C", str(repo), "-c", "core.longpaths=true", "checkout", "--quiet"],
         ]
         err = ""
         for cmd in steps:
@@ -130,7 +130,16 @@ def _force_remove(func, path, _exc):
 def files(root: Path, pattern: str) -> list[Path]:
     """Files under root matching pattern; directories named like files
     (e.g. an Eclipse plugin folder `...debug.st`) are skipped."""
-    return sorted(f for f in root.rglob(pattern) if f.is_file())
+    return sorted(f for f in long_path(root).rglob(pattern) if f.is_file())
+
+
+def long_path(p: Path) -> Path:
+    r"""On Windows, paths over 260 characters need the \\?\ prefix (TwinCAT
+    projects nest deeply); elsewhere the path is returned unchanged."""
+    prefix = "\\\\?\\"
+    if os.name != "nt" or str(p).startswith(prefix):
+        return p
+    return Path(prefix + str(p.resolve()))
 
 
 def text_of(el) -> str:
