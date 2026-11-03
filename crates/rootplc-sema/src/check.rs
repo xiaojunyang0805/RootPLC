@@ -170,6 +170,8 @@ enum Builtin {
     Mux,
     StrInt,
     StrFn,
+    /// LOWER_BOUND / UPPER_BOUND, [stdlib.functions.bounds].
+    Bound,
 }
 
 struct Arg<'a> {
@@ -271,6 +273,7 @@ fn builtin(up: &str) -> Option<Builtin> {
         "MUX" => Mux,
         "LEN" | "FIND" => StrInt,
         "LEFT" | "RIGHT" | "MID" | "CONCAT" | "INSERT" | "DELETE" | "REPLACE" => StrFn,
+        "LOWER_BOUND" | "UPPER_BOUND" => Bound,
         _ => {
             if let Some((a, b)) = up.split_once("_TO_") {
                 return Some(Conv(elem_or_str(a)?, elem_or_str(b)?));
@@ -3704,6 +3707,9 @@ impl<'a> Checker<'a> {
     /// [stdlib.conversions], [stdlib.functions], [tests.assert].
     fn builtin_call(&mut self, up: &str, b: Builtin, args: &[Arg<'a>], span: Span) -> V {
         let vals: Vec<V> = args.iter().map(|a| self.expr(a.expr)).collect();
+        if matches!(b, Builtin::Bound) {
+            return self.bound_call(up, vals, span);
+        }
         let bool_ty = Ty::Elem(Elem::Bool);
         let (ret, hint): (Ty, Option<Ty>) = match b {
             Builtin::Advance => {
@@ -3801,6 +3807,8 @@ impl<'a> Checker<'a> {
                 (t.clone(), Some(t))
             }
             Builtin::StrInt => (Ty::Elem(Elem::Int), None),
+            // handled by bound_call before this match
+            Builtin::Bound => (Ty::Elem(Elem::Dint), None),
             Builtin::StrFn => {
                 let wide = matches!(
                     vals.first().map(|v| self.strip(&v.ty)),
@@ -3825,6 +3833,59 @@ impl<'a> Checker<'a> {
             args: vals.into_iter().map(V::ir).collect(),
         };
         V::with(ret, span, ExprKind::Call(Box::new(call)))
+    }
+}
+
+impl<'a> Checker<'a> {
+    /// [stdlib.functions.bounds]: `LOWER_BOUND(arr, dim)` / `UPPER_BOUND(arr, dim)`,
+    /// DINT. A constant for an array with known bounds; for an open array
+    /// (`ARRAY[*]`) the bounds of the array passed in, at run time.
+    fn bound_call(&mut self, up: &str, vals: Vec<V>, span: Span) -> V {
+        let dint = Ty::Elem(Elem::Dint);
+        if vals.len() != 2 {
+            let msg = format!("{up} takes an array and a dimension number");
+            self.diag(codes::UNKNOWN_NAME, msg, span, None);
+            return V::unknown(span);
+        }
+        let dims = match self.strip(&vals[0].ty) {
+            Ty::Array { dims, .. } => dims,
+            Ty::Unknown => return V::unknown(span),
+            other => {
+                let msg = format!("{up} needs an array, not {}", self.ty_name(&other));
+                self.diag(codes::IMPLICIT_CONVERSION, msg, vals[0].span, None);
+                return V::unknown(span);
+            }
+        };
+        let Some(K::Int(d)) = vals[1].k else {
+            let msg = format!("the dimension number of {up} must be a constant");
+            self.diag(codes::IMPLICIT_CONVERSION, msg, vals[1].span, None);
+            return V::unknown(span);
+        };
+        if d < 1 || d as usize > dims.len() {
+            let msg = format!("{up}: the array has {} dimension(s), not {d}", dims.len());
+            self.diag(codes::CONSTANT_INDEX_OUT_OF_BOUNDS, msg, vals[1].span, None);
+            return V::unknown(span);
+        }
+        if let Some((lo, hi)) = dims[d as usize - 1] {
+            let v = if up == "LOWER_BOUND" { lo } else { hi };
+            return V {
+                ty: dint,
+                k: Some(K::Int(v)),
+                leaf: false,
+                span,
+                e: ExprKind::Const(Const::Int(v)),
+            };
+        }
+        let call = ir::Call {
+            target: CallTarget::Builtin {
+                name: up.to_string(),
+                ty: None,
+            },
+            inputs: Vec::new(),
+            outputs: Vec::new(),
+            args: vals.into_iter().map(V::ir).collect(),
+        };
+        V::with(dint, span, ExprKind::Call(Box::new(call)))
     }
 }
 

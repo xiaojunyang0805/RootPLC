@@ -36,6 +36,67 @@ pub enum Value {
     Obj(Option<(Loc, usize)>),
 }
 
+/// An array type with a `*` dimension (`ARRAY[*] OF T`).
+fn is_open(ty: &Ty) -> bool {
+    matches!(ty, Ty::Array { dims, .. } if dims.iter().any(Option::is_none))
+}
+
+/// Bounds of an array type whose dimensions are all known.
+fn fixed_dims(ty: &Ty) -> Option<Vec<(i128, i128)>> {
+    match ty {
+        Ty::Array { dims, .. } => dims.iter().copied().collect(),
+        _ => None,
+    }
+}
+
+/// [stdlib.functions.bounds]: a value stored in an open-array parameter
+/// carries the bounds of the array passed in: element 0 is the header
+/// `[lo1, hi1, ...]`, the elements follow.
+fn open_header(v: &Value) -> Option<Vec<(i128, i128)>> {
+    match v {
+        Value::Agg(xs) => match xs.first()? {
+            Value::Agg(h) => Some(h.chunks(2).map(|c| (int(&c[0]), int(&c[1]))).collect()),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+/// A fixed array passed to an open-array parameter gets the bounds header.
+fn open_wrap(param: &Ty, arg: &Ty, v: Value) -> Value {
+    if !is_open(param) || is_open(arg) {
+        return v;
+    }
+    match (fixed_dims(arg), v) {
+        (Some(dims), Value::Agg(items)) => {
+            let header = Value::Agg(
+                dims.iter()
+                    .flat_map(|&(lo, hi)| [Value::Int(lo), Value::Int(hi)])
+                    .collect(),
+            );
+            let mut out = Vec::with_capacity(items.len() + 1);
+            out.push(header);
+            out.extend(items);
+            Value::Agg(out)
+        }
+        (_, v) => v,
+    }
+}
+
+/// Writing an open-array parameter back to a fixed array drops the header.
+fn open_unwrap(param: &Ty, arg: &Ty, v: Value) -> Value {
+    if !is_open(param) || is_open(arg) {
+        return v;
+    }
+    match v {
+        Value::Agg(mut items) if open_header(&Value::Agg(items.clone())).is_some() => {
+            items.remove(0);
+            Value::Agg(items)
+        }
+        v => v,
+    }
+}
+
 /// The instance a THIS or THIS^ expression denotes.
 fn is_this_expr(e: &Expr) -> bool {
     match &e.kind {
@@ -735,17 +796,29 @@ impl<'p> Vm<'p> {
             }),
             ExprKind::Member(b, i) => Ok(self.place(b, cx)?.child(*i)),
             ExprKind::Index(b, idx) => {
-                let dims = match self.strip(&b.ty) {
-                    Ty::Array { dims, .. } => dims,
-                    _ => {
-                        return Err(self.fault(
-                            FaultKind::Unsupported,
-                            e.span,
-                            "indexing a non-array",
-                        ));
-                    }
-                };
+                let static_ty = self.strip(&b.ty);
+                if !matches!(static_ty, Ty::Array { .. }) {
+                    return Err(self.fault(FaultKind::Unsupported, e.span, "indexing a non-array"));
+                }
                 let base = self.place(b, cx)?;
+                // an open array carries the bounds of the array passed in
+                let (dims, skip): (Vec<Option<(i128, i128)>>, i128) = if is_open(&static_ty) {
+                    let v = self.get(&base, e.span)?;
+                    match open_header(v) {
+                        Some(h) => (h.into_iter().map(Some).collect(), 1),
+                        None => {
+                            return Err(self.fault(
+                                FaultKind::Unsupported,
+                                e.span,
+                                "open array without bounds",
+                            ));
+                        }
+                    }
+                } else if let Ty::Array { dims, .. } = static_ty {
+                    (dims, 0)
+                } else {
+                    (Vec::new(), 0)
+                };
                 let mut off: i128 = 0;
                 for (k, ie) in idx.iter().enumerate() {
                     let v = int(&self.eval(ie, cx)?);
@@ -765,7 +838,7 @@ impl<'p> Vm<'p> {
                     }
                     off = off * (hi - lo + 1) + (v - lo);
                 }
-                Ok(base.child(off as usize))
+                Ok(base.child((off + skip) as usize))
             }
             ExprKind::Deref(b) => match self.eval(b, cx)? {
                 Value::Ref(Some(l)) => Ok(l),
@@ -951,6 +1024,7 @@ impl<'p> Vm<'p> {
                 continue;
             }
             let v = self.get(&frame.child(*slot), span)?.clone();
+            let v = open_unwrap(&pou.vars[*slot].ty, &self.strip(&ex.ty), v);
             let target = self.place(ex, cx)?;
             self.store(&target, v, &ex.ty, ex.span)?;
         }
@@ -967,6 +1041,7 @@ impl<'p> Vm<'p> {
                 };
                 for (slot, ex) in &c.inputs {
                     let v = self.eval(ex, cx)?;
+                    let v = open_wrap(&pou.vars[*slot].ty, &self.strip(&ex.ty), v);
                     self.store(&loc.child(*slot), v, &pou.vars[*slot].ty, ex.span)?;
                 }
                 if pou.builtin {
@@ -1073,7 +1148,7 @@ impl<'p> Vm<'p> {
         }
         let mut vals = Vec::new();
         for (slot, ex) in &c.inputs {
-            vals.push((*slot, self.eval(ex, cx)?, ex.span));
+            vals.push((*slot, self.eval(ex, cx)?, ex.span, self.strip(&ex.ty)));
         }
         let frame = self.default_named(id);
         self.roots.push(frame);
@@ -1082,7 +1157,8 @@ impl<'p> Vm<'p> {
             root,
             path: Vec::new(),
         };
-        for (slot, v, span) in vals {
+        for (slot, v, span, aty) in vals {
+            let v = open_wrap(&pou.vars[slot].ty, &aty, v);
             self.store(&floc.child(slot), v, &pou.vars[slot].ty, span)?;
         }
         let saved = self.file;
@@ -1262,6 +1338,14 @@ impl<'p> Vm<'p> {
                 Ok(Value::Int(wrap(r, el)))
             }
             "LEN" => Ok(Value::Int(to_text(&arg(0)).chars().count() as i128)),
+            "LOWER_BOUND" | "UPPER_BOUND" => {
+                // only open arrays reach the VM; others fold at compile time
+                let d = int(&arg(1)).max(1) as usize;
+                match open_header(&arg(0)).and_then(|h| h.get(d - 1).copied()) {
+                    Some((lo, hi)) => Ok(Value::Int(if name == "LOWER_BOUND" { lo } else { hi })),
+                    None => Err(self.fault(FaultKind::Unsupported, e.span, "array without bounds")),
+                }
+            }
             "FIND" => {
                 let (a, b) = (to_text(&arg(0)), to_text(&arg(1)));
                 let pos = a.find(&b).map_or(0, |byte| a[..byte].chars().count() + 1);

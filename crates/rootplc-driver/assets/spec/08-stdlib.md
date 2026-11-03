@@ -43,6 +43,13 @@ type is error RP0103.
 | `LEN(s)`, `FIND(s1, s2)` | strings | `INT` |
 | `LEFT`, `RIGHT`, `MID`, `CONCAT`, `INSERT`, `DELETE`, `REPLACE` | strings, `INT` | `STRING` (or `WSTRING` for `WSTRING` arguments) |
 
+**[stdlib.functions.bounds]** `LOWER_BOUND(arr, n)` and `UPPER_BOUND(arr, n)`
+return, as DINT, the lower and upper bound of dimension n (a constant, from
+1) of an array. For an array with known bounds they are constants. For an
+open array (`ARRAY[*] OF T`, a `VAR_IN_OUT` or `VAR_INPUT` parameter) they
+are the bounds of the array passed in, and indexing it checks against those
+bounds (fault `INDEX`). A dimension that does not exist is RP0109.
+
 ## Compatibility libraries
 
 **[stdlib.compat]** A compatibility library provides the interface of a
