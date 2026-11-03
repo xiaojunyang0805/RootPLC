@@ -1,39 +1,39 @@
 # Real-world PLC code corpus: what rootplc handles today
 
-*Generated 2026-11-03 by `corpus/corpus.py`. 230 public projects, 14275 program units (POUs, types, global lists), 1,395,518 lines of Structured Text.*
+*Generated 2026-11-03 by `corpus/corpus.py`. 230 public projects, 14473 program units (POUs, types, global lists), 1,419,807 lines of Structured Text.*
 
 A unit is *syntax OK* when rootplc lexes and parses it; *clean* when it also passes the type
 checker with no errors. Units are checked per project, so references to other libraries that
 are not in the corpus count as errors.
 
-**Overall: syntax OK 84% · clean 43%.**
+**Overall: syntax OK 83% · clean 46%.**
 
 | Project | Kind | Licence | Units | Lines | Syntax OK | Clean |
 |---|---|---|---|---|---|---|
 | [tcopengroup-tcopen](https://github.com/TcOpenGroup/TcOpen) | discovered | MIT License | 1223 | 118,477 | 91% | 45% |
+| [johannespettersson80-trust-platform](https://github.com/johannesPettersson80/trust-platform) | discovered | Apache License 2.0 | 1049 | 149,705 | 75% | 46% |
+| [thorstenbrach-srci](https://github.com/ThorstenBrach/SRCI) | discovered | MIT License | 988 | 208,658 | 80% | 74% |
 | [aixocat](https://github.com/RWTH-EBC/AixOCAT) | building automation library (OSCAT based) | MIT | 973 | 57,919 | 93% | 61% |
-| [thorstenbrach-srci](https://github.com/ThorstenBrach/SRCI) | discovered | MIT License | 968 | 201,651 | 80% | 74% |
-| [johannespettersson80-trust-platform](https://github.com/johannesPettersson80/trust-platform) | discovered | Apache License 2.0 | 871 | 132,423 | 80% | 26% |
-| [tomookay-toast](https://github.com/tomookay/TOAST) | discovered | MIT License | 861 | 27,631 | 98% | 23% |
+| [tomookay-toast](https://github.com/tomookay/TOAST) | discovered | MIT License | 861 | 27,631 | 98% | 24% |
 | [lorenz-software-tc3unittest](https://github.com/Lorenz-Software/Tc3UnitTest) | discovered | MIT License | 792 | 122,715 | 74% | 5% |
 | [br-oscat](https://github.com/tkucic/brOscatLib) | standard library (OSCAT, B&R) | MIT | 729 | 45,030 | 87% | 52% |
-| [haud-ba-plc-motion-layer](https://github.com/haud-ba/PLC_MOTION_LAYER) | discovered | other (see repository) | 709 | 74,821 | 65% | 49% |
+| [haud-ba-plc-motion-layer](https://github.com/haud-ba/PLC_MOTION_LAYER) | discovered | other (see repository) | 709 | 74,821 | 65% | 50% |
 | [mihaiginta-tcoscatbasic](https://github.com/mihaiginta/TcOscatBasic) | discovered | other (see repository) | 577 | 25,656 | 97% | 67% |
 | [trofimich-twincat-openframework](https://github.com/trofimich/TwinCAT.OpenFramework) | discovered | MIT License | 574 | 45,173 | 81% | 34% |
 | [tkucic-unitest](https://github.com/tkucic/UniTest) | discovered | MIT License | 351 | 10,016 | 95% | 33% |
-| [tchaxx-protobuf](https://github.com/TcHaxx/protobuf) | discovered | MIT License | 260 | 10,719 | 82% | 21% |
-| [inxton-axsharp](https://github.com/Inxton/axsharp) | discovered | MIT License | 257 | 6,209 | 93% | 40% |
+| [tchaxx-protobuf](https://github.com/TcHaxx/protobuf) | discovered | MIT License | 260 | 10,719 | 82% | 22% |
+| [inxton-axsharp](https://github.com/Inxton/axsharp) | discovered | MIT License | 257 | 6,209 | 93% | 65% |
 | [babe-kimr-tc1200-plc-sample-oop-design-patterns-plc](https://github.com/BABE-KimR/TC1200-PLC.sample.OOP_Design_Patterns.plc) | discovered | BSD 2-Clause "Simplified" License | 239 | 7,413 | 94% | 61% |
 | [pcdshub-lcls-twincat-vacuum](https://github.com/pcdshub/lcls-twincat-vacuum) | discovered | other (see repository) | 184 | 18,463 | 77% | 49% |
 | [pcdshub-lcls-twincat-motion](https://github.com/pcdshub/lcls-twincat-motion) | discovered | other (see repository) | 169 | 22,093 | 54% | 33% |
 | [haud-ba-xts-transport-layer](https://github.com/haud-ba/XTS_TRANSPORT_LAYER) | discovered | other (see repository) | 157 | 24,048 | 59% | 42% |
-| [fisothemes-fisothemes-common-library-for-twincat](https://github.com/fisothemes/FisoThemes-Common-Library-for-TwinCAT) | discovered | MIT License | 154 | 2,065 | 90% | 27% |
+| [fisothemes-fisothemes-common-library-for-twincat](https://github.com/fisothemes/FisoThemes-Common-Library-for-TwinCAT) | discovered | MIT License | 154 | 2,065 | 90% | 71% |
 | [eponce00-tcforge](https://github.com/eponce00/TcForge) | discovered | MIT License | 152 | 17,634 | 82% | 34% |
 | [beckhoff-tf6310-samples](https://github.com/Beckhoff/TF6310_Samples) | discovered | other (see repository) | 146 | 9,761 | 95% | 21% |
 | [intecre-twincat-utils](https://github.com/Intecre/twincat-utils) | discovered | MIT License | 133 | 6,230 | 90% | 44% |
-| [pcdshub-lcls-twincat-pmps](https://github.com/pcdshub/lcls-twincat-pmps) | discovered | other (see repository) | 131 | 9,104 | 84% | 39% |
+| [pcdshub-lcls-twincat-pmps](https://github.com/pcdshub/lcls-twincat-pmps) | discovered | other (see repository) | 131 | 9,104 | 84% | 40% |
 | [twincat-dynamic-collections](https://github.com/fisothemes/TwinCat-Dynamic-Collections) | library | MIT | 108 | 10,216 | 75% | 33% |
-| [ironplc-ironplc](https://github.com/ironplc/ironplc) | discovered | MIT License | 107 | 3,112 | 78% | 14% |
+| [ironplc-ironplc](https://github.com/ironplc/ironplc) | discovered | MIT License | 107 | 3,112 | 78% | 46% |
 | [mbc-engineering-log4tc](https://github.com/mbc-engineering/log4TC) | discovered | Apache License 2.0 | 103 | 4,754 | 90% | 12% |
 | [dergraph-conveyorcontrol-with-plc](https://github.com/derGraph/ConveyorControl-with-PLC) | discovered | GNU General Public License v3.0 | 99 | 142,772 | 0% | 0% |
 | [tcunit](https://github.com/tcunit/TcUnit) | test framework | MIT (custom text) | 97 | 13,688 | 94% | 60% |
@@ -42,23 +42,23 @@ are not in the corpus count as errors.
 | [oc-twincat-core](https://github.com/OpenCommissioning/OC_TwinCAT_Core) | library | BSD-3-Clause | 92 | 5,140 | 93% | 67% |
 | [beckhoff-tf7xxx-samples](https://github.com/Beckhoff/TF7xxx_Samples) | discovered | BSD Zero Clause License | 87 | 9,492 | 93% | 13% |
 | [struckig](https://github.com/stefanbesler/struckig) | motion library (analysis only) | GPL-3.0 | 80 | 20,516 | 92% | 35% |
-| [pierredantas-esbmc-plc-benchmark-suite](https://github.com/pierredantas/esbmc-plc-benchmark-suite) | discovered | Creative Commons Attribution 4.0 International | 73 | 3,630 | 86% | 44% |
+| [pierredantas-esbmc-plc-benchmark-suite](https://github.com/pierredantas/esbmc-plc-benchmark-suite) | discovered | Creative Commons Attribution 4.0 International | 73 | 3,630 | 86% | 58% |
 | [pcdshub-lcls-twincat-general](https://github.com/pcdshub/lcls-twincat-general) | discovered | other (see repository) | 73 | 5,052 | 82% | 49% |
-| [beckhoff-tf6100-samples](https://github.com/Beckhoff/TF6100_Samples) | discovered | other (see repository) | 68 | 5,124 | 93% | 51% |
+| [beckhoff-tf6100-samples](https://github.com/Beckhoff/TF6100_Samples) | discovered | other (see repository) | 68 | 5,124 | 93% | 54% |
 | [krystian-l-lis-stage](https://github.com/Krystian-L-Lis/Stage) | discovered | MIT License | 64 | 4,294 | 86% | 58% |
 | [siyka-au-mobject-ext](https://github.com/siyka-au/mobject-ext) | discovered | MIT License | 62 | 4,145 | 77% | 42% |
-| [fisothemes-twincat-dynamic-string-kit](https://github.com/fisothemes/TwinCAT-Dynamic-String-Kit) | discovered | MIT License | 56 | 2,125 | 84% | 46% |
+| [fisothemes-twincat-dynamic-string-kit](https://github.com/fisothemes/TwinCAT-Dynamic-String-Kit) | discovered | MIT License | 56 | 2,125 | 84% | 48% |
 | [sionverhoef-twincat-st](https://github.com/SionVerhoef/twincat-st) | discovered | MIT License | 55 | 1,838 | 87% | 49% |
-| [iec-checker](https://github.com/iec-checker/iec-checker) | static-analysis test programs (analysis only) | LGPL-3.0 | 54 | 1,723 | 80% | 22% |
+| [iec-checker](https://github.com/iec-checker/iec-checker) | static-analysis test programs (analysis only) | LGPL-3.0 | 54 | 1,723 | 80% | 43% |
 | [controlforge-systems-controlforge-structured-text](https://github.com/ControlForge-Systems/controlforge-structured-text) | discovered | MIT License | 54 | 3,112 | 78% | 65% |
 | [pcdshub-lcls-twincat-common-components](https://github.com/pcdshub/lcls-twincat-common-components) | discovered | other (see repository) | 54 | 7,029 | 57% | 28% |
-| [fisothemes-standard-library](https://github.com/fisothemes/FisoThemes-Standard-Library-for-TwinCAT) | library | MIT | 53 | 841 | 91% | 45% |
-| [burksengineering-tcmatrix](https://github.com/BurksEngineering/TcMatrix) | discovered | MIT License | 52 | 4,223 | 94% | 38% |
+| [fisothemes-standard-library](https://github.com/fisothemes/FisoThemes-Standard-Library-for-TwinCAT) | library | MIT | 53 | 841 | 91% | 47% |
+| [burksengineering-tcmatrix](https://github.com/BurksEngineering/TcMatrix) | discovered | MIT License | 52 | 4,223 | 94% | 48% |
 | [fisothemes-fisothemes-controller-toolbox-library-for-twincat](https://github.com/fisothemes/FisoThemes-Controller-Toolbox-Library-for-TwinCAT) | discovered | MIT License | 47 | 4,452 | 55% | 30% |
 | [roald87-twincattutorials](https://github.com/Roald87/TwincatTutorials) | discovered | MIT License | 46 | 556 | 91% | 59% |
 | [fisothemes-twincat-retentive-timers](https://github.com/fisothemes/TwinCAT-Retentive-Timers) | discovered | MIT License | 46 | 1,375 | 80% | 33% |
 | [peterzerlauth-tc3-unittest](https://github.com/PeterZerlauth/Tc3_UnitTest) | discovered | GNU General Public License v3.0 | 42 | 3,134 | 81% | 48% |
-| [karishmapremnath4-plc-st-bug-detector-ml](https://github.com/karishmapremnath4/plc-st-bug-detector-ml) | discovered | MIT License | 40 | 516 | 100% | 12% |
+| [karishmapremnath4-plc-st-bug-detector-ml](https://github.com/karishmapremnath4/plc-st-bug-detector-ml) | discovered | MIT License | 40 | 516 | 100% | 100% |
 | [visualplc-blocklyplc](https://github.com/VisualPLC/BlocklyPLC) | discovered | MIT License | 40 | 3,473 | 85% | 72% |
 | [teodorapetrovska02-twincat3-plc-projects](https://github.com/teodorapetrovska02/twincat3-plc-projects) | discovered | MIT License | 39 | 4,343 | 90% | 67% |
 | [georgeturneruk-tckit](https://github.com/georgeturneruk/tckit) | discovered | MIT License | 39 | 1,356 | 77% | 56% |
@@ -72,21 +72,21 @@ are not in the corpus count as errors.
 | [fisothemes-labview-twincat-ads](https://github.com/fisothemes/LabVIEW-TwinCAT-ADS) | discovered | MIT License | 31 | 431 | 87% | 77% |
 | [sarparslan-ev-charging-controller](https://github.com/sarparslan/ev-charging-controller) | discovered | MIT License | 30 | 2,298 | 93% | 73% |
 | [pcdshub-lcls-twincat-vacuum-serialdrivers](https://github.com/pcdshub/lcls-twincat-vacuum-serialdrivers) | discovered | other (see repository) | 30 | 2,679 | 80% | 33% |
-| [bengeisler-tclog](https://github.com/bengeisler/TcLog) | discovered | MIT License | 27 | 2,441 | 78% | 44% |
-| [fisothemes-fisothemes-error-library-for-twincat](https://github.com/fisothemes/FisoThemes-Error-Library-for-TwinCAT) | discovered | MIT License | 27 | 1,362 | 74% | 37% |
+| [bengeisler-tclog](https://github.com/bengeisler/TcLog) | discovered | MIT License | 27 | 2,441 | 78% | 48% |
+| [fisothemes-fisothemes-error-library-for-twincat](https://github.com/fisothemes/FisoThemes-Error-Library-for-TwinCAT) | discovered | MIT License | 27 | 1,362 | 74% | 41% |
 | [beckhoff-te2000-client-samples](https://github.com/Beckhoff/TE2000_Client_Samples) | discovered | other (see repository) | 25 | 619 | 96% | 72% |
 | [milanlazov-twincat-dual-axis-coordinator](https://github.com/milanlazov/twincat-dual-axis-coordinator) | discovered | MIT License | 25 | 3,076 | 88% | 48% |
-| [fisothemes-twincat-abstract-data-structures](https://github.com/fisothemes/TwinCAT-Abstract-Data-Structures) | discovered | MIT License | 25 | 1,465 | 92% | 24% |
-| [undort-st2cpp](https://github.com/undoRT/st2cpp) | discovered | GNU General Public License v3.0 | 24 | 4,128 | 83% | 33% |
+| [fisothemes-twincat-abstract-data-structures](https://github.com/fisothemes/TwinCAT-Abstract-Data-Structures) | discovered | MIT License | 25 | 1,465 | 92% | 36% |
+| [undort-st2cpp](https://github.com/undoRT/st2cpp) | discovered | GNU General Public License v3.0 | 24 | 4,128 | 83% | 38% |
 | [pcdshub-lcls-twincat-optics](https://github.com/pcdshub/lcls-twincat-optics) | discovered | other (see repository) | 24 | 1,875 | 75% | 25% |
 | [roald87-tcblack](https://github.com/Roald87/TcBlack) | discovered | MIT License | 24 | 323 | 96% | 42% |
 | [ldnano-o-fn](https://github.com/ldnano/o-fn) | discovered | GNU General Public License v3.0 | 23 | 784 | 9% | 9% |
 | [adamfisher-plcinfo](https://github.com/adamfisher/plcinfo) | discovered | GNU General Public License v3.0 | 23 | 4,988 | 91% | 83% |
 | [burksengineering-tctransform](https://github.com/BurksEngineering/TcTransform) | discovered | MIT License | 23 | 2,207 | 91% | 22% |
-| [felipehornink-hplc](https://github.com/FelipeHornink/HPLC) | discovered | other (see repository) | 22 | 347 | 64% | 55% |
+| [felipehornink-hplc](https://github.com/FelipeHornink/HPLC) | discovered | other (see repository) | 22 | 347 | 64% | 45% |
 | [fisothemes-tcads-rs](https://github.com/fisothemes/tcads-rs) | discovered | MIT License | 22 | 364 | 100% | 59% |
 | [rassrollers-tctcpudprt](https://github.com/rassrollers/TcTcpUdpRT) | discovered | MIT License | 21 | 2,570 | 86% | 29% |
-| [malgaroshy-maker-factoryforge](https://github.com/malgaroshy-maker/factoryforge) | discovered | MIT License | 20 | 4,535 | 100% | 10% |
+| [malgaroshy-maker-factoryforge](https://github.com/malgaroshy-maker/factoryforge) | discovered | MIT License | 20 | 4,535 | 100% | 100% |
 | [iswunistuttgart-rtnnigen](https://github.com/iswunistuttgart/rtnnigen) | discovered | GNU General Public License v3.0 | 20 | 345 | 90% | 75% |
 | [stefanhenneken-blog-2014-01-iec61131-interfaces-sample01](https://github.com/StefanHenneken/Blog-2014-01-IEC61131-Interfaces-Sample01) | discovered | BSD 2-Clause "Simplified" License | 20 | 733 | 100% | 80% |
 | [arthurkax-plc-browser-io](https://github.com/ArthurkaX/plc-browser-io) | discovered | MIT License | 19 | 1,036 | 42% | 21% |
@@ -97,13 +97,13 @@ are not in the corpus count as errors.
 | [beckhoff-tc3eventlogger-samples](https://github.com/Beckhoff/Tc3Eventlogger_Samples) | discovered | BSD Zero Clause License | 17 | 785 | 94% | 6% |
 | [sa1ntsinner-rung](https://github.com/sa1ntsinner/rung) | discovered | other (see repository) | 16 | 816 | 94% | 88% |
 | [beckhoff-tf6000-ads-dotnet-v5-samples](https://github.com/Beckhoff/TF6000_ADS_DOTNET_V5_Samples) | discovered | BSD Zero Clause License | 16 | 411 | 100% | 75% |
-| [technical-software-solutions-twincat-tools](https://github.com/Technical-Software-Solutions/twincat-tools) | discovered | MIT License | 16 | 1,144 | 88% | 25% |
+| [technical-software-solutions-twincat-tools](https://github.com/Technical-Software-Solutions/twincat-tools) | discovered | MIT License | 16 | 1,144 | 88% | 31% |
 | [heytalepazguato-plc-st-review](https://github.com/HeytalePazguato/plc-st-review) | discovered | MIT License | 16 | 408 | 81% | 69% |
 | [beckhoff-tf6760-samples](https://github.com/Beckhoff/TF6760_Samples) | discovered | other (see repository) | 16 | 926 | 94% | 0% |
 | [benhar-dev-tc3-oop-serial](https://github.com/benhar-dev/tc3-oop-serial) | discovered | MIT License | 16 | 960 | 88% | 50% |
 | [loupeteam-tccommando](https://github.com/loupeteam/TcCommando) | discovered | MIT License | 16 | 1,152 | 88% | 38% |
 | [cgainsworks-plc-cip-batch-control](https://github.com/CGainsWorks/plc-cip-batch-control) | discovered | MIT License | 15 | 2,053 | 100% | 100% |
-| [pneutronic-ptc-xae-mcp](https://github.com/Pneutronic/ptc-xae-mcp) | discovered | Apache License 2.0 | 15 | 203 | 87% | 73% |
+| [pneutronic-ptc-xae-mcp](https://github.com/Pneutronic/ptc-xae-mcp) | discovered | Apache License 2.0 | 15 | 203 | 87% | 80% |
 | [stefanhenneken-blog-2016-04-iec61131-command-sample02](https://github.com/StefanHenneken/Blog-2016-04-IEC61131-Command-Sample02) | discovered | BSD 2-Clause "Simplified" License | 15 | 400 | 87% | 40% |
 | [loupeteam-tcpiper](https://github.com/loupeteam/TcPiper) | discovered | MIT License | 15 | 1,535 | 67% | 27% |
 | [stefanhenneken-blog-2022-04-iec61131-lsp-sample01](https://github.com/StefanHenneken/Blog-2022-04-IEC61131-LSP-Sample01) | discovered | BSD 2-Clause "Simplified" License | 15 | 418 | 40% | 40% |
@@ -149,7 +149,7 @@ are not in the corpus count as errors.
 | [barteling-twincat-meets-project-euler](https://github.com/Barteling/TwinCAT-Meets-Project-Euler) | discovered | MIT License | 7 | 281 | 100% | 71% |
 | [structured-text-utilities](https://github.com/WengerAG/structured-text-utilities) | utilities | MIT | 6 | 3,102 | 0% | 0% |
 | [stefanbesler-twingrind](https://github.com/stefanbesler/twingrind) | discovered | GNU General Public License v3.0 | 6 | 280 | 83% | 83% |
-| [nikvoronin-tc3-pcspeaker](https://github.com/nikvoronin/Tc3_PcSpeaker) | discovered | MIT License | 6 | 190 | 100% | 17% |
+| [nikvoronin-tc3-pcspeaker](https://github.com/nikvoronin/Tc3_PcSpeaker) | discovered | MIT License | 6 | 190 | 100% | 50% |
 | [ufukefekaya-tr-delta-plc-agent](https://github.com/ufukefekaya-tr/delta-plc-agent) | discovered | MIT License | 6 | 25 | 0% | 0% |
 | [stefanhenneken-blog-2023-06-iec61131-lod-sample01](https://github.com/StefanHenneken/Blog-2023-06-IEC61131-LoD-Sample01) | discovered | BSD 2-Clause "Simplified" License | 6 | 125 | 100% | 83% |
 | [stefanhenneken-blog-2014-03-iec61131-abstractfactory-sample01](https://github.com/StefanHenneken/Blog-2014-03-IEC61131-AbstractFactory-Sample01) | discovered | BSD 2-Clause "Simplified" License | 6 | 126 | 100% | 83% |
@@ -191,8 +191,8 @@ are not in the corpus count as errors.
 | [zeugwerk-twinpack](https://github.com/Zeugwerk/Twinpack) | discovered | GNU General Public License v3.0 | 2 | 8 | 100% | 100% |
 | [fbarresi-beckhoffs7client](https://github.com/fbarresi/BeckhoffS7Client) | discovered | MIT License | 2 | 33 | 100% | 100% |
 | [stefanhenneken-blog-2017-08-iec61131-unittests-tcunit](https://github.com/StefanHenneken/Blog-2017-08-IEC61131-UnitTests-TcUnit) | discovered | BSD 2-Clause "Simplified" License | 2 | 520 | 100% | 0% |
-| [stefanhenneken-blog-2016-03-iec61131-arrays-sample04](https://github.com/StefanHenneken/Blog-2016-03-IEC61131-Arrays-Sample04) | discovered | BSD 2-Clause "Simplified" License | 2 | 42 | 100% | 50% |
-| [stefanhenneken-blog-2016-03-iec61131-arrays-sample02](https://github.com/StefanHenneken/Blog-2016-03-IEC61131-Arrays-Sample02) | discovered | BSD 2-Clause "Simplified" License | 2 | 27 | 100% | 50% |
+| [stefanhenneken-blog-2016-03-iec61131-arrays-sample04](https://github.com/StefanHenneken/Blog-2016-03-IEC61131-Arrays-Sample04) | discovered | BSD 2-Clause "Simplified" License | 2 | 42 | 100% | 100% |
+| [stefanhenneken-blog-2016-03-iec61131-arrays-sample02](https://github.com/StefanHenneken/Blog-2016-03-IEC61131-Arrays-Sample02) | discovered | BSD 2-Clause "Simplified" License | 2 | 27 | 100% | 100% |
 | [cdilga-ladder-logic-editor](https://github.com/cdilga/ladder-logic-editor) | discovered | MIT License | 2 | 441 | 100% | 100% |
 | [1337leets-automated-assembly-line-control-system-openplc](https://github.com/1337leets/Automated-Assembly-Line-Control-System-OpenPLC) | discovered | BSD 3-Clause "New" or "Revised" License | 2 | 218 | 50% | 0% |
 | [rongxuan-zhou-multi-robot-assembly-cell](https://github.com/Rongxuan-Zhou/multi-robot-assembly-cell) | discovered | Apache License 2.0 | 2 | 822 | 50% | 50% |
@@ -247,29 +247,29 @@ Units using each construct RootPLC does not support yet:
 
 | Construct | Units |
 |---|---|
-| vendor pragmas {..} | 1343 (9%) |
-| SIZEOF | 1005 (7%) |
+| vendor pragmas {..} | 1330 (9%) |
+| SIZEOF | 1011 (7%) |
 | __ system calls | 578 (4%) |
 | __SYSTEM types | 322 (2%) |
-| UNION | 192 (1%) |
-| VAR_STAT | 46 (0%) |
+| UNION | 193 (1%) |
+| VAR_STAT | 48 (0%) |
 
 Most frequent error codes:
 
 | Code | Count |
 |---|---|
-| RP0201 | 80771 |
-| RP0203 | 63418 |
-| RP0301 | 43403 |
-| RP0111 | 12451 |
+| RP0201 | 80929 |
+| RP0203 | 56268 |
+| RP0301 | 43457 |
+| RP0111 | 14160 |
 | RP0005 | 10142 |
-| RP0103 | 7227 |
-| RP0004 | 5333 |
-| RP0204 | 4716 |
-| RP0121 | 572 |
-| RP0106 | 501 |
+| RP0103 | 7176 |
+| RP0004 | 5341 |
+| RP0121 | 570 |
+| RP0204 | 510 |
 | RP0104 | 465 |
-| RP0016 | 80 |
+| RP0106 | 142 |
+| RP0016 | 103 |
 
 ## Listed but not analysed
 

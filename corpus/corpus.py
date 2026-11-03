@@ -1,7 +1,7 @@
 """Real-world PLC code corpus: fetch, extract and analyse with rootplc.
 
     python corpus/corpus.py sync       # fetch PLC sources only, extract, delete the clone (disk-light)
-    python corpus/corpus.py sync --refresh=twincat   # re-fetch + re-extract one format (or =all)
+    python corpus/corpus.py sync --refresh=twincat   # re-fetch + re-extract one format, =all, or =name,name
     python corpus/corpus.py fetch      # shallow-clone every project into corpus/.cache
     python corpus/corpus.py analyse    # extract ST, run rootplc check, write the report + dashboard
     python corpus/corpus.py dashboard  # rebuild corpus/dashboard.html from the last analysis
@@ -70,8 +70,8 @@ def sync(refresh: str = "") -> None:
     """Fetch only the PLC source files of each project, extract the units and
     delete the clone, so the cache holds just the extracted text. Projects
     already extracted are skipped; clones left by `fetch` are pruned.
-    refresh="all" or a format name ("twincat") re-fetches and re-extracts
-    those projects, e.g. after an extractor fix. Clones go to a local temp
+    refresh="all", a format name ("twincat") or project names (comma
+    separated) re-fetches and re-extracts those projects, e.g. after an extractor fix. Clones go to a local temp
     folder (git refuses repositories on exFAT disks); the extracted units are
     replaced only when a new extraction succeeded."""
     import tempfile
@@ -85,7 +85,8 @@ def sync(refresh: str = "") -> None:
         old_repo, done = base / "repo", base / "extracted"
         if old_repo.exists():  # a clone left by fetch or an interrupted sync
             shutil.rmtree(old_repo, onexc=_force_remove)
-        if done.exists() and refresh not in ("all", p["format"]):
+        wanted = set(refresh.split(","))
+        if done.exists() and not wanted & {"all", p["format"], p["name"]}:
             continue
         repo = tmp_root / p["name"]
         if repo.exists():
@@ -266,13 +267,16 @@ def extract(p: dict, repo: Path | None = None) -> Path:
         texts = [f.read_text(encoding="utf-8", errors="replace") for f in st_files]
         # a repository of separate programs (examples, B&R tasks, benchmark
         # suites) declares the same names in different directories: then each
-        # directory is checked on its own
+        # directory is checked on its own. A library that repeats a handful of
+        # names (2 % in SRCI) is still one project: split only when at least
+        # 5 % of the declared names repeat.
         seen_in: dict[str, set] = {}
         decl = re.compile(r"^\s*(?:PROGRAM|FUNCTION_BLOCK|FUNCTION|CLASS)\s+(\w+)", re.I | re.M)
         for f, t in zip(st_files, texts):
             for n in decl.findall(t):
                 seen_in.setdefault(n.lower(), set()).add(f.parent)
-        by_dir = any(len(d) > 1 for d in seen_in.values())
+        repeated = sum(1 for d in seen_in.values() if len(d) > 1)
+        by_dir = repeated > 0 and repeated >= 0.05 * len(seen_in)
         for f, t in zip(st_files, texts):
             units.append((f.stem, t))
             groups.append(str(f.parent.relative_to(long_path(repo))) if by_dir else "")
