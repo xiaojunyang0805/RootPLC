@@ -690,6 +690,17 @@ pub fn check_embedded_assets(root: &Path) -> Result<Vec<String>, String> {
             .unwrap_or_default();
         pairs.push((root.join("spec").join(name), copy));
     }
+    let plugin = root.join("agent/plugins/claude-code");
+    pairs.push((
+        root.join("agent/mcp/claude-code.json"),
+        plugin.join(".mcp.json"),
+    ));
+    for skill in ["rootplc-st", "rootplc-migrate"] {
+        pairs.push((
+            root.join("agent/skills").join(skill).join("SKILL.md"),
+            plugin.join("skills").join(skill).join("SKILL.md"),
+        ));
+    }
     let mut problems = Vec::new();
     for (orig, copy) in pairs {
         let a = fs::read(&orig).map_err(|e| format!("{}: {e}", orig.display()))?;

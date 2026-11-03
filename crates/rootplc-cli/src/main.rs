@@ -7,11 +7,13 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 const USAGE: &str = "usage:
-  rootplc init  [dir] [--name NAME]
+  rootplc init  [dir] [--name NAME] [--agent claude|gemini|qwen|cursor|codex|all]
   rootplc check <file.st|dir>... [--json]
   rootplc test  <file.st|dir>... [--filter TEXT] [--json]
   rootplc run   <file.st|dir>... [--program NAME] [--cycles N] [--cycle-ms MS] [--json]
   rootplc explain <code> [--json]
+  rootplc examples [words...] [--show ID] [--json]   (verified ST patterns)
+  rootplc coverage <file.st|dir>... [--json]       (portable / dialect / dependent / blocked)
   rootplc mcp            (MCP server on stdio, for agent hosts)
   rootplc --version
 
@@ -35,7 +37,8 @@ impl Args {
         while let Some(x) = it.next() {
             match x.as_str() {
                 "--json" => a.json = true,
-                "--program" | "--cycles" | "--cycle-ms" | "--filter" | "--name" => {
+                "--program" | "--cycles" | "--cycle-ms" | "--filter" | "--name" | "--show"
+                | "--agent" => {
                     let v = it.next().unwrap_or_default();
                     a.options.push((x, v));
                 }
@@ -186,21 +189,128 @@ fn cmd_explain(code: Option<&String>, json_out: bool) -> ExitCode {
     ExitCode::SUCCESS
 }
 
-fn cmd_init(dir: Option<&String>, name: Option<&str>) -> ExitCode {
-    let dir = PathBuf::from(dir.map_or(".", String::as_str));
-    match rootplc_driver::init::init(&dir, name) {
-        Ok(created) => {
-            for p in created {
-                println!("created {}", p.display());
-            }
-            println!(
-                "next: rootplc check {d} && rootplc test {d}",
-                d = dir.display()
-            );
-            ExitCode::SUCCESS
+fn cmd_examples(words: &[String], args: &Args) -> ExitCode {
+    use rootplc_driver::examples;
+    if let Some(id) = args.opt("--show") {
+        let Some(e) = examples::get(id) else {
+            return io_error("examples", &format!("no example '{id}'"), args.json);
+        };
+        if args.json {
+            println!("{}", json::examples(id, &[e], true));
+        } else {
+            print!("{}", e.source);
         }
-        Err(e) => io_error("init", &e, false),
+        return ExitCode::SUCCESS;
     }
+    let query = words.join(" ");
+    let found = examples::search(&query);
+    if args.json {
+        println!("{}", json::examples(&query, &found, true));
+        return ExitCode::SUCCESS;
+    }
+    for e in &found {
+        println!(
+            "{:<22} {}
+{:<22} {}",
+            e.id, e.title, "", e.description
+        );
+    }
+    if found.is_empty() {
+        eprintln!("no example matches '{query}'; run rootplc examples to list all");
+    } else {
+        eprintln!(
+            "{} example(s); show one with rootplc examples --show <id>",
+            found.len()
+        );
+    }
+    exit(!found.is_empty())
+}
+
+fn cmd_coverage(paths: &[PathBuf], json_out: bool) -> ExitCode {
+    use rootplc_driver::coverage::Status;
+    let r = match rootplc_driver::coverage::coverage(paths) {
+        Ok(r) => r,
+        Err(e) => return io_error("coverage", &e, json_out),
+    };
+    if json_out {
+        println!("{}", json::coverage(&r));
+        return ExitCode::SUCCESS;
+    }
+    for u in &r.units {
+        let detail = if !u.blocked_by.is_empty() && u.constructs.is_empty() {
+            let deps: Vec<String> = u
+                .blocked_by
+                .iter()
+                .map(|p| p.display().to_string())
+                .collect();
+            format!("needs {}", deps.join(", "))
+        } else if u.constructs.is_empty() {
+            u.codes.join(" ")
+        } else {
+            u.constructs
+                .iter()
+                .map(|c| format!("{} (line {})", c.name, c.line))
+                .collect::<Vec<_>>()
+                .join(", ")
+        };
+        println!("{:<9} {}  {detail}", u.status.name(), u.path.display());
+    }
+    let n = r.units.len().max(1);
+    eprintln!(
+        "{} unit(s): {} portable ({}%), {} dialect, {} dependent, {} blocked",
+        r.units.len(),
+        r.count(Status::Portable),
+        100 * r.count(Status::Portable) / n,
+        r.count(Status::Dialect),
+        r.count(Status::Dependent),
+        r.count(Status::Blocked)
+    );
+    ExitCode::SUCCESS
+}
+
+fn cmd_init(dir: Option<&String>, name: Option<&str>, agent: Option<&str>) -> ExitCode {
+    use rootplc_driver::agents::{Host, Outcome, configure};
+    let dir = PathBuf::from(dir.map_or(".", String::as_str));
+    let hosts = match agent.map(Host::parse_list).transpose() {
+        Ok(h) => h,
+        Err(e) => return io_error("init", &e, false),
+    };
+    // With --agent in an existing project, only the host files are added.
+    let existing = hosts.is_some() && dir.join("rootplc.toml").exists();
+    if !existing {
+        match rootplc_driver::init::init(&dir, name) {
+            Ok(created) => {
+                for p in created {
+                    println!("created {}", p.display());
+                }
+            }
+            Err(e) => return io_error("init", &e, false),
+        }
+    }
+    if let Some(hosts) = hosts {
+        match configure(&dir, &hosts) {
+            Ok(outcomes) => {
+                for o in outcomes {
+                    match o {
+                        Outcome::Created(p) => println!("created {}", p.display()),
+                        Outcome::AlreadyConfigured(p) => {
+                            println!("kept    {} (already set up)", p.display());
+                        }
+                        Outcome::MergeByHand(p, snippet) => println!(
+                            "exists  {}: not changed; add this yourself:\n{snippet}",
+                            p.display()
+                        ),
+                    }
+                }
+            }
+            Err(e) => return io_error("init", &e, false),
+        }
+    }
+    println!(
+        "next: rootplc check {d} && rootplc test {d}",
+        d = dir.display()
+    );
+    ExitCode::SUCCESS
 }
 
 fn main() -> ExitCode {
@@ -230,7 +340,11 @@ fn main() -> ExitCode {
     }
     let cmd = Command::from_name(first);
     let paths: Vec<PathBuf> = rest.iter().map(PathBuf::from).collect();
-    if matches!(cmd, Some(Command::Check | Command::Test | Command::Run)) && paths.is_empty() {
+    if matches!(
+        cmd,
+        Some(Command::Check | Command::Test | Command::Run | Command::Coverage)
+    ) && paths.is_empty()
+    {
         eprintln!("rootplc {first}: give one or more .st files or directories\n\n{USAGE}");
         return ExitCode::from(2);
     }
@@ -239,7 +353,9 @@ fn main() -> ExitCode {
         Some(Command::Test) => cmd_test(&paths, args.opt("--filter"), args.json),
         Some(Command::Run) => cmd_run(&paths, &args),
         Some(Command::Explain) => cmd_explain(rest.first(), args.json),
-        Some(Command::Init) => cmd_init(rest.first(), args.opt("--name")),
+        Some(Command::Init) => cmd_init(rest.first(), args.opt("--name"), args.opt("--agent")),
+        Some(Command::Examples) => cmd_examples(rest, &args),
+        Some(Command::Coverage) => cmd_coverage(&paths, args.json),
         Some(cmd) => {
             if args.json {
                 println!("{}", json::error(cmd.name(), "not implemented yet"));

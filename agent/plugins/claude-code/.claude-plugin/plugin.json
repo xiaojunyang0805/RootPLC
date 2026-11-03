@@ -1,0 +1,22 @@
+{
+  "name": "rootplc",
+  "version": "0.0.1",
+  "description": "Write, check, test and port IEC 61131-3 Structured Text (PLC code) with RootPLC: MCP tools for check/test/run/explain/examples/coverage, plus skills for writing and migrating PLC code.",
+  "author": {
+    "name": "RootPLC",
+    "url": "https://github.com/xiaojunyang0805/RootPLC"
+  },
+  "homepage": "https://github.com/xiaojunyang0805/RootPLC",
+  "repository": "https://github.com/xiaojunyang0805/RootPLC",
+  "license": "Apache-2.0",
+  "keywords": [
+    "plc",
+    "iec-61131-3",
+    "structured-text",
+    "codesys",
+    "twincat",
+    "industrial-automation",
+    "mcp"
+  ],
+  "icon": ".claude-plugin/icon.png"
+}

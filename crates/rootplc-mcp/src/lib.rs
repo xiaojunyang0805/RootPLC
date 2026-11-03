@@ -3,9 +3,14 @@
 //!
 //! Roadmap phase: 1 (stdio in Phase 0 as D1a; HTTP later). See `ARCHITECTURE.md`.
 //!
-//! Tools: `rootplc_check`, `rootplc_test`, `rootplc_run`, `rootplc_explain`.
-//! All are read-only: they never write files and never touch hardware.
-//! Results are the same JSON reports as `rootplc <command> --json`.
+//! Tools: `rootplc_check`, `rootplc_test`, `rootplc_run`, `rootplc_explain`,
+//! `rootplc_examples`, `rootplc_coverage`. All are read-only: they never
+//! write files and never touch hardware. Results are the same JSON reports
+//! as `rootplc <command> --json`.
+//!
+//! Resources: the agent guide (AGENTS.md), the language spec chapters, the
+//! diagnostic registry and every verified example. Prompts: the three
+//! standard workflows (write and verify, fix diagnostics, port legacy code).
 
 pub mod json;
 
@@ -15,8 +20,8 @@ use std::path::PathBuf;
 use json::Json;
 
 /// Implementation status, reported by `rootplc mcp --version`.
-pub const STATUS: &str =
-    "stdio MCP server: rootplc_check, rootplc_test, rootplc_run, rootplc_explain";
+pub const STATUS: &str = "stdio MCP server: rootplc_check, rootplc_test, rootplc_run, \
+     rootplc_explain, rootplc_examples, rootplc_coverage; resources; prompts";
 
 /// Protocol versions this server speaks, newest first.
 pub const PROTOCOL_VERSIONS: &[&str] = &["2025-06-18", "2025-03-26", "2024-11-05"];
@@ -25,6 +30,9 @@ const INSTRUCTIONS: &str = "RootPLC checks, tests and runs IEC 61131-3 Structure
 Work in a loop: write ST, call rootplc_check until ok is true (fix every diagnostic; \
 rootplc_explain gives the spec rule for a code), then write TEST blocks and call rootplc_test \
 until every test passes. Do not report success while a check error or a failing test remains. \
+Before writing a common pattern (timers, edges, state machines, interlocks), call \
+rootplc_examples for verified code. For an existing code base, call rootplc_coverage first: \
+it says which files RootPLC can take as they are and which use vendor constructs. \
 Pass project files with `paths` (files or directories) or code with `source`. \
 Deployment to real PLCs is not available to agents; a human approves it.";
 
@@ -42,7 +50,9 @@ fn tools() -> String {
 {{"name":"rootplc_check","title":"Check Structured Text","description":"Lex, parse and type-check IEC 61131-3 Structured Text. Returns diagnostics with stable codes (RPnnnn), 1-based positions and fix hints. ok is true when there are no errors.","inputSchema":{{"type":"object","properties":{{{src}}}}},{ro}}},
 {{"name":"rootplc_test","title":"Run TEST blocks","description":"Compile the project and run every TEST ... END_TEST block in the deterministic VM. Assertions: ASSERT_TRUE, ASSERT_FALSE, ASSERT_EQ, ASSERT_NE. Tests may read every variable of an instance (white-box). Returns pass/fail per test with failure locations and run-time faults.","inputSchema":{{"type":"object","properties":{{{src},"filter":{{"type":"string","description":"Only tests whose name contains this text."}}}}}},{ro}}},
 {{"name":"rootplc_run","title":"Run a program","description":"Compile and run one PROGRAM for a number of PLC cycles in the VM (virtual clock), then return the value of every variable. Use it to inspect behaviour; use rootplc_test for pass/fail evidence.","inputSchema":{{"type":"object","properties":{{{src},"program":{{"type":"string","description":"PROGRAM to run; optional when there is only one."}},"cycles":{{"type":"integer","minimum":1,"maximum":1000000,"default":1}},"cycle_ms":{{"type":"integer","minimum":0,"default":10,"description":"Virtual time per cycle in milliseconds (timers use it)."}}}}}},{ro}}},
-{{"name":"rootplc_explain","title":"Explain a diagnostic","description":"Explain a diagnostic code such as RP0103: severity, summary and the text of the spec rule that defines it.","inputSchema":{{"type":"object","properties":{{"code":{{"type":"string","description":"Diagnostic code, e.g. RP0103 or 103."}}}},"required":["code"]}},{ro}}}
+{{"name":"rootplc_explain","title":"Explain a diagnostic","description":"Explain a diagnostic code such as RP0103: severity, summary and the text of the spec rule that defines it.","inputSchema":{{"type":"object","properties":{{"code":{{"type":"string","description":"Diagnostic code, e.g. RP0103 or 103."}}}},"required":["code"]}},{ro}}},
+{{"name":"rootplc_examples","title":"Find verified ST patterns","description":"Search a library of Structured Text patterns (edge detection, timers, counters, state machines, interlocks, arrays, structs, test blocks). Every example compiles and passes its TEST blocks in this toolchain version. Adapt them; do not copy names blindly.","inputSchema":{{"type":"object","properties":{{"query":{{"type":"string","description":"Keywords, e.g. 'timer' or 'state machine'. Empty lists every example."}},"id":{{"type":"string","description":"Return this one example, e.g. 'edge-detect'."}}}}}},{ro}}},
+{{"name":"rootplc_coverage","title":"Coverage of a code base","description":"Check every file and classify it: portable (compiles; can be tested now), dialect (uses vendor or IEC ed.3 OOP constructs RootPLC does not support yet; lists them with lines), dependent (fails only because a file it uses fails) or blocked (other errors). Use it before porting or testing existing PLC code.","inputSchema":{{"type":"object","properties":{{{src}}}}},{ro}}}
 ]}}"#
     )
 }
@@ -144,6 +154,30 @@ fn call_tool(name: &str, args: &Json) -> String {
             }
             Err(e) => fail("run", &e),
         },
+        "rootplc_examples" => {
+            let found = match args.get("id").and_then(Json::as_str) {
+                Some(id) => match rootplc_driver::examples::get(id) {
+                    Some(e) => vec![e],
+                    None => return fail("examples", &format!("no example '{id}'")),
+                },
+                None => rootplc_driver::examples::search(
+                    args.get("query").and_then(Json::as_str).unwrap_or(""),
+                ),
+            };
+            let query = args
+                .get("query")
+                .or_else(|| args.get("id"))
+                .and_then(Json::as_str)
+                .unwrap_or("");
+            tool_result(&rootplc_driver::json::examples(query, &found, true), false)
+        }
+        "rootplc_coverage" => match sources(args) {
+            Ok(s) => tool_result(
+                &rootplc_driver::json::coverage(&rootplc_driver::coverage::coverage_sources(s)),
+                false,
+            ),
+            Err(e) => fail("coverage", &e),
+        },
         "rootplc_explain" => {
             let code = args.get("code").and_then(Json::as_str).unwrap_or("");
             match rootplc_driver::explain::explain(code) {
@@ -153,6 +187,153 @@ fn call_tool(name: &str, args: &Json) -> String {
         }
         _ => fail(name, "unknown tool"),
     }
+}
+
+/// Every resource: (uri, name, title, mime type, text).
+fn resources() -> Vec<(String, String, String, &'static str, &'static str)> {
+    let mut out = vec![
+        (
+            "rootplc://guide/AGENTS.md".to_string(),
+            "AGENTS.md".to_string(),
+            "How an agent works with RootPLC".to_string(),
+            "text/markdown",
+            rootplc_driver::init::AGENTS_MD,
+        ),
+        (
+            "rootplc://spec/diagnostics.toml".to_string(),
+            "diagnostics.toml".to_string(),
+            "Every diagnostic code, its severity and spec rule".to_string(),
+            "application/toml",
+            rootplc_driver::explain::REGISTRY,
+        ),
+    ];
+    for &(path, text) in rootplc_driver::explain::SPEC {
+        let name = path.trim_start_matches("spec/");
+        out.push((
+            format!("rootplc://spec/{name}"),
+            name.to_string(),
+            format!("Language spec: {name}"),
+            "text/markdown",
+            text,
+        ));
+    }
+    for e in rootplc_driver::examples::all() {
+        out.push((
+            format!("rootplc://examples/{}", e.id),
+            format!("{}.st", e.id),
+            format!("Verified example: {}", e.title),
+            "text/plain",
+            e.source,
+        ));
+    }
+    out
+}
+
+fn resources_list() -> String {
+    let items: Vec<String> = resources()
+        .iter()
+        .map(|(uri, name, title, mime, text)| {
+            format!(
+                "{{\"uri\":{},\"name\":{},\"title\":{},\"mimeType\":\"{mime}\",\"size\":{}}}",
+                rootplc_diag::json_string(uri),
+                rootplc_diag::json_string(name),
+                rootplc_diag::json_string(title),
+                text.len()
+            )
+        })
+        .collect();
+    format!("{{\"resources\":[{}]}}", items.join(","))
+}
+
+fn resource_read(uri: &str) -> Option<String> {
+    let (uri, _, _, mime, text) = resources().into_iter().find(|r| r.0 == uri)?;
+    Some(format!(
+        "{{\"contents\":[{{\"uri\":{},\"mimeType\":\"{mime}\",\"text\":{}}}]}}",
+        rootplc_diag::json_string(&uri),
+        rootplc_diag::json_string(text)
+    ))
+}
+
+/// Prompts: (name, title, description, argument, argument description).
+const PROMPTS: &[(&str, &str, &str, &str, &str)] = &[
+    (
+        "write_and_verify",
+        "Write and verify Structured Text",
+        "Write IEC 61131-3 Structured Text for a task and prove it with passing TEST blocks.",
+        "task",
+        "What the program must do.",
+    ),
+    (
+        "fix_diagnostics",
+        "Fix every diagnostic",
+        "Check a project, explain each diagnostic code and fix the code until the check is clean.",
+        "path",
+        "Project file or directory.",
+    ),
+    (
+        "port_legacy",
+        "Port existing PLC code",
+        "Assess an existing code base with coverage, then bring files to portable IEC 61131-3 with tests as evidence.",
+        "path",
+        "Directory of the existing code.",
+    ),
+];
+
+fn prompt_text(name: &str, arg: &str) -> Option<String> {
+    Some(match name {
+        "write_and_verify" => format!(
+            "Task: {arg}\n\n\
+             1. Call rootplc_examples with the main keywords of the task and reuse the verified patterns that fit.\n\
+             2. Write the program in IEC 61131-3 Structured Text. Name inputs and outputs clearly.\n\
+             3. Call rootplc_check until ok is true. For any code you do not understand, call rootplc_explain.\n\
+             4. Write TEST blocks that state the required behaviour, including edge cases and timing (use ADVANCE for virtual time).\n\
+             5. Call rootplc_test until every test passes. Do not weaken a test to make it pass.\n\
+             6. Report the final code and the test results. Never claim success while an error or a failing test remains."
+        ),
+        "fix_diagnostics" => format!(
+            "Project: {arg}\n\n\
+             1. Call rootplc_check with paths [\"{arg}\"].\n\
+             2. For each distinct diagnostic code, call rootplc_explain to read the rule.\n\
+             3. Fix the cause, not the symptom: use explicit conversions (e.g. INT_TO_SINT) instead of hiding a narrowing.\n\
+             4. Repeat until ok is true, then call rootplc_test so behaviour is confirmed, not only syntax."
+        ),
+        "port_legacy" => format!(
+            "Code base: {arg}\n\n\
+             1. Call rootplc_coverage with paths [\"{arg}\"]. Summarise: portable, dialect, dependent and blocked counts.\n\
+             2. Portable files: write TEST blocks that pin down their current behaviour and run rootplc_test.\n\
+             3. Dialect files: for each listed construct, propose a strict IEC 61131-3 rewrite (for example explicit conversions for implicit narrowing; plain function blocks instead of METHODs where possible). Change one file at a time and keep the behaviour pinned by tests.\n\
+             4. Dependent files usually become portable when the files they need do; fix those first.\n\
+             5. Blocked files: call rootplc_check and rootplc_explain to see whether the code or RootPLC is at fault; report RootPLC gaps instead of working around them silently.\n\
+             6. Do not deploy anything. Deployment to a PLC always needs a human."
+        ),
+        _ => return None,
+    })
+}
+
+fn prompts_list() -> String {
+    let items: Vec<String> = PROMPTS
+        .iter()
+        .map(|(name, title, desc, arg, arg_desc)| {
+            format!(
+                "{{\"name\":\"{name}\",\"title\":{},\"description\":{},\"arguments\":[{{\"name\":\"{arg}\",\"description\":{},\"required\":true}}]}}",
+                rootplc_diag::json_string(title),
+                rootplc_diag::json_string(desc),
+                rootplc_diag::json_string(arg_desc)
+            )
+        })
+        .collect();
+    format!("{{\"prompts\":[{}]}}", items.join(","))
+}
+
+fn prompt_get(name: &str, args: &Json) -> Option<String> {
+    let (_, _, desc, arg, _) = PROMPTS.iter().find(|p| p.0 == name)?;
+    let value = args.get(arg).and_then(Json::as_str).unwrap_or("");
+    let text = prompt_text(name, value)?;
+    Some(format!(
+        "{{\"description\":{},\"messages\":[{{\"role\":\"user\",\"content\":{{\"type\":\"text\",\"text\":{}}}}}]}}",
+        rootplc_diag::json_string(desc),
+        rootplc_diag::json_string(&text)
+    ))
 }
 
 /// Handle one JSON-RPC message; `None` for notifications.
@@ -179,7 +360,7 @@ pub fn handle(line: &str) -> Option<String> {
                 .find(|v| **v == asked)
                 .unwrap_or(&PROTOCOL_VERSIONS[0]);
             let result = format!(
-                "{{\"protocolVersion\":\"{version}\",\"capabilities\":{{\"tools\":{{\"listChanged\":false}}}},\
+                "{{\"protocolVersion\":\"{version}\",\"capabilities\":{{\"tools\":{{\"listChanged\":false}},\"resources\":{{\"listChanged\":false}},\"prompts\":{{\"listChanged\":false}}}},\
                  \"serverInfo\":{{\"name\":\"rootplc\",\"title\":\"RootPLC\",\"version\":\"{}\"}},\"instructions\":{}}}",
                 env!("CARGO_PKG_VERSION"),
                 rootplc_diag::json_string(INSTRUCTIONS)
@@ -197,6 +378,27 @@ pub fn handle(line: &str) -> Option<String> {
                 .cloned()
                 .unwrap_or(Json::Obj(Vec::new()));
             rpc_result(&id, &call_tool(name, &args))
+        }
+        "resources/list" => rpc_result(&id, &resources_list()),
+        "resources/templates/list" => rpc_result(&id, "{\"resourceTemplates\":[]}"),
+        "resources/read" => {
+            let uri = params.get("uri").and_then(Json::as_str).unwrap_or("");
+            match resource_read(uri) {
+                Some(r) => rpc_result(&id, &r),
+                None => rpc_error(&id, -32002, &format!("resource not found: {uri}")),
+            }
+        }
+        "prompts/list" => rpc_result(&id, &prompts_list()),
+        "prompts/get" => {
+            let name = params.get("name").and_then(Json::as_str).unwrap_or("");
+            let args = params
+                .get("arguments")
+                .cloned()
+                .unwrap_or(Json::Obj(Vec::new()));
+            match prompt_get(name, &args) {
+                Some(r) => rpc_result(&id, &r),
+                None => rpc_error(&id, -32602, &format!("unknown prompt: {name}")),
+            }
         }
         _ => rpc_error(&id, -32601, &format!("method not found: {method}")),
     })
@@ -259,7 +461,7 @@ mod tests {
             .and_then(|x| x.get("tools"))
             .and_then(Json::as_array)
             .expect("tools");
-        assert_eq!(tools.len(), 4);
+        assert_eq!(tools.len(), 6);
         assert_eq!(r.get("id").and_then(Json::as_str), Some("a"));
         let r = call(r#"{"jsonrpc":"2.0","id":2,"method":"nope"}"#);
         assert!(r.get("error").is_some());
@@ -299,5 +501,69 @@ mod tests {
         );
         let rep = tool("rootplc_check", "{}");
         assert_eq!(rep.get("ok"), Some(&Json::Bool(false)));
+
+        let rep = tool("rootplc_examples", r#"{"query":"timer"}"#);
+        let ex = rep
+            .get("examples")
+            .and_then(Json::as_array)
+            .expect("examples");
+        assert_eq!(ex[0].get("id").and_then(Json::as_str), Some("on-off-delay"));
+        assert!(ex[0].get("source").and_then(Json::as_str).is_some());
+        let rep = tool("rootplc_examples", r#"{"id":"nope"}"#);
+        assert_eq!(rep.get("ok"), Some(&Json::Bool(false)));
+
+        let rep = tool(
+            "rootplc_coverage",
+            r#"{"source":"PROGRAM p VAR q : POINTER TO INT; END_VAR END_PROGRAM"}"#,
+        );
+        assert_eq!(rep.get("dialect").and_then(Json::as_f64), Some(1.0));
+    }
+
+    #[test]
+    fn resources_and_prompts() {
+        let r = call(r#"{"jsonrpc":"2.0","id":3,"method":"resources/list"}"#);
+        let list = r
+            .get("result")
+            .and_then(|x| x.get("resources"))
+            .and_then(Json::as_array)
+            .expect("resources");
+        assert!(list.len() >= 10);
+        for res in list {
+            let uri = res.get("uri").and_then(Json::as_str).expect("uri");
+            let r = call(&format!(
+                r#"{{"jsonrpc":"2.0","id":4,"method":"resources/read","params":{{"uri":"{uri}"}}}}"#
+            ));
+            let text = r
+                .get("result")
+                .and_then(|x| x.get("contents"))
+                .and_then(Json::as_array)
+                .and_then(|c| c[0].get("text"))
+                .and_then(Json::as_str);
+            assert!(text.is_some_and(|t| !t.is_empty()), "{uri}");
+        }
+        let r = call(
+            r#"{"jsonrpc":"2.0","id":5,"method":"resources/read","params":{"uri":"rootplc://none"}}"#,
+        );
+        assert!(r.get("error").is_some());
+
+        let r = call(r#"{"jsonrpc":"2.0","id":6,"method":"prompts/list"}"#);
+        let prompts = r
+            .get("result")
+            .and_then(|x| x.get("prompts"))
+            .and_then(Json::as_array)
+            .expect("prompts");
+        assert_eq!(prompts.len(), 3);
+        let r = call(
+            r#"{"jsonrpc":"2.0","id":7,"method":"prompts/get","params":{"name":"port_legacy","arguments":{"path":"src"}}}"#,
+        );
+        let text = r
+            .get("result")
+            .and_then(|x| x.get("messages"))
+            .and_then(Json::as_array)
+            .and_then(|m| m[0].get("content"))
+            .and_then(|c| c.get("text"))
+            .and_then(Json::as_str)
+            .expect("prompt text");
+        assert!(text.contains("rootplc_coverage") && text.contains("src"));
     }
 }

@@ -28,6 +28,7 @@ name = "rootplc-conformance"
 version = "0.0.1"
 dependencies = [
  "rootplc-diag",
+ "rootplc-driver",
  "rootplc-sema",
  "rootplc-syntax",
  "rootplc-testing",

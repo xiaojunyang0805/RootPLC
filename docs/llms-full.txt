@@ -1,0 +1,1678 @@
+# RootPLC: full documentation for language models
+
+> Open, agent-first IEC 61131-3 toolchain. CLI `rootplc`, MCP server `rootplc mcp`. Apache-2.0.
+> Generated from the toolchain's compiled-in assets; it matches this version exactly.
+
+
+
+======== Agent guide (AGENTS.md) ========
+
+# AGENTS.md
+
+This is a RootPLC project: IEC 61131-3 Structured Text, checked and tested
+with `rootplc`.
+
+- Code is in `src/`, tests (`TEST ... END_TEST`) in `tests/`.
+- Patterns: `rootplc examples <words>` gives verified code for timers, edges,
+  counters, state machines and interlocks; `--show <id>` prints one.
+- Check: `rootplc check . --json`. Fix every diagnostic; `rootplc explain <code>`
+  quotes the rule.
+- Test: `rootplc test . --json`. Every program change needs a passing test.
+- Inspect: `rootplc run . --cycles 10 --json` shows variable values.
+- Existing code: `rootplc coverage <dir> --json` says which files are
+  portable, which use vendor constructs, and why.
+- The MCP server `rootplc mcp` offers the same as tools.
+- Done means: check clean and all tests pass.
+- Never run `rootplc deploy`. A human approves deployments.
+
+
+======== Command line ========
+
+# rootplc command line
+
+```
+rootplc init  [dir] [--name NAME] [--agent claude|gemini|qwen|cursor|codex|all]
+rootplc check <file.st|dir>... [--json]
+rootplc test  <file.st|dir>... [--filter TEXT] [--json]
+rootplc run   <file.st|dir>... [--program NAME] [--cycles N] [--cycle-ms MS] [--json]
+rootplc explain <code> [--json]
+rootplc examples [words...] [--show ID] [--json]
+rootplc coverage <file.st|dir>... [--json]
+rootplc mcp
+```
+
+All `.st` files given (directories are searched recursively) form one
+project: names declared in one file are visible in the others.
+
+**Exit codes:** 0 ok · 1 errors, failed tests or a run-time fault · 2 usage or I/O error.
+
+## init
+
+Creates `rootplc.toml`, `src/main.st`, `tests/main_test.st` and `AGENTS.md`.
+The example checks clean and its test passes. Existing files are never
+overwritten.
+
+`--agent HOST` also connects agent hosts to `rootplc mcp` (comma list or
+`all`). In an existing project (with `rootplc.toml`) only these files are added:
+
+| Host | Files |
+|---|---|
+| `claude` | `.mcp.json`, `CLAUDE.md` (points to AGENTS.md) |
+| `gemini` | `.gemini/settings.json` (MCP server, AGENTS.md as context file) |
+| `qwen` | `.qwen/settings.json` (same format) |
+| `cursor` | `.cursor/mcp.json` |
+| `codex` | `.codex/config.toml` |
+
+A file that exists already is kept; if it does not mention rootplc yet, the
+snippet to merge is printed.
+
+## check
+
+Lexes, parses and type-checks. Files with syntax errors are not type-checked,
+so one typo does not cause a cascade of follow-on errors.
+
+Text: `file:line:col: error[RP0103]: INT does not convert implicitly to SINT`,
+then `  hint: …`.
+
+JSON:
+```json
+{"command":"check","ok":false,"files":1,"errors":1,"warnings":0,
+ "diagnostics":[{"file":"src/main.st","line":8,"column":7,"end_line":8,"end_column":8,
+   "code":"RP0103","severity":"error","message":"INT does not convert implicitly to SINT",
+   "hint":"use INT_TO_SINT(...) to convert explicitly"}]}
+```
+
+## test
+
+Compiles, then runs every `TEST ... END_TEST` block once in the VM
+(spec/07-test-blocks.md). Failed assertions are listed with their location;
+execution continues after a failed assertion. A run-time fault ends the test.
+
+```json
+{"command":"test","ok":true,"compiled":true,"passed":1,"failed":0,"diagnostics":[],
+ "tests":[{"name":"start_latches","passed":true,"failures":[],"fault":null}]}
+```
+
+## run
+
+Runs one PROGRAM for N cycles (default 1) and prints every variable as an
+IEC literal. The virtual clock advances by `--cycle-ms` (default 10) per
+cycle, so timers behave as on a PLC with that cycle time.
+
+```json
+{"command":"run","ok":true,"program":"PRG_Main","cycles":3,"fault":null,
+ "diagnostics":[],"variables":{"start":"FALSE","running":"FALSE"}}
+```
+
+Faults: `DIV_BY_ZERO`, `RANGE` (subrange), `INDEX` (array bounds),
+`NULL_REF`, `WATCHDOG` (more than 10 million statements in one cycle).
+
+## explain
+
+`rootplc explain RP0103` (or `103`) prints the severity, a summary and the
+text of the spec rule that defines the code.
+
+## examples
+
+A library of verified ST patterns: edge detection, on/off delays, state
+machines, scaling, counters, interlocks, arrays, structs, flip-flops and the
+TEST pattern. Every example compiles and passes its TEST blocks in this
+toolchain version (enforced by the test suite), and none reproduces a
+benchmark solution.
+
+`rootplc examples timer` lists matches (all words must match; tags weigh
+most). `rootplc examples --show on-off-delay` prints the code. Exit code 1
+if nothing matches.
+
+```json
+{"command":"examples","ok":true,"query":"timer","verified":true,"count":1,
+ "examples":[{"id":"on-off-delay","title":"On-delay and off-delay timers",
+   "tags":["timer","TON","TOF","delay","time"],"description":"…","source":"…"}]}
+```
+
+## coverage
+
+Checks the files as one project and gives each file one status:
+
+| Status | Meaning |
+|---|---|
+| `portable` | no errors: test and run it now |
+| `dialect` | errors, and the file uses constructs RootPLC does not take yet (`METHOD`, `POINTER TO`, vendor pragmas, implicit narrowing, …), listed with lines |
+| `dependent` | its only errors are unknown names declared in files that fail (`blocked_by`) |
+| `blocked` | other errors: see `rootplc check` |
+
+Constructs are found on lexer tokens, so comments and strings never count.
+`standard` says whether a construct is IEC 61131-3 ed.3 (`iec-ed3`) or a
+vendor extension (`vendor`). Exit code 0 whatever the statuses are.
+
+```json
+{"command":"coverage","ok":true,"units":3,"portable":1,"dialect":1,"dependent":1,"blocked":0,
+ "files":[{"file":"lib.st","status":"dialect","errors":1,"codes":["RP0201"],
+   "constructs":[{"name":"POINTER TO","standard":"vendor","line":2,"count":1}],"blocked_by":[]}]}
+```
+
+## mcp
+
+Model Context Protocol server on stdio for agent hosts; see
+[agent/mcp/README.md](../../agent/mcp/README.md). Tools: `rootplc_check`,
+`rootplc_test`, `rootplc_run`, `rootplc_explain`, `rootplc_examples`,
+`rootplc_coverage`. Source tools accept `paths`, in-memory `files`, or a
+`source` string, and return the JSON reports above. Resources: the agent
+guide, spec chapters, diagnostic registry and examples (`rootplc://…`).
+Prompts: `write_and_verify`, `fix_diagnostics`, `port_legacy`.
+
+
+======== Verified examples ========
+
+--- example: edge-detect ---
+(* title: Rising and falling edge detection
+   tags: edge, R_TRIG, F_TRIG, pulse, one-shot, button
+   description: Detect a rising and a falling edge of a signal with the standard blocks R_TRIG and F_TRIG; the outputs are TRUE for one cycle. *)
+PROGRAM EX_EdgeDetect
+VAR_INPUT
+    button : BOOL;
+END_VAR
+VAR_OUTPUT
+    pressed, released : BOOL;
+END_VAR
+VAR
+    up : R_TRIG;
+    down : F_TRIG;
+END_VAR
+up(CLK := button);
+down(CLK := button);
+pressed := up.Q;
+released := down.Q;
+END_PROGRAM
+
+TEST ex_edge_one_cycle
+VAR uut : EX_EdgeDetect; END_VAR
+uut(button := TRUE);
+ASSERT_TRUE(uut.pressed);
+uut(button := TRUE);
+ASSERT_FALSE(uut.pressed);
+uut(button := FALSE);
+ASSERT_TRUE(uut.released);
+END_TEST
+
+--- example: on-off-delay ---
+(* title: On-delay and off-delay timers
+   tags: timer, TON, TOF, delay, time
+   description: Switch an output on 2 s after a request and keep a fan running 5 s after the request ends, with TON and TOF. *)
+PROGRAM EX_Delays
+VAR_INPUT
+    request : BOOL;
+END_VAR
+VAR_OUTPUT
+    heater_on, fan_on : BOOL;
+END_VAR
+VAR
+    on_delay : TON;
+    run_on : TOF;
+END_VAR
+on_delay(IN := request, PT := T#2s);
+run_on(IN := request, PT := T#5s);
+heater_on := on_delay.Q;
+fan_on := run_on.Q;
+END_PROGRAM
+
+TEST ex_delays_on_and_run_on
+VAR uut : EX_Delays; i : INT; END_VAR
+FOR i := 1 TO 15 DO uut(request := TRUE); ADVANCE(T#100ms); END_FOR
+ASSERT_FALSE(uut.heater_on);
+FOR i := 1 TO 10 DO uut(request := TRUE); ADVANCE(T#100ms); END_FOR
+uut(request := TRUE);
+ASSERT_TRUE(uut.heater_on);
+FOR i := 1 TO 30 DO uut(request := FALSE); ADVANCE(T#100ms); END_FOR
+ASSERT_TRUE(uut.fan_on);
+FOR i := 1 TO 30 DO uut(request := FALSE); ADVANCE(T#100ms); END_FOR
+ASSERT_FALSE(uut.fan_on);
+END_TEST
+
+--- example: state-machine ---
+(* title: State machine with an enumeration and CASE
+   tags: state machine, sequence, CASE, enum, step
+   description: A three-step sequence (idle, running, done) written as an enumeration and a CASE statement; the pattern for any step sequence. *)
+TYPE E_Step : (Idle, Running, Done); END_TYPE
+
+FUNCTION_BLOCK EX_Sequence
+VAR_INPUT
+    go, finished, ack : BOOL;
+END_VAR
+VAR_OUTPUT
+    state : E_Step;
+    busy : BOOL;
+END_VAR
+CASE state OF
+    E_Step#Idle:
+        IF go THEN state := E_Step#Running; END_IF
+    E_Step#Running:
+        IF finished THEN state := E_Step#Done; END_IF
+    E_Step#Done:
+        IF ack THEN state := E_Step#Idle; END_IF
+END_CASE
+busy := state = E_Step#Running;
+END_FUNCTION_BLOCK
+
+TEST ex_sequence_steps
+VAR uut : EX_Sequence; END_VAR
+uut(go := TRUE);
+ASSERT_TRUE(uut.busy);
+uut(go := FALSE, finished := TRUE);
+ASSERT_TRUE(uut.state = E_Step#Done);
+uut(finished := FALSE, ack := TRUE);
+ASSERT_TRUE(uut.state = E_Step#Idle);
+END_TEST
+
+--- example: limit-and-scale ---
+(* title: Limit, scale and convert numbers safely
+   tags: LIMIT, conversion, scaling, INT_TO_REAL, REAL_TO_INT, clamp
+   description: Clamp a value with LIMIT and convert between INT and REAL explicitly, as strict IEC 61131-3 requires (no implicit narrowing). *)
+FUNCTION EX_PercentToRaw : INT
+VAR_INPUT
+    percent : REAL;
+END_VAR
+EX_PercentToRaw := REAL_TO_INT(LIMIT(0.0, percent, 100.0) * 100.0);
+END_FUNCTION
+
+TEST ex_percent_to_raw
+ASSERT_EQ(5000, EX_PercentToRaw(50.0));
+ASSERT_EQ(10000, EX_PercentToRaw(150.0));
+ASSERT_EQ(0, EX_PercentToRaw(-3.0));
+END_TEST
+
+--- example: counter-preset ---
+(* title: Up-counter with preset and reset
+   tags: counter, CTU, count, preset, batch
+   description: Count parts with CTU until a preset is reached; reset starts a new batch. *)
+PROGRAM EX_Batch
+VAR_INPUT
+    part, reset : BOOL;
+END_VAR
+VAR_OUTPUT
+    batch_full : BOOL;
+    count : INT;
+END_VAR
+VAR
+    c : CTU;
+END_VAR
+c(CU := part, R := reset, PV := 5);
+batch_full := c.Q;
+count := c.CV;
+END_PROGRAM
+
+TEST ex_batch_of_five
+VAR uut : EX_Batch; i : INT; END_VAR
+FOR i := 1 TO 5 DO uut(part := TRUE); uut(part := FALSE); END_FOR
+ASSERT_TRUE(uut.batch_full);
+ASSERT_EQ(5, uut.count);
+uut(reset := TRUE);
+ASSERT_EQ(0, uut.count);
+END_TEST
+
+--- example: interlock-permissive ---
+(* title: Interlock: permissives and trips
+   tags: interlock, safety, permissive, trip, emergency stop, guard
+   description: A drive may start only when all permissives are true; any trip stops it at once and it needs a new start. The common safety-interlock pattern. *)
+FUNCTION_BLOCK EX_Interlock
+VAR_INPUT
+    start, stop : BOOL;
+    permissive_ok, trip : BOOL;
+END_VAR
+VAR_OUTPUT
+    run : BOOL;
+END_VAR
+IF stop OR trip OR NOT permissive_ok THEN
+    run := FALSE;
+ELSIF start THEN
+    run := TRUE;
+END_IF
+END_FUNCTION_BLOCK
+
+TEST ex_trip_wins
+VAR uut : EX_Interlock; END_VAR
+uut(start := TRUE, permissive_ok := TRUE);
+ASSERT_TRUE(uut.run);
+uut(start := TRUE, trip := TRUE);
+ASSERT_FALSE(uut.run);
+uut(start := FALSE, trip := FALSE);
+ASSERT_FALSE(uut.run);
+END_TEST
+
+--- example: array-loop ---
+(* title: Arrays and FOR loops
+   tags: array, FOR, loop, sum, average, index
+   description: Sum and average an array with a FOR loop; indices stay inside the declared bounds. *)
+FUNCTION EX_Average : REAL
+VAR_INPUT
+    samples : ARRAY[1..5] OF REAL;
+END_VAR
+VAR
+    i : INT;
+    total : REAL;
+END_VAR
+total := 0.0;
+FOR i := 1 TO 5 DO
+    total := total + samples[i];
+END_FOR
+EX_Average := total / 5.0;
+END_FUNCTION
+
+TEST ex_average_of_five
+VAR s : ARRAY[1..5] OF REAL := [1.0, 2.0, 3.0, 4.0, 5.0]; END_VAR
+ASSERT_TRUE(ABS(EX_Average(s) - 3.0) < 0.001);
+END_TEST
+
+--- example: struct-record ---
+(* title: Structures as records
+   tags: struct, record, data type, TYPE
+   description: Group related values in a STRUCT type and pass it to a function block. *)
+TYPE ST_Recipe : STRUCT
+    temperature : REAL;
+    duration : TIME;
+    label : STRING[20];
+END_STRUCT END_TYPE
+
+FUNCTION_BLOCK EX_Oven
+VAR_INPUT
+    recipe : ST_Recipe;
+END_VAR
+VAR_OUTPUT
+    setpoint : REAL;
+    hold : TIME;
+END_VAR
+setpoint := recipe.temperature;
+hold := recipe.duration;
+END_FUNCTION_BLOCK
+
+TEST ex_recipe
+VAR
+    uut : EX_Oven;
+    r : ST_Recipe := (temperature := 180.0, duration := T#20m, label := 'bread');
+END_VAR
+uut(recipe := r);
+ASSERT_TRUE(ABS(uut.setpoint - 180.0) < 0.001);
+ASSERT_TRUE(uut.hold = T#20m);
+END_TEST
+
+--- example: testing-pattern ---
+(* title: How to write TEST blocks with virtual time
+   tags: test, TEST, ASSERT, ADVANCE, virtual time, white-box
+   description: The testing pattern: instantiate the program or block, call it once per cycle, move virtual time with ADVANCE, and assert on inputs, outputs or internal variables. *)
+FUNCTION_BLOCK EX_Toggle
+VAR_INPUT
+    enable : BOOL;
+END_VAR
+VAR_OUTPUT
+    lamp : BOOL;
+END_VAR
+VAR
+    t : TON;
+END_VAR
+t(IN := enable AND NOT t.Q, PT := T#500ms);
+IF t.Q THEN
+    lamp := NOT lamp;
+END_IF
+IF NOT enable THEN
+    lamp := FALSE;
+END_IF
+END_FUNCTION_BLOCK
+
+TEST ex_toggle_after_half_second
+VAR uut : EX_Toggle; i : INT; END_VAR
+FOR i := 1 TO 6 DO uut(enable := TRUE); ADVANCE(T#100ms); END_FOR
+ASSERT_TRUE(uut.lamp);
+uut(enable := FALSE);
+ASSERT_FALSE(uut.lamp);
+END_TEST
+
+--- example: flip-flops ---
+(* title: Set and reset flip-flops (SR, RS)
+   tags: SR, RS, flip-flop, latch, set, reset, priority
+   description: SR gives set priority, RS gives reset priority; choose RS when the reset is a safety condition. *)
+PROGRAM EX_FlipFlops
+VAR_INPUT
+    s, r : BOOL;
+END_VAR
+VAR_OUTPUT
+    set_wins, reset_wins : BOOL;
+END_VAR
+VAR
+    a : SR;
+    b : RS;
+END_VAR
+a(S1 := s, R := r);
+b(S := s, R1 := r);
+set_wins := a.Q1;
+reset_wins := b.Q1;
+END_PROGRAM
+
+TEST ex_priorities
+VAR uut : EX_FlipFlops; END_VAR
+uut(s := TRUE, r := TRUE);
+ASSERT_TRUE(uut.set_wins);
+ASSERT_FALSE(uut.reset_wins);
+END_TEST
+
+
+======== Diagnostics ========
+
+# Diagnostics
+
+*Generated from `spec/diagnostics.toml` and the spec chapters; do not edit.*
+
+Every diagnostic has a stable code. `rootplc explain <code>` prints the same text.
+Codes RP00xx are lexical, RP01xx types, RP02xx names and structure, RP03xx syntax.
+
+| Code | Severity | Summary |
+|---|---|---|
+| [RP0001](#rp0001) | error | unterminated block comment |
+| [RP0002](#rp0002) | error | unterminated string literal |
+| [RP0003](#rp0003) | warning | comment opener inside a block comment; comments do not nest |
+| [RP0004](#rp0004) | error | keyword used as an identifier |
+| [RP0005](#rp0005) | error | invalid character in source |
+| [RP0006](#rp0006) | warning | consecutive underscores in identifier |
+| [RP0007](#rp0007) | error | misplaced underscore in numeric literal |
+| [RP0008](#rp0008) | error | malformed numeric or character literal |
+| [RP0009](#rp0009) | error | character outside Latin-1 in STRING literal; use a WSTRING literal |
+| [RP0010](#rp0010) | error | unknown escape sequence |
+| [RP0011](#rp0011) | error | malformed duration or date/time literal |
+| [RP0012](#rp0012) | error | date or time value out of range |
+| [RP0013](#rp0013) | warning | unknown pragma, ignored |
+| [RP0014](#rp0014) | error | unknown type name in typed literal |
+| [RP0015](#rp0015) | error | unterminated pragma |
+| [RP0017](#rp0017) | warning | real literal without a decimal point (not portable); write 1.0E-6 |
+| [RP0016](#rp0016) | error | malformed directly represented variable |
+| [RP0201](#rp0201) | error | syntax error: unexpected token |
+| [RP0202](#rp0202) | error | block is never closed: missing END keyword |
+| [RP0301](#rp0301) | error | missing ';' at end of statement or declaration |
+| [RP0101](#rp0101) | error | overflow or division by zero in constant expression |
+| [RP0102](#rp0102) | error | literal out of range for its type |
+| [RP0103](#rp0103) | error | implicit conversion not allowed; use an explicit conversion function |
+| [RP0104](#rp0104) | error | generic type used in a user declaration |
+| [RP0105](#rp0105) | error | constant outside subrange |
+| [RP0106](#rp0106) | error | ambiguous enumeration value; qualify it as Type#Value |
+| [RP0107](#rp0107) | error | structure contains itself |
+| [RP0108](#rp0108) | error | invalid bounds or length |
+| [RP0109](#rp0109) | error | constant array index out of bounds |
+| [RP0110](#rp0110) | warning | string literal longer than declared length; it will be truncated |
+| [RP0111](#rp0111) | error | unknown type name |
+| [RP0203](#rp0203) | error | unknown name |
+| [RP0204](#rp0204) | error | name declared twice in the same POU |
+
+## RP0001
+
+error: unterminated block comment
+
+Rule `lexical.comment.unterminated` in `spec/01-lexical.md`:
+
+**[lexical.comment.unterminated]** A block comment with no closer before end
+of file is error RP0001, reported at the opener.
+
+Comment openers inside string literals and pragmas are not comments.
+
+## RP0002
+
+error: unterminated string literal
+
+Rule `lexical.literal.string` in `spec/01-lexical.md`:
+
+**[lexical.literal.string]** `'...'` is a STRING literal and `"..."` is a
+WSTRING literal. A literal cannot contain a raw line end; a literal not
+closed before the end of the line is error RP0002.
+
+## RP0003
+
+warning: comment opener inside a block comment; comments do not nest
+
+Rule `lexical.comment.nesting` in `spec/01-lexical.md`:
+
+**[lexical.comment.nesting]** Comments do not nest. An opener of the same
+kind inside a block comment (`(*` inside `(* *)`, or `/*` inside `/* */`) is
+warning RP0003, and the comment still ends at the first closer.
+
+## RP0004
+
+error: keyword used as an identifier
+
+Rule `lexical.keyword` in `spec/01-lexical.md`:
+
+**[lexical.keyword]** The keywords below are reserved. Using one as an
+identifier is error RP0004.
+
+```
+ABSTRACT ACTION AND AND_THEN ARRAY AT BY CASE CLASS CONFIGURATION CONSTANT
+CONTINUE DO ELSE ELSIF END_ACTION END_CASE END_CLASS END_CONFIGURATION
+END_FOR END_FUNCTION END_FUNCTION_BLOCK END_IF END_INTERFACE END_METHOD
+END_NAMESPACE END_PROGRAM END_REPEAT END_RESOURCE END_STEP END_STRUCT
+END_TEST END_TRANSITION END_TYPE END_VAR END_WHILE EXIT EXTENDS FALSE FINAL
+FOR FROM FUNCTION FUNCTION_BLOCK IF IMPLEMENTS INITIAL_STEP INTERFACE
+INTERNAL METHOD MOD NAMESPACE NON_RETAIN NOT NULL OF ON OR OR_ELSE OVERLAP
+OVERRIDE PRIVATE PROGRAM PROTECTED PUBLIC READ_ONLY READ_WRITE REF REF_TO
+REPEAT RESOURCE RETAIN RETURN STEP STRUCT SUPER TASK TEST THEN THIS TO
+TRANSITION TRUE TYPE UNTIL USING VAR VAR_ACCESS VAR_CONFIG VAR_EXTERNAL
+VAR_GLOBAL VAR_INPUT VAR_IN_OUT VAR_OUTPUT VAR_STAT VAR_TEMP WHILE WITH XOR
+```
+
+Elementary type names (spec/02-types.md) are also reserved.
+
+## RP0005
+
+error: invalid character in source
+
+Rule `lexical.source.charset` in `spec/01-lexical.md`:
+
+**[lexical.source.charset]** Outside comments, pragmas and `"..."` (WSTRING)
+literals, only ASCII characters may appear. Any other character there is
+error RP0005.
+
+## RP0006
+
+warning: consecutive underscores in identifier
+
+Rule `lexical.identifier.underscore` in `spec/01-lexical.md`:
+
+**[lexical.identifier.underscore]** Two or more consecutive underscores in an
+identifier are warning RP0006. (Ed2 forbade them; CODESYS accepts them, so
+RootPLC accepts them with a warning to keep migrated code compiling.)
+
+## RP0007
+
+error: misplaced underscore in numeric literal
+
+Rule `lexical.literal.underscore` in `spec/01-lexical.md`:
+
+**[lexical.literal.underscore]** A single `_` may appear between two digits of
+any numeric literal and is ignored (`1_000_000`, `2#1010_0101`). An
+underscore at the start or end of the digits, next to `#` or `.`, or doubled,
+is error RP0007.
+
+## RP0008
+
+error: malformed numeric or character literal
+
+Rule `lexical.literal.integer` in `spec/01-lexical.md`:
+
+**[lexical.literal.integer]** A decimal integer literal is a sequence of
+digits. A based literal is `2#`, `8#` or `16#` followed by digits of that
+base; hex digits are case-insensitive (`16#ff` = `16#FF`). A digit that is
+not valid for the base is error RP0008.
+
+## RP0009
+
+error: character outside Latin-1 in STRING literal; use a WSTRING literal
+
+Rule `lexical.literal.string.latin1` in `spec/01-lexical.md`:
+
+**[lexical.literal.string.latin1]** A STRING literal may contain only
+characters U+0000–U+00FF, stored as one byte each (Latin-1). Any other
+character is error RP0009 with the hint to use a WSTRING literal. WSTRING
+is UTF-16.
+
+## RP0010
+
+error: unknown escape sequence
+
+Rule `lexical.literal.escape` in `spec/01-lexical.md`:
+
+**[lexical.literal.escape]** `$` starts an escape sequence. Letters are
+case-insensitive.
+
+| Escape | Meaning |
+|---|---|
+| `$$` | `$` |
+| `$'` | `'` (in STRING; in WSTRING also allowed) |
+| `$"` | `"` (in WSTRING; in STRING also allowed) |
+| `$L` or `$N` | line feed |
+| `$P` | form feed |
+| `$R` | carriage return |
+| `$T` | tab |
+| `$hh` | byte with hex value hh (STRING only) |
+| `$hhhh` | UTF-16 code unit hhhh (WSTRING only) |
+
+Any other character after `$` is error RP0010. A bare `'` inside a STRING
+literal ends the literal; likewise `"` inside a WSTRING literal.
+
+## RP0011
+
+error: malformed duration or date/time literal
+
+Rule `lexical.literal.duration` in `spec/01-lexical.md`:
+
+**[lexical.literal.duration]** A duration literal is a prefix `T#`, `TIME#`,
+`LT#` or `LTIME#`, an optional `-`, and one or more fields. Each field is a
+number followed by a unit: `d`, `h`, `m`, `s`, `ms`, `us`, `ns`. Prefixes and
+units are case-insensitive, and `_` may separate fields (`T#1h_30m`).
+
+- Units appear in descending order, each at most once.
+- Only the last field may have a fraction (`T#1.5s`).
+- Only the first field may exceed its natural range (`T#90m` is allowed,
+  `T#1h90m` is not).
+
+A literal that breaks any of these is error RP0011.
+
+## RP0012
+
+error: date or time value out of range
+
+Rule `lexical.literal.date` in `spec/01-lexical.md`:
+
+**[lexical.literal.date]** Date and time literals:
+
+| Prefix | Form | Example |
+|---|---|---|
+| `D#`, `DATE#`, `LD#`, `LDATE#` | `yyyy-mm-dd` | `D#2026-11-03` |
+| `TOD#`, `TIME_OF_DAY#`, `LTOD#`, `LTIME_OF_DAY#` | `hh:mm:ss[.f]` | `TOD#14:30:00.5` |
+| `DT#`, `DATE_AND_TIME#`, `LDT#`, `LDATE_AND_TIME#` | `yyyy-mm-dd-hh:mm:ss[.f]` | `DT#2026-11-03-14:30:00` |
+
+A value outside the calendar or clock (month 13, 30 February, hour 24) is
+error RP0012. A malformed literal is error RP0011.
+
+## RP0013
+
+warning: unknown pragma, ignored
+
+Rule `lexical.pragma` in `spec/01-lexical.md`:
+
+**[lexical.pragma]** `{` starts a pragma that ends at the next `}`. Pragmas do
+not nest. The first word names the pragma. Pragmas that RootPLC defines are
+listed in spec/09-properties.md; for example `{attribute 'name'}`. An unknown
+pragma is warning RP0013 and is otherwise ignored. A pragma with no closing
+`}` before end of file is error RP0015.
+
+## RP0014
+
+error: unknown type name in typed literal
+
+Rule `lexical.literal.typed` in `spec/01-lexical.md`:
+
+**[lexical.literal.typed]** A typed literal is an elementary type name, `#`,
+and a literal: `INT#5`, `REAL#1.5`, `BYTE#16#FF`, `BOOL#1`. An unknown type
+name before `#` is error RP0014. For enumerations, `Type#Value` names an
+enumeration value (spec/02-types.md).
+
+## RP0015
+
+error: unterminated pragma
+
+Rule `lexical.pragma` in `spec/01-lexical.md`:
+
+**[lexical.pragma]** `{` starts a pragma that ends at the next `}`. Pragmas do
+not nest. The first word names the pragma. Pragmas that RootPLC defines are
+listed in spec/09-properties.md; for example `{attribute 'name'}`. An unknown
+pragma is warning RP0013 and is otherwise ignored. A pragma with no closing
+`}` before end of file is error RP0015.
+
+## RP0017
+
+warning: real literal without a decimal point (not portable); write 1.0E-6
+
+Rule `lexical.literal.real` in `spec/01-lexical.md`:
+
+**[lexical.literal.real]** A real literal is `digits . digits`, optionally
+followed by an exponent `E` or `e`, an optional sign, and digits. Both sides
+of the point are required: `1.` and `.5` are error RP0008. A literal with an
+exponent but no point, such as `1E-6`, is accepted as a real with warning
+RP0017: IEC 61131-3 requires the point, but CODESYS and TwinCAT accept this
+form and real code uses it. The portable spelling is `1.0E-6`.
+
+## RP0016
+
+error: malformed directly represented variable
+
+Rule `lexical.direct-variable` in `spec/01-lexical.md`:
+
+**[lexical.direct-variable]** `%` followed by a location `I` (input), `Q`
+(output) or `M` (memory), an optional size `X` (bit), `B`, `W`, `D` or `L`,
+and an address: digits separated by single dots (`%IX0.0`, `%QW4`, `%MD12`),
+or `*` for an address assigned later in the configuration (`%I*`). Letters
+are case-insensitive. Anything else after `%` is error RP0016.
+
+## RP0201
+
+error: syntax error: unexpected token
+
+Rule `syntax.general` in `spec/04-pous.md`:
+
+**[syntax.general]** A token that cannot start or continue the expected
+construct is error RP0201. The message names what was expected and what was
+found.
+
+## RP0202
+
+error: block is never closed: missing END keyword
+
+Rule `pous.end` in `spec/04-pous.md`:
+
+**[pous.end]** A POU or block whose closing keyword is missing before the end
+of the file is error RP0202. The error is reported at the opening keyword.
+
+## RP0301
+
+error: missing ';' at end of statement or declaration
+
+Rule `statements.terminator` in `spec/05-statements.md`:
+
+**[statements.terminator]** Every statement except the block statements
+(`IF`, `CASE`, `FOR`, `WHILE`, `REPEAT`) ends with `;`, and so does every
+variable declaration. A missing `;` is error RP0301, reported at the end of
+the statement. A lone `;` is an empty statement.
+
+## RP0101
+
+error: overflow or division by zero in constant expression
+
+Rule `types.int.overflow` in `spec/02-types.md`:
+
+**[types.int.overflow]** Integer arithmetic at run time wraps around in two's
+complement (for example, `SINT#127 + 1` gives `-128`). Overflow while
+evaluating a constant expression at compile time is error RP0101.
+
+## RP0102
+
+error: literal out of range for its type
+
+Rule `types.literal.range` in `spec/02-types.md`:
+
+**[types.literal.range]** A literal, or a constant expression, must fit the
+type it is used as. `SINT#200` or `x : SINT := 200` is error RP0102.
+`-128` fits SINT because the minus is folded first.
+
+## RP0103
+
+error: implicit conversion not allowed; use an explicit conversion function
+
+Rule `types.conversion.implicit` in `spec/02-types.md`:
+
+**[types.conversion.implicit]** A value converts implicitly only when no
+value is lost. The allowed implicit conversions are (transitively):
+
+| From | To |
+|---|---|
+| `SINT` | `INT`, `DINT`, `LINT`, `REAL`, `LREAL` |
+| `INT` | `DINT`, `LINT`, `REAL`, `LREAL` |
+| `DINT` | `LINT`, `LREAL` |
+| `USINT` | `UINT`, `UDINT`, `ULINT`, `INT`, `DINT`, `LINT`, `REAL`, `LREAL` |
+| `UINT` | `UDINT`, `ULINT`, `DINT`, `LINT`, `REAL`, `LREAL` |
+| `UDINT` | `ULINT`, `LINT`, `LREAL` |
+| `REAL` | `LREAL` |
+| `BOOL` | `BYTE` |
+| `BYTE` → `WORD` → `DWORD` → `LWORD` | each wider bit string |
+| `TIME` | `LTIME` |
+| `DATE`, `TOD`, `DT` | `LDATE`, `LTOD`, `LDT` respectively |
+| `CHAR` | `STRING` |
+| `WCHAR` | `WSTRING` |
+
+Every other conversion, including narrowing, signed to unsigned, integer to
+`BOOL`, integer to bit string, enumeration to integer and `STRING` to
+`WSTRING`, is error RP0103. The fix hint names the explicit function.
+
+## RP0104
+
+error: generic type used in a user declaration
+
+Rule `types.generic` in `spec/02-types.md`:
+
+**[types.generic]** The generic types group elementary types:
+
+```
+ANY
+├─ ANY_DERIVED
+└─ ANY_ELEMENTARY
+   ├─ ANY_MAGNITUDE
+   │  ├─ ANY_NUM
+   │  │  ├─ ANY_REAL      REAL, LREAL
+   │  │  └─ ANY_INT
+   │  │     ├─ ANY_SIGNED    SINT, INT, DINT, LINT
+   │  │     └─ ANY_UNSIGNED  USINT, UINT, UDINT, ULINT
+   │  └─ ANY_DURATION   TIME, LTIME
+   ├─ ANY_BIT          BOOL, BYTE, WORD, DWORD, LWORD
+   ├─ ANY_CHARS
+   │  ├─ ANY_STRING    STRING, WSTRING
+   │  └─ ANY_CHAR      CHAR, WCHAR
+   └─ ANY_DATE         DATE, TOD, DT, LDATE, LTOD, LDT
+```
+
+Generic types may appear only in the signatures of standard-library
+functions. Using one in a user declaration is error RP0104.
+
+## RP0105
+
+error: constant outside subrange
+
+Rule `types.derived.subrange` in `spec/02-types.md`:
+
+**[types.derived.subrange]** `TYPE Percent : INT (0..100); END_TYPE`. The
+bounds are constant and lower <= upper (otherwise RP0108). The default is the
+lower bound. A constant outside the range is error RP0105. A run-time
+assignment outside the range raises the fault `RANGE` in the VM and
+simulator; in generated C the check can be switched off per build.
+
+## RP0106
+
+error: ambiguous enumeration value; qualify it as Type#Value
+
+Rule `types.derived.enum` in `spec/02-types.md`:
+
+**[types.derived.enum]** `TYPE Mode : (Off, Manual, Auto); END_TYPE`, or with
+a base type and values: `TYPE Mode : INT (Off := 0, Auto := 10); END_TYPE`.
+Without explicit values the base type is `INT` and the values are 0, 1, 2...
+in order. The default is the first value. `Mode#Auto` names a value; plain `Auto` is
+allowed when exactly one enumeration in scope has it, otherwise error RP0106.
+Enumerations do not convert implicitly to integers (RP0103); use `TO_INT`.
+
+## RP0107
+
+error: structure contains itself
+
+Rule `types.derived.struct` in `spec/02-types.md`:
+
+**[types.derived.struct]** `STRUCT ... END_STRUCT` declares members with
+optional initial values. A structure that contains itself, directly or
+through other structures or arrays, is error RP0107. (`REF_TO` to itself is
+allowed.)
+
+## RP0108
+
+error: invalid bounds or length
+
+Rule `types.derived.array` in `spec/02-types.md`:
+
+**[types.derived.array]** `ARRAY[l1..u1, l2..u2] OF T`. Bounds are constant
+`DINT` expressions with l <= u, otherwise error RP0108. A constant index
+outside the bounds is error RP0109. A run-time index outside the bounds
+raises the fault `INDEX`. `ARRAY[*]` is allowed only for `VAR_IN_OUT`
+parameters.
+
+## RP0109
+
+error: constant array index out of bounds
+
+Rule `types.derived.array` in `spec/02-types.md`:
+
+**[types.derived.array]** `ARRAY[l1..u1, l2..u2] OF T`. Bounds are constant
+`DINT` expressions with l <= u, otherwise error RP0108. A constant index
+outside the bounds is error RP0109. A run-time index outside the bounds
+raises the fault `INDEX`. `ARRAY[*]` is allowed only for `VAR_IN_OUT`
+parameters.
+
+## RP0110
+
+warning: string literal longer than declared length; it will be truncated
+
+Rule `types.derived.string` in `spec/02-types.md`:
+
+**[types.derived.string]** `STRING[n]` and `WSTRING[n]` with 1 <= n <= 65535
+(otherwise RP0108). Assigning a longer string truncates it to n characters.
+A string literal longer than n in a declaration or constant assignment is
+warning RP0110.
+
+## RP0111
+
+error: unknown type name
+
+Rule `types.derived.alias` in `spec/02-types.md`:
+
+**[types.derived.alias]** `TYPE Speed : INT := 10; END_TYPE` declares an alias
+with an optional new default. An alias of an elementary type is compatible
+with its base type in both directions.
+
+## RP0203
+
+error: unknown name
+
+Rule `variables.resolution` in `spec/03-variables.md`:
+
+**[variables.resolution]** A name used in a statement or initial value
+resolves, in this order, to:
+
+1. a variable of the enclosing POU (in a `FUNCTION`, the function name is
+   also the variable holding the result);
+2. a value of an enumeration type, if exactly one enumeration has it
+   ([types.derived.enum]);
+3. a POU or standard function or function block (spec/08-stdlib.md), when
+   the name is called.
+
+A name that resolves to none of these is error RP0203. So is a member that
+the structure or function-block instance does not have (`p.z`, `tmr.QQ`).
+Members of a function-block or program instance that can be accessed from
+outside are its `VAR_INPUT`, `VAR_OUTPUT` and `VAR_IN_OUT` variables.
+
+## RP0204
+
+error: name declared twice in the same POU
+
+Rule `variables.unique` in `spec/03-variables.md`:
+
+**[variables.unique]** Within one POU, every variable name is declared once,
+across all its sections. Names compare case-insensitively
+([lexical.identifier.case]). Likewise, every type and POU name is declared once
+in a project. A second declaration is error RP0204, reported at the second
+one. A user POU may replace a standard function block (spec/08-stdlib.md).
+
+
+======== Specification: spec/01-lexical.md ========
+
+# Lexical structure
+
+*Status: draft v0.1. Normative. Diagnostic range RP0001–RP0099.*
+
+This chapter defines how source text is split into tokens. It follows
+IEC 61131-3 Ed3 and states where RootPLC makes a choice the standard leaves
+open. Every rule has an ID in bold; conformance cases cite these IDs.
+
+## 1. Source text
+
+**[lexical.source.encoding]** A source file is UTF-8. A leading byte-order
+mark is allowed and ignored. A byte sequence that is not valid UTF-8 is
+error RP0005.
+
+**[lexical.source.charset]** Outside comments, pragmas and `"..."` (WSTRING)
+literals, only ASCII characters may appear. Any other character there is
+error RP0005.
+
+**[lexical.whitespace]** Whitespace is space (U+0020), tab (U+0009), line feed
+(U+000A), carriage return (U+000D) and form feed (U+000C). Whitespace
+separates tokens and has no other meaning. A line ends at LF or CR LF.
+
+**[lexical.longest-match]** The lexer always takes the longest sequence of
+characters that forms a valid token. For example, `<=` is one token, and
+`1..10` is the tokens `1`, `..`, `10`.
+
+## 2. Comments
+
+**[lexical.comment.block]** `(*` starts a comment that ends at the next `*)`.
+
+**[lexical.comment.cblock]** `/*` starts a comment that ends at the next `*/`.
+
+**[lexical.comment.line]** `//` starts a comment that ends at the end of the line.
+
+**[lexical.comment.nesting]** Comments do not nest. An opener of the same
+kind inside a block comment (`(*` inside `(* *)`, or `/*` inside `/* */`) is
+warning RP0003, and the comment still ends at the first closer.
+
+**[lexical.comment.unterminated]** A block comment with no closer before end
+of file is error RP0001, reported at the opener.
+
+Comment openers inside string literals and pragmas are not comments.
+
+## 3. Identifiers
+
+**[lexical.identifier]** An identifier starts with an ASCII letter or `_`,
+followed by any number of ASCII letters, digits and `_`. All characters are
+significant; there is no length limit.
+
+**[lexical.identifier.case]** Identifiers and keywords are case-insensitive.
+They are compared after ASCII lower-case folding. `Motor_On`, `MOTOR_ON` and
+`motor_on` are the same name. Tools keep the spelling of the declaration
+when they print a name.
+
+**[lexical.identifier.underscore]** Two or more consecutive underscores in an
+identifier are warning RP0006. (Ed2 forbade them; CODESYS accepts them, so
+RootPLC accepts them with a warning to keep migrated code compiling.)
+
+**[lexical.keyword]** The keywords below are reserved. Using one as an
+identifier is error RP0004.
+
+```
+ABSTRACT ACTION AND AND_THEN ARRAY AT BY CASE CLASS CONFIGURATION CONSTANT
+CONTINUE DO ELSE ELSIF END_ACTION END_CASE END_CLASS END_CONFIGURATION
+END_FOR END_FUNCTION END_FUNCTION_BLOCK END_IF END_INTERFACE END_METHOD
+END_NAMESPACE END_PROGRAM END_REPEAT END_RESOURCE END_STEP END_STRUCT
+END_TEST END_TRANSITION END_TYPE END_VAR END_WHILE EXIT EXTENDS FALSE FINAL
+FOR FROM FUNCTION FUNCTION_BLOCK IF IMPLEMENTS INITIAL_STEP INTERFACE
+INTERNAL METHOD MOD NAMESPACE NON_RETAIN NOT NULL OF ON OR OR_ELSE OVERLAP
+OVERRIDE PRIVATE PROGRAM PROTECTED PUBLIC READ_ONLY READ_WRITE REF REF_TO
+REPEAT RESOURCE RETAIN RETURN STEP STRUCT SUPER TASK TEST THEN THIS TO
+TRANSITION TRUE TYPE UNTIL USING VAR VAR_ACCESS VAR_CONFIG VAR_EXTERNAL
+VAR_GLOBAL VAR_INPUT VAR_IN_OUT VAR_OUTPUT VAR_STAT VAR_TEMP WHILE WITH XOR
+```
+
+Elementary type names (spec/02-types.md) are also reserved.
+
+## 4. Numeric literals
+
+**[lexical.literal.integer]** A decimal integer literal is a sequence of
+digits. A based literal is `2#`, `8#` or `16#` followed by digits of that
+base; hex digits are case-insensitive (`16#ff` = `16#FF`). A digit that is
+not valid for the base is error RP0008.
+
+**[lexical.literal.underscore]** A single `_` may appear between two digits of
+any numeric literal and is ignored (`1_000_000`, `2#1010_0101`). An
+underscore at the start or end of the digits, next to `#` or `.`, or doubled,
+is error RP0007.
+
+**[lexical.literal.sign]** A literal has no sign. A leading `-` or `+` is the
+unary operator. Constant folding makes `-128` valid where a SINT is expected
+(spec/02-types.md [types.literal.range]).
+
+**[lexical.literal.real]** A real literal is `digits . digits`, optionally
+followed by an exponent `E` or `e`, an optional sign, and digits. Both sides
+of the point are required: `1.` and `.5` are error RP0008. A literal with an
+exponent but no point, such as `1E-6`, is accepted as a real with warning
+RP0017: IEC 61131-3 requires the point, but CODESYS and TwinCAT accept this
+form and real code uses it. The portable spelling is `1.0E-6`.
+
+**[lexical.literal.typed]** A typed literal is an elementary type name, `#`,
+and a literal: `INT#5`, `REAL#1.5`, `BYTE#16#FF`, `BOOL#1`. An unknown type
+name before `#` is error RP0014. For enumerations, `Type#Value` names an
+enumeration value (spec/02-types.md).
+
+**[lexical.literal.bool]** `TRUE` and `FALSE` are the boolean literals.
+`BOOL#0` and `BOOL#1` are also accepted.
+
+## 5. Character and string literals
+
+**[lexical.literal.string]** `'...'` is a STRING literal and `"..."` is a
+WSTRING literal. A literal cannot contain a raw line end; a literal not
+closed before the end of the line is error RP0002.
+
+**[lexical.literal.string.latin1]** A STRING literal may contain only
+characters U+0000–U+00FF, stored as one byte each (Latin-1). Any other
+character is error RP0009 with the hint to use a WSTRING literal. WSTRING
+is UTF-16.
+
+**[lexical.literal.escape]** `$` starts an escape sequence. Letters are
+case-insensitive.
+
+| Escape | Meaning |
+|---|---|
+| `$$` | `$` |
+| `$'` | `'` (in STRING; in WSTRING also allowed) |
+| `$"` | `"` (in WSTRING; in STRING also allowed) |
+| `$L` or `$N` | line feed |
+| `$P` | form feed |
+| `$R` | carriage return |
+| `$T` | tab |
+| `$hh` | byte with hex value hh (STRING only) |
+| `$hhhh` | UTF-16 code unit hhhh (WSTRING only) |
+
+Any other character after `$` is error RP0010. A bare `'` inside a STRING
+literal ends the literal; likewise `"` inside a WSTRING literal.
+
+**[lexical.literal.char]** `CHAR#'a'` and `WCHAR#"a"` are character literals.
+The quoted part must contain exactly one character or escape sequence;
+otherwise error RP0008.
+
+## 6. Duration and date/time literals
+
+**[lexical.literal.duration]** A duration literal is a prefix `T#`, `TIME#`,
+`LT#` or `LTIME#`, an optional `-`, and one or more fields. Each field is a
+number followed by a unit: `d`, `h`, `m`, `s`, `ms`, `us`, `ns`. Prefixes and
+units are case-insensitive, and `_` may separate fields (`T#1h_30m`).
+
+- Units appear in descending order, each at most once.
+- Only the last field may have a fraction (`T#1.5s`).
+- Only the first field may exceed its natural range (`T#90m` is allowed,
+  `T#1h90m` is not).
+
+A literal that breaks any of these is error RP0011.
+
+**[lexical.literal.date]** Date and time literals:
+
+| Prefix | Form | Example |
+|---|---|---|
+| `D#`, `DATE#`, `LD#`, `LDATE#` | `yyyy-mm-dd` | `D#2026-11-03` |
+| `TOD#`, `TIME_OF_DAY#`, `LTOD#`, `LTIME_OF_DAY#` | `hh:mm:ss[.f]` | `TOD#14:30:00.5` |
+| `DT#`, `DATE_AND_TIME#`, `LDT#`, `LDATE_AND_TIME#` | `yyyy-mm-dd-hh:mm:ss[.f]` | `DT#2026-11-03-14:30:00` |
+
+A value outside the calendar or clock (month 13, 30 February, hour 24) is
+error RP0012. A malformed literal is error RP0011.
+
+## 7. Pragmas
+
+**[lexical.pragma]** `{` starts a pragma that ends at the next `}`. Pragmas do
+not nest. The first word names the pragma. Pragmas that RootPLC defines are
+listed in spec/09-properties.md; for example `{attribute 'name'}`. An unknown
+pragma is warning RP0013 and is otherwise ignored. A pragma with no closing
+`}` before end of file is error RP0015.
+
+## 7a. Directly represented variables
+
+**[lexical.direct-variable]** `%` followed by a location `I` (input), `Q`
+(output) or `M` (memory), an optional size `X` (bit), `B`, `W`, `D` or `L`,
+and an address: digits separated by single dots (`%IX0.0`, `%QW4`, `%MD12`),
+or `*` for an address assigned later in the configuration (`%I*`). Letters
+are case-insensitive. Anything else after `%` is error RP0016.
+
+## 8. Operators and punctuation
+
+**[lexical.punctuation]** The punctuation tokens are:
+
+```
+:=  =>  ?=  (  )  [  ]  ,  ;  :  .  ..  #  ^
++  -  *  /  **  &  =  <>  <  >  <=  >=
+```
+
+`AND`, `OR`, `XOR`, `NOT`, `MOD`, `AND_THEN` and `OR_ELSE` are keyword
+operators. Any other character outside a token, comment, literal or pragma
+is error RP0005.
+
+## Open questions
+
+- Nested comments: check whether CODESYS supports nesting of `(* *)` by
+  default. If it does, consider supporting nesting for migration.
+- `?=` (assignment attempt, Ed3) is reserved as a token; its semantics belong
+  in spec/05-statements.md.
+
+
+======== Specification: spec/02-types.md ========
+
+# Data types
+
+*Status: draft v0.1. Normative. Diagnostic range RP0100–RP0199.*
+
+This chapter defines the data types, their values and the conversions
+between them. Where IEC 61131-3 Ed3 leaves a choice to the implementation,
+RootPLC fixes it, so that the VM, generated C and CBMC all agree bit for bit.
+
+## 1. Elementary types
+
+**[types.elementary]** The elementary types are:
+
+| Type | Size | Values / representation | Default |
+|---|---|---|---|
+| `BOOL` | 1 byte | `FALSE`, `TRUE` | `FALSE` |
+| `SINT` / `USINT` | 8 bit | signed / unsigned two's complement | `0` |
+| `INT` / `UINT` | 16 bit | " | `0` |
+| `DINT` / `UDINT` | 32 bit | " | `0` |
+| `LINT` / `ULINT` | 64 bit | " | `0` |
+| `REAL` | 32 bit | IEEE 754 binary32 | `0.0` |
+| `LREAL` | 64 bit | IEEE 754 binary64 | `0.0` |
+| `BYTE` / `WORD` / `DWORD` / `LWORD` | 8 / 16 / 32 / 64 bit | bit string | `0` |
+| `TIME` | 32 bit | signed milliseconds | `T#0s` |
+| `LTIME` | 64 bit | signed nanoseconds | `LT#0s` |
+| `DATE` | 32 bit | seconds since 1970-01-01, day-aligned | `D#1970-01-01` |
+| `TIME_OF_DAY` (`TOD`) | 32 bit | milliseconds since midnight | `TOD#00:00:00` |
+| `DATE_AND_TIME` (`DT`) | 32 bit | seconds since 1970-01-01 00:00 | `DT#1970-01-01-00:00:00` |
+| `LDATE`, `LTOD`, `LDT` | 64 bit | nanoseconds since the same origins | origin |
+| `CHAR` / `WCHAR` | 8 / 16 bit | Latin-1 byte / UTF-16 code unit | `'$00'` |
+| `STRING[n]` | n+1 bytes | Latin-1, default n = 80 | `''` |
+| `WSTRING[n]` | 2(n+1) bytes | UTF-16, default n = 80 | `""` |
+
+The 32-bit `TIME`, `DATE`, `TOD` and `DT` follow CODESYS, so that migrated
+programs keep their behaviour. New code should prefer the `L` types.
+
+**[types.default-init]** A variable without an initial value starts with the
+default of its type. Elements of arrays and members of structures get the
+default of their own type, unless the type declaration gives one.
+
+## 2. Arithmetic semantics
+
+**[types.int.overflow]** Integer arithmetic at run time wraps around in two's
+complement (for example, `SINT#127 + 1` gives `-128`). Overflow while
+evaluating a constant expression at compile time is error RP0101.
+
+**[types.int.division]** Integer division truncates toward zero. The result
+of `MOD` has the sign of the dividend. Division or `MOD` by zero at run time
+raises the runtime fault `DIV_BY_ZERO` (spec/06-tasks-config.md); with a
+constant divisor of zero it is error RP0101.
+
+**[types.real]** `REAL` and `LREAL` follow IEEE 754 with round-to-nearest-even.
+Infinities and NaN are ordinary values and never raise a fault.
+
+## 3. Literals and types
+
+**[types.literal.range]** A literal, or a constant expression, must fit the
+type it is used as. `SINT#200` or `x : SINT := 200` is error RP0102.
+`-128` fits SINT because the minus is folded first.
+
+**[types.literal.untyped]** An untyped literal takes its type from its
+context: the variable assigned, the parameter passed, or the other operand.
+With no context, an integer literal is `DINT` if it fits and `LINT`
+otherwise, and a real literal is `LREAL`.
+
+## 4. Conversions
+
+**[types.conversion.implicit]** A value converts implicitly only when no
+value is lost. The allowed implicit conversions are (transitively):
+
+| From | To |
+|---|---|
+| `SINT` | `INT`, `DINT`, `LINT`, `REAL`, `LREAL` |
+| `INT` | `DINT`, `LINT`, `REAL`, `LREAL` |
+| `DINT` | `LINT`, `LREAL` |
+| `USINT` | `UINT`, `UDINT`, `ULINT`, `INT`, `DINT`, `LINT`, `REAL`, `LREAL` |
+| `UINT` | `UDINT`, `ULINT`, `DINT`, `LINT`, `REAL`, `LREAL` |
+| `UDINT` | `ULINT`, `LINT`, `LREAL` |
+| `REAL` | `LREAL` |
+| `BOOL` | `BYTE` |
+| `BYTE` → `WORD` → `DWORD` → `LWORD` | each wider bit string |
+| `TIME` | `LTIME` |
+| `DATE`, `TOD`, `DT` | `LDATE`, `LTOD`, `LDT` respectively |
+| `CHAR` | `STRING` |
+| `WCHAR` | `WSTRING` |
+
+Every other conversion, including narrowing, signed to unsigned, integer to
+`BOOL`, integer to bit string, enumeration to integer and `STRING` to
+`WSTRING`, is error RP0103. The fix hint names the explicit function.
+
+**[types.conversion.explicit]** Explicit conversions are written
+`<FROM>_TO_<TO>(x)` (for example `INT_TO_SINT`) or the overloaded `TO_<TO>(x)`.
+Their results are fully defined:
+
+- integer to integer: the value modulo 2^n, read as the target type (wrap);
+- real to integer: round to nearest, ties away from zero; saturate at the
+  target limits; NaN gives 0. `TRUNC` rounds toward zero instead;
+- integer to real: round to nearest-even;
+- bit string to integer and back: the same bits, with the target width.
+
+## 5. Generic types
+
+**[types.generic]** The generic types group elementary types:
+
+```
+ANY
+├─ ANY_DERIVED
+└─ ANY_ELEMENTARY
+   ├─ ANY_MAGNITUDE
+   │  ├─ ANY_NUM
+   │  │  ├─ ANY_REAL      REAL, LREAL
+   │  │  └─ ANY_INT
+   │  │     ├─ ANY_SIGNED    SINT, INT, DINT, LINT
+   │  │     └─ ANY_UNSIGNED  USINT, UINT, UDINT, ULINT
+   │  └─ ANY_DURATION   TIME, LTIME
+   ├─ ANY_BIT          BOOL, BYTE, WORD, DWORD, LWORD
+   ├─ ANY_CHARS
+   │  ├─ ANY_STRING    STRING, WSTRING
+   │  └─ ANY_CHAR      CHAR, WCHAR
+   └─ ANY_DATE         DATE, TOD, DT, LDATE, LTOD, LDT
+```
+
+Generic types may appear only in the signatures of standard-library
+functions. Using one in a user declaration is error RP0104.
+
+## 6. Derived types
+
+Derived types are declared between `TYPE` and `END_TYPE`. Referring to a
+type that is not declared is error RP0111.
+
+**[types.derived.alias]** `TYPE Speed : INT := 10; END_TYPE` declares an alias
+with an optional new default. An alias of an elementary type is compatible
+with its base type in both directions.
+
+**[types.equivalence]** Apart from aliases of elementary types, types are
+compatible by name only. Two structures with identical members but
+different names are different types.
+
+**[types.derived.subrange]** `TYPE Percent : INT (0..100); END_TYPE`. The
+bounds are constant and lower <= upper (otherwise RP0108). The default is the
+lower bound. A constant outside the range is error RP0105. A run-time
+assignment outside the range raises the fault `RANGE` in the VM and
+simulator; in generated C the check can be switched off per build.
+
+**[types.derived.enum]** `TYPE Mode : (Off, Manual, Auto); END_TYPE`, or with
+a base type and values: `TYPE Mode : INT (Off := 0, Auto := 10); END_TYPE`.
+Without explicit values the base type is `INT` and the values are 0, 1, 2...
+in order. The default is the first value. `Mode#Auto` names a value; plain `Auto` is
+allowed when exactly one enumeration in scope has it, otherwise error RP0106.
+Enumerations do not convert implicitly to integers (RP0103); use `TO_INT`.
+
+**[types.derived.struct]** `STRUCT ... END_STRUCT` declares members with
+optional initial values. A structure that contains itself, directly or
+through other structures or arrays, is error RP0107. (`REF_TO` to itself is
+allowed.)
+
+**[types.derived.array]** `ARRAY[l1..u1, l2..u2] OF T`. Bounds are constant
+`DINT` expressions with l <= u, otherwise error RP0108. A constant index
+outside the bounds is error RP0109. A run-time index outside the bounds
+raises the fault `INDEX`. `ARRAY[*]` is allowed only for `VAR_IN_OUT`
+parameters.
+
+**[types.derived.string]** `STRING[n]` and `WSTRING[n]` with 1 <= n <= 65535
+(otherwise RP0108). Assigning a longer string truncates it to n characters.
+A string literal longer than n in a declaration or constant assignment is
+warning RP0110.
+
+**[types.reference]** `REF_TO T` is a reference to a variable of type T.
+`REF(x)` takes a reference, `r^` dereferences it, and `NULL` is the empty
+reference. Dereferencing `NULL` raises the fault `NULL_REF`. CODESYS
+`POINTER TO` is not part of the language. The importer maps it to `REF_TO`
+where it can and reports the rest.
+
+
+======== Specification: spec/03-variables.md ========
+
+# Variables and declarations
+
+*Status: draft v0.1 (syntax). Normative. Diagnostic range RP0200–RP0299 (shared with 04).*
+
+This chapter defines how variables are declared and how names are resolved.
+Retain behaviour follows in a later revision.
+Grammar notation: `[x]` optional, `{x}` zero or more, `|` alternative,
+`'…'` a literal token.
+
+**[variables.section]** Declarations are grouped in sections:
+
+```
+var_section  = section_kw [ 'CONSTANT' | 'RETAIN' | 'NON_RETAIN' ] { var_decl } 'END_VAR'
+section_kw   = 'VAR' | 'VAR_INPUT' | 'VAR_OUTPUT' | 'VAR_IN_OUT' | 'VAR_TEMP'
+             | 'VAR_STAT' | 'VAR_GLOBAL' | 'VAR_EXTERNAL'
+```
+
+A POU may contain any number of sections, in any order, before its body.
+
+**[variables.declaration]** A declaration names one or more variables of one
+type, with an optional initial value, and ends with `;`:
+
+```
+var_decl     = name { ',' name } [ 'AT' direct_variable ] ':' type_spec [ ':=' initializer ] ';'
+```
+
+A keyword or elementary type name used as `name` is error RP0004
+([lexical.keyword]). A missing `;` is error RP0301 ([statements.terminator]).
+
+**[variables.located]** `AT` binds a variable to a directly represented
+address (`%IX0.0`, `%QW4`, `%I*`, see [lexical.direct-variable]):
+`start_btn AT %IX0.0 : BOOL;`.
+
+**[variables.initializer]** An initial value is an expression, an array
+initializer or a structure initializer:
+
+```
+initializer  = expression
+             | '[' initializer { ',' initializer } ']'                    (* array *)
+             | '(' name ':=' initializer { ',' name ':=' initializer } ')' (* structure *)
+```
+
+`type_spec` is defined in spec/04-pous.md [pous.type-spec].
+
+## Names and scope
+
+**[variables.unique]** Within one POU, every variable name is declared once,
+across all its sections. Names compare case-insensitively
+([lexical.identifier.case]). Likewise, every type and POU name is declared once
+in a project. A second declaration is error RP0204, reported at the second
+one. A user POU may replace a standard function block (spec/08-stdlib.md).
+
+**[variables.resolution]** A name used in a statement or initial value
+resolves, in this order, to:
+
+1. a variable of the enclosing POU (in a `FUNCTION`, the function name is
+   also the variable holding the result);
+2. a value of an enumeration type, if exactly one enumeration has it
+   ([types.derived.enum]);
+3. a POU or standard function or function block (spec/08-stdlib.md), when
+   the name is called.
+
+A name that resolves to none of these is error RP0203. So is a member that
+the structure or function-block instance does not have (`p.z`, `tmr.QQ`).
+Members of a function-block or program instance that can be accessed from
+outside are its `VAR_INPUT`, `VAR_OUTPUT` and `VAR_IN_OUT` variables.
+
+**[variables.initializer.check]** An initial value must be assignable to the
+declared type under the same rules as an assignment (spec/02-types.md). An
+array initializer gives the elements in order; a structure initializer names
+members of the structure.
+
+
+======== Specification: spec/04-pous.md ========
+
+# Program organisation units and parsing
+
+*Status: draft v0.1 (syntax). Normative. Diagnostic range RP0200–RP0299.*
+
+This chapter defines the top-level structure of a source file and the general
+parsing rules every RootPLC parser follows. Semantics of calls, instances and
+Ed3 object orientation follow in a later revision. Grammar notation as in
+spec/03-variables.md.
+
+## 1. General parsing rules
+
+**[syntax.lossless]** The syntax tree keeps every byte of the source,
+including whitespace, comments and pragmas. Printing the tree gives back the
+exact input. Tools that edit code (agents, formatters, migration) therefore
+never lose comments.
+
+**[syntax.recovery]** A syntax error does not stop parsing. The parser reports
+the error, skips to the next `;` or block keyword (`END_…`, `ELSE`, `ELSIF`,
+`UNTIL`, a statement keyword or a new POU) and continues. All syntax errors in
+a file are reported in one run, so an agent can fix them together.
+
+**[syntax.general]** A token that cannot start or continue the expected
+construct is error RP0201. The message names what was expected and what was
+found.
+
+**[syntax.pragmas]** Pragmas (`{…}`) may appear between any two tokens. The
+parser keeps them in the tree but they do not affect the grammar.
+
+## 2. Source file
+
+```
+source_file  = { pou }
+pou          = program | function | function_block | type_block | test_block
+```
+
+**[pous.program]**
+```
+program      = 'PROGRAM' name { var_section } statement_list 'END_PROGRAM'
+```
+
+**[pous.function]**
+```
+function     = 'FUNCTION' name ':' type_spec { var_section } statement_list 'END_FUNCTION'
+```
+
+**[pous.function-block]**
+```
+function_block = 'FUNCTION_BLOCK' name { var_section } statement_list 'END_FUNCTION_BLOCK'
+```
+
+**[pous.test]** A TEST block is a POU that only the test runner executes
+(semantics: spec/07-test-blocks.md):
+```
+test_block   = 'TEST' name { var_section } statement_list 'END_TEST'
+```
+
+**[pous.end]** A POU or block whose closing keyword is missing before the end
+of the file is error RP0202. The error is reported at the opening keyword.
+
+## 3. Types
+
+**[pous.type-block]** Derived types are declared in `TYPE … END_TYPE`. One
+block may declare several types. The `;` after each declaration is optional
+(CODESYS style accepts both):
+```
+type_block   = 'TYPE' { type_decl } 'END_TYPE'
+type_decl    = name ':' type_spec [ ':=' initializer ] [ ';' ]
+```
+
+**[pous.type-spec]** Type specifications:
+```
+type_spec    = elementary [ '[' expression ']' ] [ '(' subrange_or_enum ')' ]   (* STRING[n], INT(0..100), INT (A := 1) *)
+             | name                                                         (* derived type *)
+             | 'ARRAY' '[' dim { ',' dim } ']' 'OF' type_spec
+             | 'REF_TO' type_spec
+             | '(' enum_value { ',' enum_value } ')'                         (* enumeration *)
+             | 'STRUCT' { var_decl } 'END_STRUCT'
+dim          = expression '..' expression | '*'
+subrange_or_enum = expression '..' expression | enum_value { ',' enum_value }
+enum_value   = name [ ':=' expression ]
+```
+
+Ed3 object orientation (`CLASS`, `METHOD`, `INTERFACE`, `PROPERTY`) is
+reserved for a later revision.
+
+
+======== Specification: spec/05-statements.md ========
+
+# Statements and expressions
+
+*Status: draft v0.1 (syntax). Normative. Diagnostic range RP0300–RP0399.*
+
+This chapter defines the syntax of statements and expressions. Typing rules
+are in spec/02-types.md; evaluation semantics follow in a later revision.
+Grammar notation as in spec/03-variables.md.
+
+```
+statement_list = { statement }
+```
+
+**[statements.terminator]** Every statement except the block statements
+(`IF`, `CASE`, `FOR`, `WHILE`, `REPEAT`) ends with `;`, and so does every
+variable declaration. A missing `;` is error RP0301, reported at the end of
+the statement. A lone `;` is an empty statement.
+
+**[statements.assignment]**
+```
+assignment   = variable ':=' expression ';'
+```
+
+**[statements.call]** A call to a function or function-block instance as a
+statement. Arguments are positional, or named with `:=` (input) and `=>`
+(output):
+```
+call_stmt    = variable '(' [ argument { ',' argument } ] ')' ';'
+argument     = [ name ( ':=' | '=>' ) ] expression
+```
+
+**[statements.if]** `IF c THEN … {ELSIF c THEN …} [ELSE …] END_IF`
+evaluates the conditions in order and runs the statements of the first branch
+whose condition is `TRUE`, or the `ELSE` branch if none is. Each condition
+must be of type `BOOL` (no implicit conversion, spec/02-types.md).
+
+**[statements.case]**
+```
+case_stmt    = 'CASE' expression 'OF' { case_label { ',' case_label } ':' statement_list }
+               [ 'ELSE' statement_list ] 'END_CASE'
+case_label   = constant [ '..' constant ]                    (* constant: literal, enumeration value, signed integer *)
+```
+
+**[statements.for]**
+```
+for_stmt     = 'FOR' name ':=' expression 'TO' expression [ 'BY' expression ] 'DO' statement_list 'END_FOR'
+```
+
+**[statements.while]**
+```
+while_stmt   = 'WHILE' expression 'DO' statement_list 'END_WHILE'
+```
+
+**[statements.repeat]**
+```
+repeat_stmt  = 'REPEAT' statement_list 'UNTIL' expression 'END_REPEAT'
+```
+
+**[statements.control]** `EXIT;` leaves the innermost loop. `CONTINUE;`
+skips to its next iteration. `RETURN;` leaves the POU.
+
+## Expressions
+
+**[statements.expression.precedence]** Operators, from highest to lowest
+precedence. Operators of equal precedence group from left to right.
+
+| Precedence | Operators |
+|---|---|
+| 1 (highest) | parentheses, function call, `^` dereference, `.` member, `[]` index |
+| 2 | unary `-`, unary `+`, `NOT` |
+| 3 | `**` |
+| 4 | `*`, `/`, `MOD` |
+| 5 | `+`, `-` |
+| 6 | `<`, `>`, `<=`, `>=` |
+| 7 | `=`, `<>` |
+| 8 | `AND`, `&`, `AND_THEN` |
+| 9 | `XOR` |
+| 10 (lowest) | `OR`, `OR_ELSE` |
+
+Examples:
+- `2 + 3 * 4 ** 2` is `2 + (3 * (4 ** 2))`, which is 50.
+- `-2 ** 2` is `(-2) ** 2`, which is 4.
+- `a + 1 = b` compares `(a + 1)` with `b`.
+
+**[statements.expression.access]** Variables and values:
+```
+variable     = name { '.' (name | integer) | '[' expression { ',' expression } ']' | '^' }
+primary      = literal | variable | variable '(' [arguments] ')' | 'REF' '(' variable ')'
+             | '(' expression ')' | 'NULL' | 'TRUE' | 'FALSE'
+```
+Literals are defined in spec/01-lexical.md.
+
+
+======== Specification: spec/07-test-blocks.md ========
+
+# TEST blocks and assertions
+
+*Status: draft v0.3 (assertions, white-box access, runner, mocked time). Normative.*
+
+A `TEST … END_TEST` block ([pous.test]) is a POU that only the test runner
+executes. It may declare instances of programs and function blocks, call
+them and inspect their inputs and outputs.
+
+**[tests.assert]** The assertion statements are calls of these standard
+procedures. A failed assertion fails the test and records the source location.
+
+| Call | Passes when |
+|---|---|
+| `ASSERT_TRUE(c)` | `c` is `TRUE`; `c` must be `BOOL` |
+| `ASSERT_FALSE(c)` | `c` is `FALSE`; `c` must be `BOOL` |
+| `ASSERT_EQ(expected, actual)` | the values are equal; both must have a common type |
+| `ASSERT_NE(a, b)` | the values differ; both must have a common type |
+
+An argument of the wrong type is error RP0103 ([types.conversion.implicit]).
+
+**[tests.whitebox]** Inside a TEST block, every variable of an instance can
+be read and written through `instance.name`, not only its inputs and
+outputs. Tests can therefore check internal state. Outside TEST blocks the
+rule of [variables.resolution] applies.
+
+**[tests.runner]** `rootplc test` runs every TEST block once, on a fresh
+machine: variables start with their initial values, the virtual clock starts
+at 0. A failed assertion is recorded and execution continues. A run-time
+fault (division by zero, index or subrange violation, NULL dereference,
+watchdog) ends the test. A test passes when no assertion failed and no fault
+occurred.
+
+**[tests.time]** Time in a test is virtual. The clock starts at 0 and moves
+only when the test calls `ADVANCE(d)` with a duration `d` (`TIME` or
+`LTIME`), for example `ADVANCE(T#5s)`. Timers (`TON`, `TOF`, `TP`) read the
+clock when they are called, so a typical test calls the instance, advances,
+and calls it again. `ADVANCE` is available only in TEST blocks; elsewhere it
+is error RP0203. A negative duration does nothing.
+
+
+======== Specification: spec/08-stdlib.md ========
+
+# Standard library
+
+*Status: draft v0.1 (catalogue for checking). Normative. Exact run-time
+behaviour of each block (timing, edge cases) follows in a later revision.*
+
+The names below are predeclared in every project. A user POU with the same
+name replaces the standard one.
+
+**[stdlib.fbs]** Standard function blocks. Inputs are set with `:=` in the
+call, outputs read as `instance.Q` or bound with `=>`.
+
+| Block | Inputs | Outputs |
+|---|---|---|
+| `TON`, `TOF`, `TP` | `IN : BOOL`, `PT : TIME` | `Q : BOOL`, `ET : TIME` |
+| `R_TRIG`, `F_TRIG` | `CLK : BOOL` | `Q : BOOL` |
+| `CTU` | `CU : BOOL`, `R : BOOL`, `PV : INT` | `Q : BOOL`, `CV : INT` |
+| `CTD` | `CD : BOOL`, `LD : BOOL`, `PV : INT` | `Q : BOOL`, `CV : INT` |
+| `CTUD` | `CU`, `CD`, `R`, `LD : BOOL`, `PV : INT` | `QU`, `QD : BOOL`, `CV : INT` |
+| `SR` | `S1 : BOOL`, `R : BOOL` | `Q1 : BOOL` |
+| `RS` | `S : BOOL`, `R1 : BOOL` | `Q1 : BOOL` |
+
+**[stdlib.conversions]** Conversion functions ([types.conversion.explicit]):
+
+- `<A>_TO_<B>(x)` for elementary types `A`, `B` (including `STRING` and
+  `WSTRING`): `x` must be assignable to `A`; the result has type `B`.
+- `TO_<B>(x)`: `x` of any elementary or enumeration type; the result has
+  type `B`.
+- `TRUNC(x)`: `x` of type `ANY_REAL`; the result is `DINT`, rounded toward zero.
+
+**[stdlib.functions]** Overloaded standard functions. "Common type" means the
+type that all arguments convert to implicitly (spec/02-types.md); no common
+type is error RP0103.
+
+| Functions | Arguments | Result |
+|---|---|---|
+| `ABS`, `SQRT`, `LN`, `LOG`, `EXP`, `SIN`, `COS`, `TAN`, `ASIN`, `ACOS`, `ATAN` | one `ANY_NUM` | type of the argument |
+| `EXPT(a, b)` | `ANY_REAL`, `ANY_NUM` | type of `a` |
+| `MIN`, `MAX`, `MOVE` | values | common type |
+| `LIMIT(mn, in, mx)` | values | common type |
+| `SEL(g, a, b)` | `BOOL`, values | common type of `a`, `b` |
+| `MUX(k, v0, …)` | `ANY_INT`, values | common type of the values |
+| `SHL`, `SHR`, `ROL`, `ROR` `(in, n)` | `ANY_BIT`, `ANY_INT` | type of `in` |
+| `LEN(s)`, `FIND(s1, s2)` | strings | `INT` |
+| `LEFT`, `RIGHT`, `MID`, `CONCAT`, `INSERT`, `DELETE`, `REPLACE` | strings, `INT` | `STRING` (or `WSTRING` for `WSTRING` arguments) |

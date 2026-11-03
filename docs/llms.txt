@@ -4,8 +4,11 @@
 
 ## Docs
 - [Getting started](guide/getting-started.md)
-- [CLI reference](cli/README.md): check, test, run, explain, init, mcp; JSON output
+- [Everything in one file](llms-full.txt): guide, CLI, verified examples, diagnostics, spec
+- [CLI reference](cli/README.md): check, test, run, explain, examples, coverage, init, mcp; JSON output
 - [Agent hosts (MCP)](../agent/mcp/README.md)
 - [Skill: writing ST with rootplc](../agent/skills/rootplc-st/SKILL.md)
+- [Skill: porting existing PLC code](../agent/skills/rootplc-migrate/SKILL.md)
+- [Claude Code plugin](../agent/plugins/claude-code/README.md)
 - [Standard library](stdlib/README.md)
 - [Diagnostics](diagnostics/README.md)

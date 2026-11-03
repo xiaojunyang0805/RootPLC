@@ -2,9 +2,11 @@
 //! defines it. The registry and the spec chapters are compiled in, so the
 //! explanation always matches the toolchain version.
 
-const REGISTRY: &str = include_str!("../assets/spec/diagnostics.toml");
+/// The diagnostic registry (`spec/diagnostics.toml`).
+pub const REGISTRY: &str = include_str!("../assets/spec/diagnostics.toml");
 
-const SPEC: &[(&str, &str)] = &[
+/// The spec chapters: (path, text).
+pub const SPEC: &[(&str, &str)] = &[
     (
         "spec/01-lexical.md",
         include_str!("../assets/spec/01-lexical.md"),

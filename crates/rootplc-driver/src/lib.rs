@@ -2,6 +2,10 @@
 //!
 //! Roadmap phase: 1. See `ARCHITECTURE.md`.
 
+pub mod agents;
+pub mod coverage;
+pub mod docs;
+pub mod examples;
 pub mod explain;
 pub mod init;
 pub mod json;
@@ -27,6 +31,10 @@ pub enum Command {
     Verify,
     /// Explain a diagnostic code.
     Explain,
+    /// Search the verified pattern library.
+    Examples,
+    /// Classify units as portable, dialect or blocked.
+    Coverage,
     /// Import PLCopen / TwinCAT XML.
     Import,
     /// Deploy to a runtime. Always requires human approval.
@@ -48,6 +56,8 @@ impl Command {
         Command::Sim,
         Command::Verify,
         Command::Explain,
+        Command::Examples,
+        Command::Coverage,
         Command::Import,
         Command::Deploy,
         Command::Monitor,
@@ -65,6 +75,8 @@ impl Command {
             Command::Sim => "sim",
             Command::Verify => "verify",
             Command::Explain => "explain",
+            Command::Examples => "examples",
+            Command::Coverage => "coverage",
             Command::Import => "import",
             Command::Deploy => "deploy",
             Command::Monitor => "monitor",

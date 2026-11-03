@@ -1,0 +1,15 @@
+{
+  "name": "rootplc",
+  "owner": { "name": "RootPLC" },
+  "metadata": {
+    "description": "RootPLC plugins for agent hosts."
+  },
+  "plugins": [
+    {
+      "name": "rootplc",
+      "source": "./agent/plugins/claude-code",
+      "description": "IEC 61131-3 Structured Text toolchain for agents: check, test, run, explain, verified examples and code-base coverage.",
+      "category": "development"
+    }
+  ]
+}

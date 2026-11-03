@@ -1,11 +1,13 @@
 # rootplc command line
 
 ```
-rootplc init  [dir] [--name NAME]
+rootplc init  [dir] [--name NAME] [--agent claude|gemini|qwen|cursor|codex|all]
 rootplc check <file.st|dir>... [--json]
 rootplc test  <file.st|dir>... [--filter TEXT] [--json]
 rootplc run   <file.st|dir>... [--program NAME] [--cycles N] [--cycle-ms MS] [--json]
 rootplc explain <code> [--json]
+rootplc examples [words...] [--show ID] [--json]
+rootplc coverage <file.st|dir>... [--json]
 rootplc mcp
 ```
 
@@ -19,6 +21,20 @@ project: names declared in one file are visible in the others.
 Creates `rootplc.toml`, `src/main.st`, `tests/main_test.st` and `AGENTS.md`.
 The example checks clean and its test passes. Existing files are never
 overwritten.
+
+`--agent HOST` also connects agent hosts to `rootplc mcp` (comma list or
+`all`). In an existing project (with `rootplc.toml`) only these files are added:
+
+| Host | Files |
+|---|---|
+| `claude` | `.mcp.json`, `CLAUDE.md` (points to AGENTS.md) |
+| `gemini` | `.gemini/settings.json` (MCP server, AGENTS.md as context file) |
+| `qwen` | `.qwen/settings.json` (same format) |
+| `cursor` | `.cursor/mcp.json` |
+| `codex` | `.codex/config.toml` |
+
+A file that exists already is kept; if it does not mention rootplc yet, the
+snippet to merge is printed.
 
 ## check
 
@@ -66,9 +82,51 @@ Faults: `DIV_BY_ZERO`, `RANGE` (subrange), `INDEX` (array bounds),
 `rootplc explain RP0103` (or `103`) prints the severity, a summary and the
 text of the spec rule that defines the code.
 
+## examples
+
+A library of verified ST patterns: edge detection, on/off delays, state
+machines, scaling, counters, interlocks, arrays, structs, flip-flops and the
+TEST pattern. Every example compiles and passes its TEST blocks in this
+toolchain version (enforced by the test suite), and none reproduces a
+benchmark solution.
+
+`rootplc examples timer` lists matches (all words must match; tags weigh
+most). `rootplc examples --show on-off-delay` prints the code. Exit code 1
+if nothing matches.
+
+```json
+{"command":"examples","ok":true,"query":"timer","verified":true,"count":1,
+ "examples":[{"id":"on-off-delay","title":"On-delay and off-delay timers",
+   "tags":["timer","TON","TOF","delay","time"],"description":"…","source":"…"}]}
+```
+
+## coverage
+
+Checks the files as one project and gives each file one status:
+
+| Status | Meaning |
+|---|---|
+| `portable` | no errors: test and run it now |
+| `dialect` | errors, and the file uses constructs RootPLC does not take yet (`METHOD`, `POINTER TO`, vendor pragmas, implicit narrowing, …), listed with lines |
+| `dependent` | its only errors are unknown names declared in files that fail (`blocked_by`) |
+| `blocked` | other errors: see `rootplc check` |
+
+Constructs are found on lexer tokens, so comments and strings never count.
+`standard` says whether a construct is IEC 61131-3 ed.3 (`iec-ed3`) or a
+vendor extension (`vendor`). Exit code 0 whatever the statuses are.
+
+```json
+{"command":"coverage","ok":true,"units":3,"portable":1,"dialect":1,"dependent":1,"blocked":0,
+ "files":[{"file":"lib.st","status":"dialect","errors":1,"codes":["RP0201"],
+   "constructs":[{"name":"POINTER TO","standard":"vendor","line":2,"count":1}],"blocked_by":[]}]}
+```
+
 ## mcp
 
 Model Context Protocol server on stdio for agent hosts; see
 [agent/mcp/README.md](../../agent/mcp/README.md). Tools: `rootplc_check`,
-`rootplc_test`, `rootplc_run`, `rootplc_explain`. They accept `paths`,
-in-memory `files`, or a `source` string, and return the JSON reports above.
+`rootplc_test`, `rootplc_run`, `rootplc_explain`, `rootplc_examples`,
+`rootplc_coverage`. Source tools accept `paths`, in-memory `files`, or a
+`source` string, and return the JSON reports above. Resources: the agent
+guide, spec chapters, diagnostic registry and examples (`rootplc://…`).
+Prompts: `write_and_verify`, `fix_diagnostics`, `port_legacy`.

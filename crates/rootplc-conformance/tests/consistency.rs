@@ -69,3 +69,33 @@ fn embedded_spec_copies_match() {
         rc::check_embedded_assets(&rc::repo_root()),
     );
 }
+
+/// `docs/diagnostics/README.md` and `docs/llms-full.txt` are generated.
+/// Regenerate with `ROOTPLC_UPDATE_DOCS=1 cargo test -p rootplc-conformance`.
+#[test]
+fn generated_docs_are_current() {
+    let root = rc::repo_root();
+    let cli = std::fs::read_to_string(root.join("docs/cli/README.md")).expect("cli docs");
+    let docs = [
+        (
+            root.join("docs/diagnostics/README.md"),
+            rootplc_driver::docs::diagnostics_md(),
+        ),
+        (
+            root.join("docs/llms-full.txt"),
+            rootplc_driver::docs::llms_full(&cli),
+        ),
+    ];
+    let update = std::env::var_os("ROOTPLC_UPDATE_DOCS").is_some();
+    for (path, want) in docs {
+        if update {
+            std::fs::write(&path, &want).expect("write docs");
+        }
+        let have = std::fs::read_to_string(&path).unwrap_or_default();
+        assert!(
+            have == want,
+            "{} is stale; run ROOTPLC_UPDATE_DOCS=1 cargo test -p rootplc-conformance",
+            path.display()
+        );
+    }
+}

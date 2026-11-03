@@ -2,7 +2,8 @@
 
 use std::path::{Path, PathBuf};
 
-const AGENTS_MD: &str = include_str!("../assets/AGENTS.md");
+/// The AGENTS.md written by `rootplc init`.
+pub const AGENTS_MD: &str = include_str!("../assets/AGENTS.md");
 
 const MAIN_ST: &str = "(* Created by rootplc init. Replace it with your program. *)
 PROGRAM PRG_Main

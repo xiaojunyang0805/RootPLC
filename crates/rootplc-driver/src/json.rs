@@ -4,6 +4,8 @@
 
 use rootplc_diag::{json_string, line_col};
 
+use crate::coverage::{CoverageReport, Status};
+use crate::examples::Example;
 use crate::explain::Explanation;
 use crate::{CheckReport, RunReport, TestReport};
 
@@ -131,6 +133,81 @@ pub fn explain(e: &Explanation) -> String {
         json_string(&e.rule),
         json_string(&e.file),
         json_string(&e.text)
+    )
+}
+
+/// `examples` report. `with_source` adds the full code of each example.
+pub fn examples(query: &str, found: &[Example], with_source: bool) -> String {
+    let items: Vec<String> = found
+        .iter()
+        .map(|e| {
+            let tags: Vec<String> = e.tags.iter().map(|t| json_string(t)).collect();
+            let source = if with_source {
+                format!(",\"source\":{}", json_string(e.source))
+            } else {
+                String::new()
+            };
+            format!(
+                "{{\"id\":{},\"title\":{},\"tags\":[{}],\"description\":{}{source}}}",
+                json_string(e.id),
+                json_string(&e.title),
+                tags.join(","),
+                json_string(&e.description)
+            )
+        })
+        .collect();
+    format!(
+        "{{\"command\":\"examples\",\"ok\":true,\"query\":{},\"verified\":true,\"count\":{},\"examples\":[{}]}}",
+        json_string(query),
+        found.len(),
+        items.join(",")
+    )
+}
+
+/// `coverage` report.
+pub fn coverage(r: &CoverageReport) -> String {
+    let units: Vec<String> = r
+        .units
+        .iter()
+        .map(|u| {
+            let codes: Vec<String> = u.codes.iter().map(|c| json_string(c)).collect();
+            let cons: Vec<String> = u
+                .constructs
+                .iter()
+                .map(|c| {
+                    format!(
+                        "{{\"name\":{},\"standard\":\"{}\",\"line\":{},\"count\":{}}}",
+                        json_string(c.name),
+                        if c.iec { "iec-ed3" } else { "vendor" },
+                        c.line,
+                        c.count
+                    )
+                })
+                .collect();
+            let deps: Vec<String> = u
+                .blocked_by
+                .iter()
+                .map(|p| json_string(&p.display().to_string()))
+                .collect();
+            format!(
+                "{{\"file\":{},\"status\":\"{}\",\"errors\":{},\"codes\":[{}],\"constructs\":[{}],\"blocked_by\":[{}]}}",
+                json_string(&u.path.display().to_string()),
+                u.status.name(),
+                u.errors,
+                codes.join(","),
+                cons.join(","),
+                deps.join(",")
+            )
+        })
+        .collect();
+    format!(
+        "{{\"command\":\"coverage\",\"ok\":true,\"units\":{},\"portable\":{},\"dialect\":{},\"dependent\":{},\"blocked\":{},\"files\":[{}]}}",
+        r.units.len(),
+        r.count(Status::Portable),
+        r.count(Status::Dialect),
+        r.count(Status::Dependent),
+        r.count(Status::Blocked),
+        units.join(",")
     )
 }
 

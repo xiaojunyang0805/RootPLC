@@ -6,22 +6,26 @@ description: Write, check and test IEC 61131-3 Structured Text (PLC code) with t
 # Writing PLC code with rootplc
 
 Use the MCP tools (`rootplc_check`, `rootplc_test`, `rootplc_run`,
-`rootplc_explain`) when available; otherwise the same commands with `--json`.
+`rootplc_explain`, `rootplc_examples`, `rootplc_coverage`) when available;
+otherwise the same commands with `--json`.
 
 ## Loop
 
 1. No `rootplc.toml` yet? Run `rootplc init` (creates `src/`, `tests/`, a
    passing example test and AGENTS.md).
-2. Write ST in `src/`. Write `TEST ... END_TEST` blocks in `tests/`.
-3. `rootplc check . --json` until `ok` is true. Fix every diagnostic. Each has
+2. Common pattern (timer, edge, counter, state machine, interlock)? Call
+   `rootplc_examples` (or `rootplc examples <words>`) first: every example
+   compiles and passes its tests in this toolchain version.
+3. Write ST in `src/`. Write `TEST ... END_TEST` blocks in `tests/`.
+4. `rootplc check . --json` until `ok` is true. Fix every diagnostic. Each has
    a stable code (RPnnnn), a 1-based line and column, and often a `hint`.
    `rootplc explain <code>` quotes the spec rule.
-4. `rootplc test . --json` until every test passes. Failures give the
+5. `rootplc test . --json` until every test passes. Failures give the
    assertion's location; faults (DIV_BY_ZERO, INDEX, RANGE, NULL_REF,
    WATCHDOG) give where execution stopped.
-5. Report success only when check is clean and all tests pass. Show the test
+6. Report success only when check is clean and all tests pass. Show the test
    names you added.
-6. Never deploy to a real PLC. A human approves deployments.
+7. Never deploy to a real PLC. A human approves deployments.
 
 ## Language notes (strict, like the IEC standard)
 
