@@ -60,7 +60,7 @@ def fetch() -> None:
 
 # Files each format needs; sync checks out only these (sparse, blobless clone).
 SOURCES = {
-    "twincat": ["*.TcPOU", "*.TcDUT", "*.TcGVL", "*.TcIO"],
+    "twincat": ["*.TcPOU", "*.TcDUT", "*.TcGVL", "*.TcIO", "*.plcproj"],
     "brx": ["*.st", "*.fun", "*.typ", "*.var"],
     "st": ["*.st"],
 }
@@ -105,7 +105,7 @@ def sync(refresh: str = "") -> None:
             print(f"FAIL  {p['name']}: {err}", flush=True)
         else:
             base.mkdir(parents=True, exist_ok=True)
-            n = len(list(extract(p, repo).glob("*.st")))
+            n = len(list(extract(p, repo).rglob("*.st")))
             print(f"sync  {p['name']:44} {n:5} units", flush=True)
         if repo.exists():
             shutil.rmtree(repo, onexc=_force_remove)
@@ -221,21 +221,40 @@ def extract(p: dict, repo: Path | None = None) -> Path:
     shutil.rmtree(dst, ignore_errors=True)
     dst.mkdir(parents=True)
     units: list[tuple[str, str]] = []
+    groups: list[str] = []
     if p["format"] == "twincat":
+        # a repository may hold several PLC projects (each with a .plcproj);
+        # each gets its own folder so that its MAIN does not collide with
+        # another project's MAIN
+        projs = sorted({f.parent for f in files(repo, "*.plcproj")}, key=lambda x: -len(str(x)))
         for f in sorted(files(repo, "*")):
             if f.suffix in (".TcPOU", ".TcDUT", ".TcGVL", ".TcIO"):
-                units += twincat_units(f)
+                owner = next((pj for pj in projs if pj in f.parents), None)
+                found = twincat_units(f)
+                units += found
+                groups += [str(owner) if owner else ""] * len(found)
     elif p["format"] == "brx":
         units = brx_units(repo)
     else:
         for f in sorted(files(repo, "*.st")):
             units.append((f.stem, f.read_text(encoding="utf-8", errors="replace")))
+    distinct = sorted(set(groups))
+    split = len(distinct) > 1
     seen = Counter()
-    for name, src in units:
+    for k, (name, src) in enumerate(units):
+        folder = dst
+        if split:
+            g = groups[k]
+            label = Path(g).name if g else "_shared"
+            # disambiguate projects with the same folder name
+            idx = distinct.index(g)
+            folder = dst / f"{re.sub(r'[^A-Za-z0-9_.-]', '_', label)[:40]}_{idx}"
+            folder.mkdir(exist_ok=True)
         safe = re.sub(r"[^A-Za-z0-9_.-]", "_", name)[:80]
-        seen[safe] += 1
-        fname = safe + (f"_{seen[safe]}" if seen[safe] > 1 else "") + ".st"
-        (dst / fname).write_text(src, encoding="utf-8")
+        key = (str(folder), safe)
+        seen[key] += 1
+        fname = safe + (f"_{seen[key]}" if seen[key] > 1 else "") + ".st"
+        (folder / fname).write_text(src, encoding="utf-8")
     shutil.rmtree(final, ignore_errors=True)
     dst.rename(final)
     return final
@@ -264,7 +283,7 @@ def analyse() -> None:
         else:
             print(f"skip {p['name']} (not fetched)")
             continue
-        files = sorted(d.glob("*.st"))
+        files = sorted(d.rglob("*.st"))
         feats = Counter()
         lines = 0
         for f in files:
@@ -273,17 +292,25 @@ def analyse() -> None:
             for k, rx in FEATURES.items():
                 if re.search(rx, text, re.M | re.I):
                     feats[k] += 1
-        rep = {}
-        if files:
-            r = subprocess.run([exe, "check", str(d), "--json"], capture_output=True, text=True, encoding="utf-8")
-            rep = json.loads(r.stdout) if r.stdout.strip().startswith("{") else {}
+        # one check per sub-project folder (see extract); files directly in d
+        # form a project of their own
+        subdirs = sorted(x for x in d.iterdir() if x.is_dir())
+        targets = [[str(x)] for x in subdirs]
+        top = [str(f) for f in files if f.parent == d]
+        if top:
+            targets.append(top)
         per_file: dict[str, list] = {}
-        for diag in rep.get("diagnostics", []):
-            if diag["severity"] == "error":
-                per_file.setdefault(Path(diag["file"]).name, []).append(diag)
+        for t in targets:
+            r = subprocess.run([exe, "check", *t, "--json"], capture_output=True, text=True, encoding="utf-8")
+            rep = json.loads(r.stdout) if r.stdout.strip().startswith("{") else {}
+            for diag in rep.get("diagnostics", []):
+                if diag["severity"] == "error":
+                    key = str(Path(diag["file"]).resolve())
+                    per_file.setdefault(key, []).append(diag)
+        key_of = {f: str(f.resolve()) for f in files}
         syntax_ok = sum(1 for f in files if not any(x["code"] in SYNTAX_CODES or x["code"] == "RP0004"
-                                                    for x in per_file.get(f.name, [])))
-        clean = sum(1 for f in files if f.name not in per_file)
+                                                    for x in per_file.get(key_of[f], [])))
+        clean = sum(1 for f in files if key_of[f] not in per_file)
         codes = Counter(x["code"] for xs in per_file.values() for x in xs)
         msgs = Counter(re.sub(r"'[^']*'", "'…'", x["message"]) for xs in per_file.values() for x in xs)
         all_codes.update(codes)
