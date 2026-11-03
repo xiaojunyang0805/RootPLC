@@ -174,9 +174,14 @@ impl<'a> Parser<'a> {
         }
     }
 
-    /// `TEST(` inside a body is a call (TcUnit's TEST function), not a test block.
+    /// `TEST` inside a body is a name (TcUnit's TEST function, or the result
+    /// variable of a function called TEST), not the start of a test block.
     fn at_test_call(&self) -> bool {
-        self.at_kw("TEST") && self.nth_kind(1) == Some(TokenKind::LParen)
+        self.at_kw("TEST")
+            && matches!(
+                self.nth_kind(1),
+                Some(TokenKind::LParen | TokenKind::Assign | TokenKind::Dot | TokenKind::Semicolon)
+            )
     }
 
     /// At the start of a method or property, or at a word closing one.
@@ -308,6 +313,12 @@ impl<'a> Parser<'a> {
     fn name(&mut self) -> bool {
         match self.kind() {
             Some(TokenKind::Ident) => {
+                self.bump();
+                true
+            }
+            // [pous.test]: TEST is reserved only where a test block starts, so
+            // a POU may be called TEST (TcUnit declares FUNCTION TEST)
+            Some(TokenKind::Keyword) if self.at_kw("TEST") => {
                 self.bump();
                 true
             }
@@ -1440,10 +1451,9 @@ impl<'a> Parser<'a> {
                 | TokenKind::Minus
                 | TokenKind::Plus,
             ) => true,
-            Some(TokenKind::Keyword) => {
-                self.at_any_kw(&["NOT", "TRUE", "FALSE", "NULL", "REF", "THIS", "SUPER"])
-                    || self.at_test_call()
-            }
+            Some(TokenKind::Keyword) => self.at_any_kw(&[
+                "NOT", "TRUE", "FALSE", "NULL", "REF", "THIS", "SUPER", "TEST",
+            ]),
             _ => false,
         }
     }
@@ -1602,9 +1612,7 @@ impl<'a> Parser<'a> {
                 true
             }
             // [pous.oop.this]: THIS and SUPER, dereferenced with ^; TEST(...) is a call
-            Some(TokenKind::Keyword)
-                if self.at_any_kw(&["THIS", "SUPER"]) || self.at_test_call() =>
-            {
+            Some(TokenKind::Keyword) if self.at_any_kw(&["THIS", "SUPER", "TEST"]) => {
                 self.b.start(N::NameRef);
                 self.bump();
                 self.b.finish();

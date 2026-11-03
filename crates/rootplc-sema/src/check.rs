@@ -707,10 +707,13 @@ impl<'a> Checker<'a> {
     /// The declared name of a POU or method: the first identifier after its
     /// keyword and any modifiers.
     fn decl_name(&self, n: &'a Node) -> Option<usize> {
-        // modifiers and keywords (including PROPERTY, a plain word) come first
+        // modifiers and keywords (including PROPERTY, a plain word) come first;
+        // TEST after the keyword is a name ([pous.test])
         self.items(n)
             .into_iter()
-            .find_map(|i| match i {
+            .enumerate()
+            .find_map(|(k, i)| match i {
+                Item::Tok(t) if k > 0 && self.is_kw(t, "TEST") => Some(t),
                 Item::Tok(t)
                     if self.tkind(t) != T::Keyword
                         && !(n.kind == N::Property
@@ -720,7 +723,7 @@ impl<'a> Checker<'a> {
                 }
                 _ => None,
             })
-            .filter(|&t| self.tkind(t) == T::Ident)
+            .filter(|&t| self.tkind(t) == T::Ident || self.is_kw(t, "TEST"))
     }
 
     /// Short name of a method definition ("FB.M" -> "M").

@@ -169,7 +169,9 @@ and back after it. The argument must be a variable, an element or a member
 (semantics: spec/07-test-blocks.md):
 ```
 test_block   = 'TEST' name { var_section } statement_list 'END_TEST'
-```
+``` `TEST` is reserved only where a test block starts: a POU may be named
+`TEST` and `TEST(…)` inside a body is a call (the TcUnit test framework
+declares such a function).
 
 **[pous.end]** A POU or block whose closing keyword is missing before the end
 of the file is error RP0202. The error is reported at the opening keyword.
