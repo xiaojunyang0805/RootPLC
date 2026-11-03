@@ -4,6 +4,8 @@
 
 ## Docs
 - [Getting started](guide/getting-started.md)
-- [CLI reference](cli/README.md)
+- [CLI reference](cli/README.md): check, test, run, explain, init, mcp; JSON output
+- [Agent hosts (MCP)](../agent/mcp/README.md)
+- [Skill: writing ST with rootplc](../agent/skills/rootplc-st/SKILL.md)
 - [Standard library](stdlib/README.md)
 - [Diagnostics](diagnostics/README.md)

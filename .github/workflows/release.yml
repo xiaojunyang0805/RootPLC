@@ -1,10 +1,65 @@
-# Placeholder: Sigstore-signed release binaries plus a CycloneDX SBOM.
+# Release binaries for the one-line installers (scripts/install.sh, install.ps1).
+# Trigger: push a tag v*. Each asset ships with a .sha256 file.
+# Planned next: Sigstore signatures and a CycloneDX SBOM.
 name: release
 on:
   push:
     tags: ['v*']
+
+permissions:
+  contents: write
+
 jobs:
-  placeholder:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest, target: x86_64-unknown-linux-gnu, ext: tar.gz }
+          - { os: ubuntu-24.04-arm, target: aarch64-unknown-linux-gnu, ext: tar.gz }
+          - { os: macos-latest, target: aarch64-apple-darwin, ext: tar.gz }
+          - { os: macos-13, target: x86_64-apple-darwin, ext: tar.gz }
+          - { os: windows-latest, target: x86_64-pc-windows-msvc, ext: zip }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - run: cargo test --workspace --release
+      - run: cargo build --release --locked -p rootplc-cli --target ${{ matrix.target }}
+      - name: Package
+        shell: bash
+        run: |
+          name=rootplc-${{ matrix.target }}
+          cd target/${{ matrix.target }}/release
+          if [ "${{ matrix.ext }}" = "zip" ]; then
+            7z a "../../../$name.zip" rootplc.exe
+          else
+            tar czf "../../../$name.tar.gz" rootplc
+          fi
+          cd ../../..
+          if command -v sha256sum >/dev/null; then sha256sum "$name.${{ matrix.ext }}" > "$name.${{ matrix.ext }}.sha256"
+          else shasum -a 256 "$name.${{ matrix.ext }}" > "$name.${{ matrix.ext }}.sha256"; fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rootplc-${{ matrix.target }}
+          path: rootplc-${{ matrix.target }}.*
+
+  publish:
+    needs: build
     runs-on: ubuntu-latest
     steps:
-      - run: echo "release pipeline not implemented yet"
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" dist/* \
+            --title "rootplc ${GITHUB_REF_NAME}" \
+            --notes "Install: see README. Each archive has a .sha256 checksum." \
+            --prerelease

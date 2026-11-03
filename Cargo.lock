@@ -13,7 +13,6 @@ dependencies = [
  "rootplc-diag",
  "rootplc-driver",
  "rootplc-mcp",
- "rootplc-vm",
 ]
 
 [[package]]
@@ -81,6 +80,7 @@ dependencies = [
 name = "rootplc-mcp"
 version = "0.0.0"
 dependencies = [
+ "rootplc-diag",
  "rootplc-driver",
 ]
 

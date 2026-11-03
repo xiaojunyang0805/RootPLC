@@ -2,6 +2,12 @@
 //!
 //! Roadmap phase: 1. See `ARCHITECTURE.md`.
 
+pub mod explain;
+pub mod init;
+pub mod json;
+
+use std::path::PathBuf;
+
 /// Every command the toolchain offers. CLI and MCP map onto this list one to one.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Command {
@@ -81,7 +87,7 @@ impl Command {
 #[derive(Debug, Clone)]
 pub struct CheckedFile {
     /// Path as given or found.
-    pub path: std::path::PathBuf,
+    pub path: PathBuf,
     /// Source text.
     pub source: String,
     /// Lexer, parser and checker diagnostics.
@@ -115,7 +121,7 @@ impl CheckReport {
     }
 }
 
-fn collect_st(path: &std::path::Path, out: &mut Vec<std::path::PathBuf>) -> std::io::Result<()> {
+fn collect_st(path: &std::path::Path, out: &mut Vec<PathBuf>) -> std::io::Result<()> {
     if path.is_dir() {
         let mut entries: Vec<_> = std::fs::read_dir(path)?
             .map(|e| e.map(|e| e.path()))
@@ -132,25 +138,40 @@ fn collect_st(path: &std::path::Path, out: &mut Vec<std::path::PathBuf>) -> std:
     Ok(())
 }
 
-/// `rootplc check`: lex, parse and type-check `.st` files. Directories are
-/// searched recursively. All files form one project, so names declared in one
-/// file are visible in the others. Files with syntax errors are not
-/// type-checked; the rest are.
-pub fn check(paths: &[std::path::PathBuf]) -> Result<CheckReport, String> {
+/// Read the `.st` files under `paths` (directories recursively).
+pub fn read_sources(paths: &[PathBuf]) -> Result<Vec<(PathBuf, String)>, String> {
     let mut found = Vec::new();
     for p in paths {
         collect_st(p, &mut found).map_err(|e| format!("{}: {e}", p.display()))?;
     }
-    let mut files = Vec::new();
-    for path in found {
-        let source =
-            std::fs::read_to_string(&path).map_err(|e| format!("{}: {e}", path.display()))?;
-        files.push(CheckedFile {
+    found
+        .into_iter()
+        .map(|path| {
+            let source =
+                std::fs::read_to_string(&path).map_err(|e| format!("{}: {e}", path.display()))?;
+            Ok((path, source))
+        })
+        .collect()
+}
+
+/// `rootplc check`: lex, parse and type-check `.st` files. Directories are
+/// searched recursively. All files form one project, so names declared in one
+/// file are visible in the others. Files with syntax errors are not
+/// type-checked; the rest are.
+pub fn check(paths: &[PathBuf]) -> Result<CheckReport, String> {
+    Ok(check_sources(read_sources(paths)?))
+}
+
+/// [`check`] on sources held in memory (name, text), e.g. from an agent.
+pub fn check_sources(sources: Vec<(PathBuf, String)>) -> CheckReport {
+    let mut files: Vec<CheckedFile> = sources
+        .into_iter()
+        .map(|(path, source)| CheckedFile {
             path,
             source,
             diagnostics: Vec::new(),
-        });
-    }
+        })
+        .collect();
     let parses: Vec<_> = files
         .iter()
         .map(|f| rootplc_syntax::parse(&f.source))
@@ -183,7 +204,7 @@ pub fn check(paths: &[std::path::PathBuf]) -> Result<CheckReport, String> {
     if report.ok() {
         report.program = Some(analysis.program);
     }
-    Ok(report)
+    report
 }
 
 /// Result of [`test`].
@@ -207,13 +228,17 @@ impl TestReport {
 }
 
 /// `rootplc test`: compile, then run every TEST block ([tests.runner]).
-pub fn test(paths: &[std::path::PathBuf], filter: Option<&str>) -> Result<TestReport, String> {
-    let check = check(paths)?;
+pub fn test(paths: &[PathBuf], filter: Option<&str>) -> Result<TestReport, String> {
+    Ok(test_report(check(paths)?, filter))
+}
+
+/// Run the TEST blocks of a compiled project.
+pub fn test_report(check: CheckReport, filter: Option<&str>) -> TestReport {
     let outcomes = match &check.program {
         Some(p) => rootplc_testing::run_tests(p, filter),
         None => Vec::new(),
     };
-    Ok(TestReport { check, outcomes })
+    TestReport { check, outcomes }
 }
 
 /// Result of [`run`].
@@ -231,15 +256,31 @@ pub struct RunReport {
     pub variables: Vec<(String, String)>,
 }
 
+impl RunReport {
+    /// Compiled and ran without a fault.
+    pub fn ok(&self) -> bool {
+        self.check.ok() && self.fault.is_none()
+    }
+}
+
 /// `rootplc run`: execute a PROGRAM for `cycles` cycles in the VM, advancing
 /// the virtual clock by `cycle_ns` per cycle.
 pub fn run(
-    paths: &[std::path::PathBuf],
+    paths: &[PathBuf],
     program: Option<&str>,
     cycles: u64,
     cycle_ns: i128,
 ) -> Result<RunReport, String> {
-    let check = check(paths)?;
+    run_report(check(paths)?, program, cycles, cycle_ns)
+}
+
+/// Run a program of a compiled project.
+pub fn run_report(
+    check: CheckReport,
+    program: Option<&str>,
+    cycles: u64,
+    cycle_ns: i128,
+) -> Result<RunReport, String> {
     let Some(prog) = &check.program else {
         return Ok(RunReport {
             check,

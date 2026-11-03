@@ -10,6 +10,7 @@ authors.workspace = true
 
 [dependencies]
 rootplc-driver.workspace = true
+rootplc-diag.workspace = true
 
 [lints]
 workspace = true

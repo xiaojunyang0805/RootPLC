@@ -1,21 +1,21 @@
 //! The `rootplc` binary. Argument parsing and output formatting only;
 //! every command is implemented in `rootplc-driver`.
 
-use rootplc_diag::{Severity, json_string, line_col};
-use rootplc_driver::{CheckReport, Command};
+use rootplc_diag::Severity;
+use rootplc_driver::{CheckReport, Command, json};
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-fn usage() -> String {
-    let names: Vec<&str> = Command::ALL.iter().map(|c| c.name()).collect();
-    format!(
-        "usage: rootplc <{}|mcp> [--json]\n       \
-         rootplc check <file.st|dir>... [--json]\n       \
-         rootplc test  <file.st|dir>... [--filter TEXT] [--json]\n       \
-         rootplc run   <file.st|dir>... [--program NAME] [--cycles N] [--cycle-ms MS] [--json]",
-        names.join("|")
-    )
-}
+const USAGE: &str = "usage:
+  rootplc init  [dir] [--name NAME]
+  rootplc check <file.st|dir>... [--json]
+  rootplc test  <file.st|dir>... [--filter TEXT] [--json]
+  rootplc run   <file.st|dir>... [--program NAME] [--cycles N] [--cycle-ms MS] [--json]
+  rootplc explain <code> [--json]
+  rootplc mcp            (MCP server on stdio, for agent hosts)
+  rootplc --version
+
+exit codes: 0 ok, 1 errors / failed tests / fault, 2 usage or I/O error";
 
 /// Parsed command line: positional arguments, flags and `--name value` options.
 struct Args {
@@ -35,7 +35,7 @@ impl Args {
         while let Some(x) = it.next() {
             match x.as_str() {
                 "--json" => a.json = true,
-                "--program" | "--cycles" | "--cycle-ms" | "--filter" => {
+                "--program" | "--cycles" | "--cycle-ms" | "--filter" | "--name" => {
                     let v = it.next().unwrap_or_default();
                     a.options.push((x, v));
                 }
@@ -54,161 +54,82 @@ impl Args {
     }
 }
 
+fn exit(ok: bool) -> ExitCode {
+    if ok {
+        ExitCode::SUCCESS
+    } else {
+        ExitCode::from(1)
+    }
+}
+
 fn io_error(cmd: &str, e: &str, json: bool) -> ExitCode {
     if json {
-        println!(
-            "{{\"command\":\"{cmd}\",\"status\":\"io_error\",\"message\":{}}}",
-            json_string(e)
-        );
+        println!("{}", json::error(cmd, e));
     } else {
         eprintln!("rootplc {cmd}: {e}");
     }
     ExitCode::from(2)
 }
 
-/// Diagnostics as JSON array elements, or printed as text.
-fn diagnostics(report: &CheckReport, json: bool) -> Vec<String> {
-    let mut out = Vec::new();
+fn print_diagnostics(report: &CheckReport) {
     for f in &report.files {
         let name = f.path.display().to_string();
         for d in &f.diagnostics {
-            if json {
-                out.push(d.render_json(&name, &f.source));
-            } else {
-                println!("{}", d.render_text(&name, &f.source));
-            }
+            println!("{}", d.render_text(&name, &f.source));
         }
     }
-    out
 }
 
-/// File name and 1-based position of a VM location.
-fn location(report: &CheckReport, file: usize, offset: u32) -> (String, usize, usize) {
-    match report.ir_files.get(file).and_then(|&i| report.files.get(i)) {
-        Some(f) => {
-            let (l, c) = line_col(&f.source, offset);
-            (f.path.display().to_string(), l, c)
-        }
-        None => (String::from("?"), 0, 0),
-    }
-}
-
-fn located_json(report: &CheckReport, file: usize, offset: u32, extra: &str) -> String {
-    let (name, l, c) = location(report, file, offset);
-    format!(
-        "{{\"file\":{},\"line\":{l},\"column\":{c},{extra}}}",
-        json_string(&name)
-    )
-}
-
-fn fault_json(report: &CheckReport, f: Option<&rootplc_vm::Fault>) -> String {
-    f.map_or("null".to_string(), |f| {
-        let extra = format!(
-            "\"kind\":\"{}\",\"message\":{}",
-            f.kind.name(),
-            json_string(&f.message)
-        );
-        located_json(report, f.file, f.span.start, &extra)
-    })
-}
-
-/// `rootplc check`. Exit codes: 0 no errors, 1 errors found, 2 usage or I/O error.
-fn cmd_check(paths: &[PathBuf], json: bool) -> ExitCode {
-    let report = match rootplc_driver::check(paths) {
+fn cmd_check(paths: &[PathBuf], json_out: bool) -> ExitCode {
+    let r = match rootplc_driver::check(paths) {
         Ok(r) => r,
-        Err(e) => return io_error("check", &e, json),
+        Err(e) => return io_error("check", &e, json_out),
     };
-    let (errors, warnings) = (
-        report.count(Severity::Error),
-        report.count(Severity::Warning),
-    );
-    let diags = diagnostics(&report, json);
-    if json {
-        println!(
-            "{{\"command\":\"check\",\"ok\":{},\"files\":{},\"errors\":{errors},\"warnings\":{warnings},\"diagnostics\":[{}]}}",
-            report.ok(),
-            report.files.len(),
-            diags.join(",")
-        );
+    if json_out {
+        println!("{}", json::check(&r));
     } else {
+        print_diagnostics(&r);
         eprintln!(
-            "checked {} file(s): {errors} error(s), {warnings} warning(s)",
-            report.files.len()
+            "checked {} file(s): {} error(s), {} warning(s)",
+            r.files.len(),
+            r.count(Severity::Error),
+            r.count(Severity::Warning)
         );
     }
-    if report.ok() {
-        ExitCode::SUCCESS
-    } else {
-        ExitCode::from(1)
-    }
+    exit(r.ok())
 }
 
-/// `rootplc test`. Exit codes: 0 all passed, 1 compile errors or failures, 2 usage or I/O.
-fn cmd_test(paths: &[PathBuf], filter: Option<&str>, json: bool) -> ExitCode {
+fn cmd_test(paths: &[PathBuf], filter: Option<&str>, json_out: bool) -> ExitCode {
     let r = match rootplc_driver::test(paths, filter) {
         Ok(r) => r,
-        Err(e) => return io_error("test", &e, json),
+        Err(e) => return io_error("test", &e, json_out),
     };
-    let diags = diagnostics(&r.check, json);
+    if json_out {
+        println!("{}", json::test(&r));
+        return exit(r.ok());
+    }
+    print_diagnostics(&r.check);
+    for o in &r.outcomes {
+        println!("{} {}", if o.passed() { "PASS" } else { "FAIL" }, o.name);
+        for f in &o.failures {
+            let (n, l, c) = json::location(&r.check, f.file, f.span.start);
+            println!("  {n}:{l}:{c}: {}", f.message);
+        }
+        if let Some(f) = &o.fault {
+            let (n, l, c) = json::location(&r.check, f.file, f.span.start);
+            println!("  {n}:{l}:{c}: fault {}: {}", f.kind.name(), f.message);
+        }
+    }
     let passed = r.outcomes.iter().filter(|o| o.passed()).count();
-    let failed = r.outcomes.len() - passed;
-    if json {
-        let tests: Vec<String> = r
-            .outcomes
-            .iter()
-            .map(|o| {
-                let failures: Vec<String> = o
-                    .failures
-                    .iter()
-                    .map(|f| {
-                        let extra = format!("\"message\":{}", json_string(&f.message));
-                        located_json(&r.check, f.file, f.span.start, &extra)
-                    })
-                    .collect();
-                format!(
-                    "{{\"name\":{},\"passed\":{},\"failures\":[{}],\"fault\":{}}}",
-                    json_string(&o.name),
-                    o.passed(),
-                    failures.join(","),
-                    fault_json(&r.check, o.fault.as_ref())
-                )
-            })
-            .collect();
-        println!(
-            "{{\"command\":\"test\",\"ok\":{},\"compiled\":{},\"passed\":{passed},\"failed\":{failed},\"diagnostics\":[{}],\"tests\":[{}]}}",
-            r.ok(),
-            r.check.ok(),
-            diags.join(","),
-            tests.join(",")
-        );
+    if r.check.ok() {
+        eprintln!("{passed} passed, {} failed", r.outcomes.len() - passed);
     } else {
-        for o in &r.outcomes {
-            println!("{} {}", if o.passed() { "PASS" } else { "FAIL" }, o.name);
-            for f in &o.failures {
-                let (n, l, c) = location(&r.check, f.file, f.span.start);
-                println!("  {n}:{l}:{c}: {}", f.message);
-            }
-            if let Some(f) = &o.fault {
-                let (n, l, c) = location(&r.check, f.file, f.span.start);
-                println!("  {n}:{l}:{c}: fault {}: {}", f.kind.name(), f.message);
-            }
-        }
-        if r.check.ok() {
-            eprintln!("{passed} passed, {failed} failed");
-        } else {
-            eprintln!("compilation failed; no tests were run");
-        }
+        eprintln!("compilation failed; no tests were run");
     }
-    if r.ok() {
-        ExitCode::SUCCESS
-    } else {
-        ExitCode::from(1)
-    }
+    exit(r.ok())
 }
 
-/// `rootplc run`. Exit codes: 0 ran, 1 compile errors or fault, 2 usage or I/O.
 fn cmd_run(paths: &[PathBuf], args: &Args) -> ExitCode {
-    let json = args.json;
     let cycles = args
         .opt("--cycles")
         .and_then(|v| v.parse().ok())
@@ -219,38 +140,66 @@ fn cmd_run(paths: &[PathBuf], args: &Args) -> ExitCode {
         .unwrap_or(10);
     let r = match rootplc_driver::run(paths, args.opt("--program"), cycles, cycle_ms * 1_000_000) {
         Ok(r) => r,
-        Err(e) => return io_error("run", &e, json),
+        Err(e) => return io_error("run", &e, args.json),
     };
-    let diags = diagnostics(&r.check, json);
-    let ok = r.check.ok() && r.fault.is_none();
-    if json {
-        let vars: Vec<String> = r
-            .variables
-            .iter()
-            .map(|(n, v)| format!("{}:{}", json_string(n), json_string(v)))
-            .collect();
-        println!(
-            "{{\"command\":\"run\",\"ok\":{ok},\"program\":{},\"cycles\":{},\"fault\":{},\"diagnostics\":[{}],\"variables\":{{{}}}}}",
-            json_string(&r.program),
-            r.cycles,
-            fault_json(&r.check, r.fault.as_ref()),
-            diags.join(","),
-            vars.join(",")
-        );
-    } else if r.check.ok() {
+    if args.json {
+        println!("{}", json::run(&r));
+        return exit(r.ok());
+    }
+    print_diagnostics(&r.check);
+    if r.check.ok() {
         println!("{} after {} cycle(s):", r.program, r.cycles);
         for (n, v) in &r.variables {
             println!("  {n} = {v}");
         }
         if let Some(f) = &r.fault {
-            let (n, l, c) = location(&r.check, f.file, f.span.start);
+            let (n, l, c) = json::location(&r.check, f.file, f.span.start);
             println!("{n}:{l}:{c}: fault {}: {}", f.kind.name(), f.message);
         }
     }
-    if ok {
-        ExitCode::SUCCESS
+    exit(r.ok())
+}
+
+fn cmd_explain(code: Option<&String>, json_out: bool) -> ExitCode {
+    let Some(code) = code else {
+        return io_error(
+            "explain",
+            "give a diagnostic code, e.g. rootplc explain RP0103",
+            json_out,
+        );
+    };
+    let Some(e) = rootplc_driver::explain::explain(code) else {
+        return io_error(
+            "explain",
+            &format!("unknown diagnostic code '{code}'"),
+            json_out,
+        );
+    };
+    if json_out {
+        println!("{}", json::explain(&e));
     } else {
-        ExitCode::from(1)
+        println!(
+            "{} ({}): {}\n\nRule [{}] in {}:\n\n{}",
+            e.code, e.severity, e.summary, e.rule, e.file, e.text
+        );
+    }
+    ExitCode::SUCCESS
+}
+
+fn cmd_init(dir: Option<&String>, name: Option<&str>) -> ExitCode {
+    let dir = PathBuf::from(dir.map_or(".", String::as_str));
+    match rootplc_driver::init::init(&dir, name) {
+        Ok(created) => {
+            for p in created {
+                println!("created {}", p.display());
+            }
+            println!(
+                "next: rootplc check {d} && rootplc test {d}",
+                d = dir.display()
+            );
+            ExitCode::SUCCESS
+        }
+        Err(e) => io_error("init", &e, false),
     }
 }
 
@@ -261,40 +210,38 @@ fn main() -> ExitCode {
             println!("rootplc {}", env!("CARGO_PKG_VERSION"));
             return ExitCode::SUCCESS;
         }
-        eprintln!("{}", usage());
+        eprintln!("{USAGE}");
         return ExitCode::from(2);
     };
-    // `rootplc mcp` starts the MCP server on stdio (used by agent host configs).
+    let rest = &args.positional[1..];
     if first == "mcp" {
-        eprintln!("rootplc mcp: {}", rootplc_mcp::STATUS);
-        return ExitCode::from(1);
+        return match rootplc_mcp::serve_stdio() {
+            Ok(()) => ExitCode::SUCCESS,
+            Err(e) => io_error("mcp", &e.to_string(), false),
+        };
     }
-    let paths: Vec<PathBuf> = args.positional[1..].iter().map(PathBuf::from).collect();
     let cmd = Command::from_name(first);
+    let paths: Vec<PathBuf> = rest.iter().map(PathBuf::from).collect();
     if matches!(cmd, Some(Command::Check | Command::Test | Command::Run)) && paths.is_empty() {
-        eprintln!(
-            "rootplc {first}: give one or more .st files or directories\n{}",
-            usage()
-        );
+        eprintln!("rootplc {first}: give one or more .st files or directories\n\n{USAGE}");
         return ExitCode::from(2);
     }
     match cmd {
         Some(Command::Check) => cmd_check(&paths, args.json),
         Some(Command::Test) => cmd_test(&paths, args.opt("--filter"), args.json),
         Some(Command::Run) => cmd_run(&paths, &args),
+        Some(Command::Explain) => cmd_explain(rest.first(), args.json),
+        Some(Command::Init) => cmd_init(rest.first(), args.opt("--name")),
         Some(cmd) => {
             if args.json {
-                println!(
-                    "{{\"command\":\"{}\",\"status\":\"not_implemented\"}}",
-                    cmd.name()
-                );
+                println!("{}", json::error(cmd.name(), "not implemented yet"));
             } else {
                 eprintln!("rootplc {}: not implemented yet", cmd.name());
             }
             ExitCode::from(1)
         }
         None => {
-            eprintln!("unknown command '{first}'\n{}", usage());
+            eprintln!("unknown command '{first}'\n\n{USAGE}");
             ExitCode::from(2)
         }
     }
