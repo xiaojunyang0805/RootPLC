@@ -8,3 +8,4 @@
 .DS_Store
 npm-out/
 corpus/.cache/
+__pycache__/
