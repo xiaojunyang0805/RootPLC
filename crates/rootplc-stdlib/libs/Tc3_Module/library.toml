@@ -1,0 +1,14 @@
+# Compatibility library: part of the interface of Beckhoff's Tc3_Module.
+# Clean-room: written only from the public references below. RootPLC is an
+# independent project, not affiliated with or endorsed by Beckhoff Automation.
+name = "Tc3_Module"
+vendor = "Beckhoff Automation GmbH"
+version = "1.0.0"
+description = "TwinCAT Tc3_Module (part): S_OK, S_FALSE, S_PENDING, S_WATCHDOG_TIMEOUT, OTCID constants, SUCCEEDED, FAILED"
+requires = ["TwinCAT_BuiltIns"]
+declare_only = []
+references = [
+  "https://infosys.beckhoff.com/content/1033/tcplclib_tc3_module/2404564491.html (global constants)",
+  "https://infosys.beckhoff.com/content/1033/tcplclib_tc3_module/1899167627.html (SUCCEEDED)",
+  "https://infosys.beckhoff.com/content/1033/tcplclib_tc3_module/1899313035.html (FAILED)",
+]

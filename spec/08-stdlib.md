@@ -66,7 +66,9 @@ libraries with their vendor, version and the public references they were
 written from (clean-room; RootPLC is not affiliated with the vendors).
 Bundled: `Tc2_System` (also `ST_LibVersion`, `F_CmpLibVersion`, the AMS
 address types and the task index; RootPLC runs one task, index 1) and
-`Tc2_Utilities` (TwinCAT; `Tc2_Utilities`
+`Tc2_Utilities` (TwinCAT; case conversion, trimming, `TIMESTRUCT`, the
+`T_Arg` argument helpers `F_INT`, `F_STRING`, ...; `FB_FormatString` is
+declared only; `Tc2_Utilities`
 requires `Tc2_System`, which requires `TwinCAT_BuiltIns`; activating a
 library activates what it requires) and
 `TwinCAT_BuiltIns` (names every TwinCAT project has: `BIT`, the 64-bit
@@ -76,7 +78,9 @@ of namespace `TwinCAT_SystemInfoVarList`, declared but not filled at run
 time)
 and `Tc2_Standard` (TwinCAT's `CTU`, `CTD` and `CTUD` with `RESET`, `LOAD`
 and `WORD` counts, the `LTIME` timers `LTON`, `LTOF`, `LTP`, and the
-`WSTRING` functions `WLEN`, `WMID`, `WCONCAT`, ...). A library may replace a
+`WSTRING` functions `WLEN`, `WMID`, `WCONCAT`, ...) and `Tc3_Module`
+(`S_OK` and the other HRESULT constants, `SUCCEEDED`, `FAILED`; `HRESULT`
+itself, a `DINT`, is in `TwinCAT_BuiltIns`). A library may replace a
 standard function block of [stdlib.fbs]; while it is active its declaration
 is the one used.
 Library functions are implemented in ST where their documented behaviour

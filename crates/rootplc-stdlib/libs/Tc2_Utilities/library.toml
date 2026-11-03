@@ -4,10 +4,11 @@
 name = "Tc2_Utilities"
 vendor = "Beckhoff Automation GmbH"
 version = "1.0.0"
-description = "TwinCAT Tc2_Utilities (part): BYTE/WORD/DWORD/LWORD_TO_HEXSTR, implemented"
+description = "TwinCAT Tc2_Utilities (part): *_TO_HEXSTR, F_ToLCase/F_ToUCase, F_LTrim/F_RTrim, TIMESTRUCT, T_Arg and the F_ argument helpers, FB_FormatString (declared)"
 requires = ["Tc2_System"]
-declare_only = []
+declare_only = ["FB_FormatString"]
 references = [
   "https://infosys.beckhoff.com/content/1033/tcplclib_tc2_utilities/934060555.html (BYTE_TO_HEXSTR: inputs, iPrecision, bLoCase, empty result)",
   "https://infosys.beckhoff.com/content/1033/tcplclib_tc2_utilities/934165003.html (*_TO_HEXSTR family)",
+  "https://download.beckhoff.com/download/Document/automation/twincat3/TwinCAT_3_PLC_Lib_Tc2_Utilities_EN.pdf (TE1000 Tc2_Utilities manual 2.18.2: T_Arg, E_ArgType, F_ helpers, FB_FormatString, F_ToLCase/F_ToUCase, F_LTrim/F_RTrim, TIMESTRUCT)",
 ]

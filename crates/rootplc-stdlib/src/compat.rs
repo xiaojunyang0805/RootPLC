@@ -52,6 +52,13 @@ const BUNDLED: &[(&str, &[(&str, &str)])] = &[
         )],
     ),
     (
+        include_str!("../libs/Tc3_Module/library.toml"),
+        &[(
+            "Tc3_Module.st",
+            include_str!("../libs/Tc3_Module/1.0.0/Tc3_Module.st"),
+        )],
+    ),
+    (
         include_str!("../libs/Tc2_Utilities/library.toml"),
         &[(
             "Tc2_Utilities.st",
@@ -210,10 +217,11 @@ mod tests {
                 "MEMCPY",
                 "MEMMOVE",
                 "MEMSET",
-                "MEMCMP"
+                "MEMCMP",
+                "DRAND"
             ]
         );
-        assert_eq!(tc.references.len(), 18);
+        assert_eq!(tc.references.len(), 19);
         assert!(find("nope").is_none());
         let r = resolve(&["Tc2_Utilities".into()]).expect("resolve");
         let names: Vec<&str> = r.iter().map(|l| l.name.as_str()).collect();

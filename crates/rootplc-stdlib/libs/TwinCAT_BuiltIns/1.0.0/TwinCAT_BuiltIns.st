@@ -16,6 +16,9 @@ TYPE
     __XINT : LINT;
     __UXINT : ULINT;
     __XWORD : LWORD;
+    (* HRESULT: a 32-bit signed status code (Tc3_Module declares S_OK as
+       HRESULT and checks codes with SUCCEEDED(hr : DINT)) *)
+    HRESULT : DINT;
 END_TYPE
 
 NAMESPACE __SYSTEM

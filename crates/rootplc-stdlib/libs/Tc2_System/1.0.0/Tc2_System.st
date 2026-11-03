@@ -194,3 +194,14 @@ VAR_INPUT
     n : UDINT;
 END_VAR
 END_FUNCTION
+
+(* Pseudo-random LREAL in 0.0 .. 1.0, series given by Seed. The generator
+   is not published: declared only. *)
+FUNCTION_BLOCK DRAND
+VAR_INPUT
+    Seed : INT;
+END_VAR
+VAR_OUTPUT
+    Num : LREAL;
+END_VAR
+END_FUNCTION_BLOCK
