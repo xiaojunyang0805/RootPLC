@@ -4,6 +4,8 @@
 # Apache, CC0, Unlicense): only those may ever be copied into a published
 # dataset. Everything else is analysed locally and cited by URL.
 #
+# granularity = "file": the repository is a collection of independent
+#   snippets (test inputs, datasets); each file is checked on its own.
 # provides / provides_folder: this project is the library of that name; a
 #   project whose .plcproj references it is checked together with the units
 #   in that folder (which never count for the referencing project).
@@ -148,6 +150,7 @@ kind = "motion library (analysis only)"
 
 [[project]]
 name = "iec-checker"
+granularity = "file"  # independent snippets: each file is checked on its own
 url = "https://github.com/iec-checker/iec-checker"
 licence = "LGPL-3.0"
 redistribute = false
@@ -339,6 +342,7 @@ kind = "discovered"
 
 [[project]]
 name = "ironplc-ironplc"
+granularity = "file"  # independent snippets: each file is checked on its own
 url = "https://github.com/ironplc/ironplc"
 licence = "MIT License"
 redistribute = true
@@ -507,6 +511,7 @@ kind = "discovered"
 
 [[project]]
 name = "karishmapremnath4-plc-st-bug-detector-ml"
+granularity = "file"  # independent snippets: each file is checked on its own
 url = "https://github.com/karishmapremnath4/plc-st-bug-detector-ml"
 licence = "MIT License"
 redistribute = true
@@ -643,6 +648,7 @@ kind = "discovered"
 
 [[project]]
 name = "undort-st2cpp"
+granularity = "file"  # independent snippets: each file is checked on its own
 url = "https://github.com/undoRT/st2cpp"
 licence = "GNU General Public License v3.0"
 redistribute = false

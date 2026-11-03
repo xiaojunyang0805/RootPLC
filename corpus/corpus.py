@@ -262,15 +262,27 @@ def extract(p: dict, repo: Path | None = None) -> Path:
     elif p["format"] == "brx":
         units = brx_units(repo)
     else:
-        for f in sorted(files(repo, "*.st")):
-            units.append((f.stem, f.read_text(encoding="utf-8", errors="replace")))
+        st_files = sorted(files(repo, "*.st"))
+        texts = [f.read_text(encoding="utf-8", errors="replace") for f in st_files]
+        # a repository of separate programs (examples, B&R tasks, benchmark
+        # suites) declares the same names in different directories: then each
+        # directory is checked on its own
+        seen_in: dict[str, set] = {}
+        decl = re.compile(r"^\s*(?:PROGRAM|FUNCTION_BLOCK|FUNCTION|CLASS)\s+(\w+)", re.I | re.M)
+        for f, t in zip(st_files, texts):
+            for n in decl.findall(t):
+                seen_in.setdefault(n.lower(), set()).add(f.parent)
+        by_dir = any(len(d) > 1 for d in seen_in.values())
+        for f, t in zip(st_files, texts):
+            units.append((f.stem, t))
+            groups.append(str(f.parent.relative_to(repo)) if by_dir else "")
     distinct = sorted(set(groups))
     split = len(distinct) > 1
 
     def folder_of(g: str) -> Path:
         if not split:
             return dst
-        label = Path(g).name if g else "_shared"
+        label = "_".join(Path(g).parts[-2:]) if g else "_shared"
         f = dst / f"{re.sub(r'[^A-Za-z0-9_.-]', '_', label)[:40]}_{distinct.index(g)}"
         f.mkdir(exist_ok=True)
         return f
@@ -374,7 +386,11 @@ def analyse() -> None:
         # form a project of their own
         subdirs = sorted(x for x in d.iterdir() if x.is_dir())
         targets = [([str(x)], x) for x in subdirs]
-        top = [str(f) for f in files if f.parent == d]
+        if p.get("granularity") == "file":
+            # a collection of independent snippets: each file on its own
+            subdirs = []
+            targets = [([str(f)], f.parent) for f in files]
+        top = [str(f) for f in files if f.parent == d] if p.get("granularity") != "file" else []
         if top and not subdirs:
             targets.append(([str(d)], d))  # one project: pass the folder (short command line)
         elif top:
