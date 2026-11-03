@@ -1942,7 +1942,10 @@ global_list  = 'VAR_GLOBAL' [ 'CONSTANT' | 'RETAIN' | 'NON_RETAIN' ] { var_decl 
 
 Every global variable is visible in every POU of the project
 ([variables.resolution]); a variable of the POU with the same name hides it.
-Each global name is declared once in the project (RP0204). A `CONSTANT`
+Each global name is declared once per namespace (RP0204): two global
+variable lists in different namespaces (for example TwinCAT lists, which
+are named) may both declare `x`; `GVL_A.x` names one of them, and `x` alone
+the one outside any namespace, else the first declared. A `CONSTANT`
 global with a constant initial value is a constant: it can be used in array
 bounds, string lengths and other constant expressions, and constants may use
 the constants declared before them. Global variables keep their values from

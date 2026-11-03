@@ -193,6 +193,8 @@ struct GlobalVar {
     file: usize,
     name: String,
     value: Option<i128>,
+    /// Namespace it was declared in (lower case), e.g. a TwinCAT GVL name.
+    ns: Option<String>,
 }
 
 pub(crate) struct Checker<'a> {
@@ -205,7 +207,11 @@ pub(crate) struct Checker<'a> {
     scope: Option<usize>,
     irs: HashMap<usize, DefIr>,
     /// `VAR_GLOBAL` sections outside POUs: (file, section, CONSTANT?), [config.global-list].
-    global_sections: Vec<(usize, &'a Node, bool)>,
+    global_sections: Vec<(usize, &'a Node, bool, Option<String>)>,
+    /// Namespace being collected (lower case), [pous.namespace].
+    cur_ns: Option<String>,
+    /// Qualifier of the name being resolved (`GVL_A` in `GVL_A.x`).
+    qualifier: Option<String>,
     /// Global variables in slot order; their types live in `defs[globals_def]`.
     globals: Vec<GlobalVar>,
     /// The synthetic definition holding every global variable.
@@ -293,6 +299,8 @@ impl<'a> Checker<'a> {
             scope: None,
             irs: HashMap::new(),
             global_sections: Vec::new(),
+            cur_ns: None,
+            qualifier: None,
             globals: Vec::new(),
             globals_def: None,
             configs: Vec::new(),
@@ -675,14 +683,18 @@ impl<'a> Checker<'a> {
                 }
                 // [pous.namespace]: declarations inside a namespace are collected as usual
                 N::Namespace => {
+                    let mut parts = Vec::new();
                     for i in self.items(n) {
                         if let Item::Tok(t) = i {
                             if self.tkind(t) == T::Ident {
                                 self.qualifiers.insert(self.text(t).to_ascii_lowercase());
+                                parts.push(self.text(t).to_ascii_lowercase());
                             }
                         }
                     }
+                    let saved = self.cur_ns.replace(parts.join("."));
                     self.collect(n);
+                    self.cur_ns = saved;
                 }
                 // [pous.action]: a member after its block belongs to that block
                 N::Method | N::Property | N::Action => {
@@ -1411,7 +1423,8 @@ impl<'a> Checker<'a> {
                 .take(5)
                 .any(|i| matches!(i, Item::Tok(t) if self.is_kw(*t, "CONSTANT")));
             if global {
-                self.global_sections.push((self.cur, s, constant));
+                self.global_sections
+                    .push((self.cur, s, constant, self.cur_ns.clone()));
             }
         }
         for r in self.child_nodes(n, N::Resource) {
@@ -1424,7 +1437,7 @@ impl<'a> Checker<'a> {
     fn resolve_globals(&mut self, id: usize) {
         let saved = self.cur;
         let mut vars = Vec::new();
-        for (file, sec, constant) in self.global_sections.clone() {
+        for (file, sec, constant, ns) in self.global_sections.clone() {
             self.cur = file;
             for d in self.child_nodes(sec, N::VarDecl) {
                 let start = vars.len();
@@ -1441,6 +1454,7 @@ impl<'a> Checker<'a> {
                         file,
                         name: v.name.clone(),
                         value,
+                        ns: ns.clone(),
                     });
                 }
             }
@@ -1467,7 +1481,9 @@ impl<'a> Checker<'a> {
         let mut seen = HashSet::new();
         for (k, v) in p.vars.iter().enumerate() {
             self.cur = self.globals[k].file;
-            if !seen.insert(v.name.to_ascii_lowercase()) {
+            // [config.global-list]: names are unique within a namespace
+            let key = (self.globals[k].ns.clone(), v.name.to_ascii_lowercase());
+            if !seen.insert(key) {
                 let msg = format!("'{}' is already declared as a global variable", v.name);
                 self.diag(codes::DUPLICATE_NAME, msg, v.span, None);
             }
@@ -2564,10 +2580,29 @@ impl<'a> Checker<'a> {
 
     /// A global variable: type and slot, [variables.resolution].
     fn lookup_global(&self, name: &str) -> Option<(Ty, usize)> {
-        let slot = self
-            .globals
-            .iter()
-            .position(|g| g.name.eq_ignore_ascii_case(name))?;
+        let cands: Vec<usize> = (0..self.globals.len())
+            .filter(|&k| self.globals[k].name.eq_ignore_ascii_case(name))
+            .collect();
+        // GVL_A.x picks the x of namespace GVL_A; x alone the one outside any
+        // namespace, else the first ([pous.namespace])
+        let in_ns = |k: &usize, q: &str| {
+            self.globals[*k]
+                .ns
+                .as_deref()
+                .is_some_and(|ns| ns == q || ns.ends_with(&format!(".{q}")))
+        };
+        let slot = match &self.qualifier {
+            Some(q) => cands
+                .iter()
+                .find(|k| in_ns(k, q))
+                .or(cands.first())
+                .copied()?,
+            None => cands
+                .iter()
+                .find(|k| self.globals[**k].ns.is_none())
+                .or(cands.first())
+                .copied()?,
+        };
         match &self.defs[self.globals_def?].kind {
             Kind::Pou(p) => Some((p.vars.get(slot)?.ty.clone(), slot)),
             _ => None,
@@ -3333,7 +3368,14 @@ impl<'a> Checker<'a> {
         };
         if self.is_qualifier(b) {
             // [stdlib.compat]: Tc2_System.PI names PI
-            return self.name_ref(m, span);
+            let q = match self.items(b).first().copied() {
+                Some(Item::Tok(t)) => Some(self.text(t).to_ascii_lowercase()),
+                _ => None,
+            };
+            let saved = std::mem::replace(&mut self.qualifier, q);
+            let v = self.name_ref(m, span);
+            self.qualifier = saved;
+            return v;
         }
         let base = self.expr(b);
         self.member_on(base, m, span)
