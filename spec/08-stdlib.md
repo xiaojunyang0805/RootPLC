@@ -67,7 +67,12 @@ written from (clean-room; RootPLC is not affiliated with the vendors).
 Bundled: `Tc2_System` and `Tc2_Utilities` (TwinCAT; `Tc2_Utilities`
 requires `Tc2_System` and activating it activates both) and
 `TwinCAT_BuiltIns` (names every TwinCAT project has: `BIT`, the 64-bit
-special types `XINT`, `UXINT`, `XWORD`, `PVOID`, `__SYSTEM.IQueryInterface`).
+special types `XINT`, `UXINT`, `XWORD`, `PVOID`, `__SYSTEM.IQueryInterface`)
+and `Tc2_Standard` (TwinCAT's `CTU`, `CTD` and `CTUD` with `RESET`, `LOAD`
+and `WORD` counts, the `LTIME` timers `LTON`, `LTOF`, `LTP`, and the
+`WSTRING` functions `WLEN`, `WMID`, `WCONCAT`, ...). A library may replace a
+standard function block of [stdlib.fbs]; while it is active its declaration
+is the one used.
 Library functions are implemented in ST where their documented behaviour
 can be reproduced (for example `BYTE_TO_HEXSTR`).
 

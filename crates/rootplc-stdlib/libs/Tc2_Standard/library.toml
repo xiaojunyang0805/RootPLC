@@ -1,0 +1,12 @@
+# Compatibility library: part of the interface of Beckhoff's Tc2_Standard.
+# Clean-room: written only from the public references below. RootPLC is an
+# independent project, not affiliated with or endorsed by Beckhoff Automation.
+name = "Tc2_Standard"
+vendor = "Beckhoff Automation GmbH"
+version = "1.0.0"
+description = "TwinCAT Tc2_Standard: CTU/CTD/CTUD (RESET, LOAD, WORD), LTON/LTOF/LTP, W-string functions, implemented"
+declare_only = []
+references = [
+  "https://download.beckhoff.com/download/Document/automation/twincat3/TwinCAT_3_PLC_Lib_Tc2_Standard_EN.pdf (TE1000 Tc2_Standard manual 1.3.4: POU list, declarations, behaviour)",
+  "https://infosys.beckhoff.com/content/1033/tcplclib_tc2_standard/2260730123.html (Tc2_Standard overview)",
+]

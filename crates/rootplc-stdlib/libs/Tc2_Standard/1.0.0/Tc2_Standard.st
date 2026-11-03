@@ -1,0 +1,215 @@
+(* Tc2_Standard compatibility library for RootPLC (see library.toml).
+
+   TwinCAT's counters differ from the IEC ones RootPLC builds in: the reset
+   input is RESET, the load input LOAD, and PV/CV are WORD. Declaring them
+   here replaces the built-in blocks while the library is active.
+   LTON/LTOF/LTP use the TON/TOF/TP blocks underneath, so ET advances in
+   whole milliseconds of the virtual clock.
+   The W functions are the WSTRING forms of LEN, LEFT, ... (the built-ins
+   accept WSTRING). *)
+
+FUNCTION WLEN : INT
+VAR_INPUT
+    STR : WSTRING[255];
+END_VAR
+WLEN := LEN(STR);
+END_FUNCTION
+
+FUNCTION WLEFT : WSTRING[255]
+VAR_INPUT
+    STR : WSTRING[255];
+    SIZE : INT;
+END_VAR
+WLEFT := LEFT(STR, SIZE);
+END_FUNCTION
+
+FUNCTION WRIGHT : WSTRING[255]
+VAR_INPUT
+    STR : WSTRING[255];
+    SIZE : INT;
+END_VAR
+WRIGHT := RIGHT(STR, SIZE);
+END_FUNCTION
+
+FUNCTION WMID : WSTRING[255]
+VAR_INPUT
+    STR : WSTRING[255];
+    LEN : INT;
+    POS : INT;
+END_VAR
+WMID := MID(STR, LEN, POS);
+END_FUNCTION
+
+FUNCTION WCONCAT : WSTRING[255]
+VAR_INPUT
+    STR1 : WSTRING[255];
+    STR2 : WSTRING[255];
+END_VAR
+WCONCAT := CONCAT(STR1, STR2);
+END_FUNCTION
+
+FUNCTION WINSERT : WSTRING[255]
+VAR_INPUT
+    STR1 : WSTRING[255];
+    STR2 : WSTRING[255];
+    POS : INT;
+END_VAR
+WINSERT := INSERT(STR1, STR2, POS);
+END_FUNCTION
+
+FUNCTION WDELETE : WSTRING[255]
+VAR_INPUT
+    STR : WSTRING[255];
+    LEN : INT;
+    POS : INT;
+END_VAR
+WDELETE := DELETE(STR, LEN, POS);
+END_FUNCTION
+
+FUNCTION WREPLACE : WSTRING[255]
+VAR_INPUT
+    STR1 : WSTRING[255];
+    STR2 : WSTRING[255];
+    L : INT;
+    P : INT;
+END_VAR
+WREPLACE := REPLACE(STR1, STR2, L, P);
+END_FUNCTION
+
+FUNCTION WFIND : INT
+VAR_INPUT
+    STR1 : WSTRING[255];
+    STR2 : WSTRING[255];
+END_VAR
+WFIND := FIND(STR1, STR2);
+END_FUNCTION
+
+FUNCTION_BLOCK CTU
+VAR_INPUT
+    CU : BOOL;
+    RESET : BOOL;
+    PV : WORD;
+END_VAR
+VAR_OUTPUT
+    Q : BOOL;
+    CV : WORD;
+END_VAR
+VAR
+    edge : R_TRIG;
+END_VAR
+edge(CLK := CU);
+IF RESET THEN
+    CV := 16#0;
+ELSIF edge.Q AND WORD_TO_UINT(CV) < 65535 THEN
+    CV := UINT_TO_WORD(WORD_TO_UINT(CV) + 1);
+END_IF
+Q := WORD_TO_UINT(CV) >= WORD_TO_UINT(PV);
+END_FUNCTION_BLOCK
+
+FUNCTION_BLOCK CTD
+VAR_INPUT
+    CD : BOOL;
+    LOAD : BOOL;
+    PV : WORD;
+END_VAR
+VAR_OUTPUT
+    Q : BOOL;
+    CV : WORD;
+END_VAR
+VAR
+    edge : R_TRIG;
+END_VAR
+edge(CLK := CD);
+IF LOAD THEN
+    CV := PV;
+ELSIF edge.Q AND WORD_TO_UINT(CV) > 0 THEN
+    CV := UINT_TO_WORD(WORD_TO_UINT(CV) - 1);
+END_IF
+Q := CV = 16#0;
+END_FUNCTION_BLOCK
+
+FUNCTION_BLOCK CTUD
+VAR_INPUT
+    CU : BOOL;
+    CD : BOOL;
+    RESET : BOOL;
+    LOAD : BOOL;
+    PV : WORD;
+END_VAR
+VAR_OUTPUT
+    QU : BOOL;
+    QD : BOOL;
+    CV : WORD;
+END_VAR
+VAR
+    up : R_TRIG;
+    down : R_TRIG;
+END_VAR
+up(CLK := CU);
+down(CLK := CD);
+IF RESET THEN
+    CV := 16#0;
+ELSIF LOAD THEN
+    CV := PV;
+ELSE
+    IF up.Q AND WORD_TO_UINT(CV) < 65535 THEN
+        CV := UINT_TO_WORD(WORD_TO_UINT(CV) + 1);
+    END_IF
+    IF down.Q AND WORD_TO_UINT(CV) > 0 THEN
+        CV := UINT_TO_WORD(WORD_TO_UINT(CV) - 1);
+    END_IF
+END_IF
+QU := WORD_TO_UINT(CV) >= WORD_TO_UINT(PV);
+QD := CV = 16#0;
+END_FUNCTION_BLOCK
+
+FUNCTION_BLOCK LTON
+VAR_INPUT
+    IN : BOOL;
+    PT : LTIME;
+END_VAR
+VAR_OUTPUT
+    Q : BOOL;
+    ET : LTIME;
+END_VAR
+VAR
+    timer : TON;
+END_VAR
+timer(IN := IN, PT := LTIME_TO_TIME(PT));
+Q := timer.Q;
+ET := TIME_TO_LTIME(timer.ET);
+END_FUNCTION_BLOCK
+
+FUNCTION_BLOCK LTOF
+VAR_INPUT
+    IN : BOOL;
+    PT : LTIME;
+END_VAR
+VAR_OUTPUT
+    Q : BOOL;
+    ET : LTIME;
+END_VAR
+VAR
+    timer : TOF;
+END_VAR
+timer(IN := IN, PT := LTIME_TO_TIME(PT));
+Q := timer.Q;
+ET := TIME_TO_LTIME(timer.ET);
+END_FUNCTION_BLOCK
+
+FUNCTION_BLOCK LTP
+VAR_INPUT
+    IN : BOOL;
+    PT : LTIME;
+END_VAR
+VAR_OUTPUT
+    Q : BOOL;
+    ET : LTIME;
+END_VAR
+VAR
+    timer : TP;
+END_VAR
+timer(IN := IN, PT := LTIME_TO_TIME(PT));
+Q := timer.Q;
+ET := TIME_TO_LTIME(timer.ET);
+END_FUNCTION_BLOCK
