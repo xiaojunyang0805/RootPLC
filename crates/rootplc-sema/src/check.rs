@@ -883,10 +883,17 @@ impl<'a> Checker<'a> {
         let Kind::Pou(p) = &self.defs[fb].kind else {
             return None;
         };
+        // the method's own VAR_INST variables first, then the block's
+        let inst = format!("{}#{name}", self.method_name(id));
         let slot = p
             .vars
             .iter()
-            .position(|v| v.name.eq_ignore_ascii_case(name))?;
+            .position(|v| v.name.eq_ignore_ascii_case(&inst))
+            .or_else(|| {
+                p.vars
+                    .iter()
+                    .position(|v| v.name.eq_ignore_ascii_case(name))
+            })?;
         Some((p.vars[slot].ty.clone(), slot, fb))
     }
 
@@ -1664,6 +1671,30 @@ impl<'a> Checker<'a> {
             }
         }
         let inherited = vars.len();
+        // [pous.oop.method]: VAR_INST variables of the block's methods keep their
+        // value between calls: they are stored in the instance as "M#name"
+        let mut inst_vars = Vec::new();
+        if matches!(node.kind, N::FunctionBlock | N::Program) {
+            for m in self.child_nodes(node, N::Method) {
+                let Some(mt) = self.decl_name(m) else {
+                    continue;
+                };
+                let mname = self.text(mt).to_string();
+                for s in self.child_nodes(m, N::VarSection) {
+                    let is_inst = matches!(self.items(s).first(), Some(Item::Tok(t)) if self.text(*t).eq_ignore_ascii_case("VAR_INST"));
+                    if !is_inst {
+                        continue;
+                    }
+                    for d in self.child_nodes(s, N::VarDecl) {
+                        let start = inst_vars.len();
+                        self.var_decl(d, Section::Local, &mut inst_vars);
+                        for v in &mut inst_vars[start..] {
+                            v.name = format!("{mname}#{}", v.name);
+                        }
+                    }
+                }
+            }
+        }
         for it in self.items(node) {
             let Item::Node(n) = it else { continue };
             match n.kind {
@@ -1676,6 +1707,8 @@ impl<'a> Checker<'a> {
                             "VAR_IN_OUT" => Section::InOut,
                             // [config.external]: names the global variable itself
                             "VAR_EXTERNAL" => continue,
+                            // [pous.oop.method]: VAR_INST lives in the block (see below)
+                            "VAR_INST" if node.kind == N::Method => continue,
                             // [variables.section]: VAR PUBLIC is visible from outside
                             "VAR"
                                 if self.items(n).iter().take(5).any(
@@ -1695,6 +1728,7 @@ impl<'a> Checker<'a> {
                 _ => {}
             }
         }
+        vars.extend(inst_vars);
         self.defs[id].kind = Kind::Pou(Pou {
             kind,
             vars,
@@ -1712,7 +1746,11 @@ impl<'a> Checker<'a> {
         for it in &its {
             match *it {
                 Item::Tok(t) if self.tkind(t) == T::Colon => before_colon = false,
-                Item::Tok(t) if before_colon && self.tkind(t) == T::Ident => names.push(t),
+                Item::Tok(t)
+                    if before_colon && (self.tkind(t) == T::Ident || self.is_kw(t, "TEST")) =>
+                {
+                    names.push(t)
+                }
                 Item::Node(n) if n.kind == N::TypeSpec => spec = Some(n),
                 Item::Node(n) if n.kind == N::Initializer => init = Some(n),
                 _ => {}
@@ -2333,42 +2371,46 @@ impl<'a> Checker<'a> {
             }
             N::ForStmt => {
                 let mut ctrl = V::unknown(self.span(n));
-                if let Some(Item::Tok(t)) = its.get(1).copied() {
-                    let name = self.text(t);
-                    let span = self.tok_span(t);
-                    match self.lookup_var(name) {
-                        Some((ty, slot)) => {
-                            let ok = match self.strip(&ty) {
-                                Ty::Elem(e) => e.is_int(),
-                                Ty::Unknown => true,
-                                _ => false,
-                            };
-                            if !ok {
-                                let msg = format!(
-                                    "FOR control variable '{name}' must be an integer, not {}",
-                                    self.ty_name(&ty)
-                                );
-                                self.diag(codes::IMPLICIT_CONVERSION, msg, span, None);
-                            }
-                            ctrl = V::with(
-                                if ok { ty } else { Ty::Unknown },
-                                span,
-                                ExprKind::Var(slot),
-                            );
-                        }
-                        None => {
-                            self.diag(
-                                codes::UNKNOWN_NAME,
-                                format!("unknown name '{name}'"),
-                                span,
-                                None,
-                            );
-                        }
+                // [statements.for]: the control variable is a place: a variable,
+                // or (TwinCAT) an array element or member
+                let ctrl_node = match its.get(1).copied() {
+                    Some(Item::Node(c)) if c.kind != N::StmtList => Some(c),
+                    _ => None,
+                };
+                if let Some(c) = ctrl_node {
+                    let v = self.expr(c);
+                    let ok = match self.strip(&v.ty) {
+                        Ty::Elem(e) => e.is_int(),
+                        Ty::Unknown => true,
+                        _ => false,
+                    };
+                    let is_place = matches!(
+                        v.e,
+                        ExprKind::Var(_)
+                            | ExprKind::Global(_)
+                            | ExprKind::Member(..)
+                            | ExprKind::Index(..)
+                            | ExprKind::Deref(_)
+                            | ExprKind::Invalid
+                    );
+                    if !ok || !is_place {
+                        let msg = format!(
+                            "the FOR control variable must be an integer variable, not {}",
+                            self.ty_name(&v.ty)
+                        );
+                        self.diag(codes::IMPLICIT_CONVERSION, msg, v.span, None);
+                        ctrl = V::unknown(v.span);
+                    } else {
+                        ctrl = v;
                     }
                 }
                 let mut exprs = Vec::new();
                 let mut body = Vec::new();
-                for it in its {
+                for it in its
+                    .iter()
+                    .skip(if ctrl_node.is_some() { 2 } else { 0 })
+                    .copied()
+                {
                     let Item::Node(c) = it else { continue };
                     if c.kind == N::StmtList {
                         body = self.stmt_list(c);

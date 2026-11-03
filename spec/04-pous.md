@@ -93,7 +93,9 @@ method = 'METHOD' { modifier } name [ ':' type_spec ] { var_section } statement_
 ```
 
 Its variables are new for every call, like those of a function; the method
-name holds the result. Inside the method, the variables of its block
+name holds the result. Variables in a `VAR_INST` section (CODESYS, TwinCAT) keep
+their value between calls: they belong to the instance, visible only in
+that method. Inside the method, the variables of its block
 (inherited ones included) are visible by name after the method's own. A
 method is called on an instance, `inst.M(args)`, or inside the block or one
 of its methods without a prefix, `M(args)`; arguments bind as for functions.

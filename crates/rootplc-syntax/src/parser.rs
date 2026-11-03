@@ -174,6 +174,33 @@ impl<'a> Parser<'a> {
         }
     }
 
+    /// `TEST :` or `TEST,` in a variable section declares a variable named TEST.
+    fn at_test_decl(&self) -> bool {
+        self.at_kw("TEST") && matches!(self.nth_kind(1), Some(TokenKind::Colon | TokenKind::Comma))
+    }
+
+    /// The start of a statement: a name followed by `:=`, `.`, `(`, `[` or `^`,
+    /// or a statement keyword.
+    fn at_stmt_start(&self) -> bool {
+        (matches!(self.kind(), Some(TokenKind::Ident))
+            && matches!(
+                self.nth_kind(1),
+                Some(
+                    TokenKind::Assign
+                        | TokenKind::Dot
+                        | TokenKind::LParen
+                        | TokenKind::LBracket
+                        | TokenKind::Caret
+                )
+            ))
+            || self.at_any_kw(STMT_KWS)
+    }
+
+    /// The start of a variable section, including CODESYS VAR_INST.
+    fn at_section(&self) -> bool {
+        self.at_any_kw(SECTION_KWS) || self.at_word("VAR_INST")
+    }
+
     /// `TEST` inside a body is a name (TcUnit's TEST function, or the result
     /// variable of a function called TEST), not the start of a test block.
     fn at_test_call(&self) -> bool {
@@ -533,7 +560,7 @@ impl<'a> Parser<'a> {
         if has_type {
             if self.eat(TokenKind::Colon) {
                 self.type_spec();
-            } else if self.at_any_kw(SECTION_KWS) || self.at_kw(close) {
+            } else if self.at_section() || self.at_kw(close) || self.at_stmt_start() {
                 // [pous.function]: CODESYS and TwinCAT allow a function without a result
                 let sp = self.span_prev_end();
                 self.error(
@@ -546,7 +573,7 @@ impl<'a> Parser<'a> {
                 self.expect(TokenKind::Colon, "':' and the return type");
             }
         }
-        while self.at_any_kw(SECTION_KWS) {
+        while self.at_section() {
             self.var_section();
         }
         if oop {
@@ -592,7 +619,7 @@ impl<'a> Parser<'a> {
         ];
         while !self.at_eof() && !self.at_kw(close) && !self.at_any_kw(STOP) {
             let before = self.pos;
-            if self.at_any_kw(SECTION_KWS) {
+            if self.at_section() {
                 self.var_section();
             } else if self.at_kw("VAR_CONFIG") {
                 // [config.var-config]: instance paths with addresses; recorded only
@@ -739,7 +766,7 @@ impl<'a> Parser<'a> {
         if self.eat(TokenKind::Colon) {
             self.type_spec();
         }
-        while self.at_any_kw(SECTION_KWS) {
+        while self.at_section() {
             self.var_section();
         }
         self.stmt_list(&["END_METHOD"]);
@@ -767,7 +794,7 @@ impl<'a> Parser<'a> {
         self.bump();
         self.name();
         self.eat(TokenKind::Colon);
-        while self.at_any_kw(SECTION_KWS) {
+        while self.at_section() {
             self.var_section();
         }
         self.stmt_list(&["END_ACTION"]);
@@ -800,7 +827,7 @@ impl<'a> Parser<'a> {
         if self.expect(TokenKind::Colon, "':' and the property type") {
             self.type_spec();
         }
-        while self.at_any_kw(SECTION_KWS) {
+        while self.at_section() {
             self.var_section();
         }
         let saved = self.in_property;
@@ -812,7 +839,7 @@ impl<'a> Parser<'a> {
             if self.at_word(open) {
                 self.b.start(kind);
                 self.bump();
-                while self.at_any_kw(SECTION_KWS) {
+                while self.at_section() {
                     self.var_section();
                 }
                 self.stmt_list(&[]);
@@ -924,7 +951,10 @@ impl<'a> Parser<'a> {
         {
             self.bump();
         }
-        while !self.at_eof() && !self.at_kw("END_VAR") && !self.at_any_kw(POU_KWS) {
+        while !self.at_eof()
+            && !self.at_kw("END_VAR")
+            && !(self.at_any_kw(POU_KWS) && !self.at_test_decl())
+        {
             let before = self.pos;
             self.var_decl();
             if self.pos == before {
@@ -1390,7 +1420,12 @@ impl<'a> Parser<'a> {
         self.b.start(N::ForStmt);
         let open = self.span_here();
         self.bump();
-        self.name();
+        // [statements.for]: a variable, or (TwinCAT) an element or member
+        if matches!(self.kind(), Some(TokenKind::Ident)) {
+            self.postfix_expr();
+        } else {
+            self.name();
+        }
         self.expect(TokenKind::Assign, "':='");
         self.expr();
         self.expect_kw("TO");

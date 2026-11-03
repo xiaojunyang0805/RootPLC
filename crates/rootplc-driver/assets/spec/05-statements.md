@@ -43,7 +43,8 @@ case_label   = constant [ '..' constant ]                    (* constant: litera
 **[statements.for]**
 ```
 for_stmt     = 'FOR' name ':=' expression 'TO' expression [ 'BY' expression ] 'DO' statement_list 'END_FOR'
-```
+``` The control variable may also be an array element or a structure member of
+integer type (`FOR idx[1] := 0 TO 9 DO`), as TwinCAT accepts.
 
 **[statements.while]**
 ```

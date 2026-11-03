@@ -33,7 +33,7 @@ SYNTAX_CODES = {f"RP{n:04d}" for n in list(range(1, 17)) + [201, 202, 301]}
 # Constructs RootPLC does not support yet (counted in extracted code). Keep in
 # step with the RULES list in crates/rootplc-driver/src/coverage.rs.
 FEATURES = {
-    "VAR_INST / VAR_STAT": r"\bVAR_(INST|STAT)\b",
+    "VAR_STAT": r"\bVAR_STAT\b",
     "UNION": r"\bUNION\b",
     "SIZEOF": r"\bSIZEOF\s*\(",
     "__ system calls": r"\b__(?!ISVALIDREF)[A-Z]+\s*\(",

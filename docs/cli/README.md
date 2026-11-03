@@ -112,7 +112,7 @@ Checks the files as one project and gives each file one status:
 | Status | Meaning |
 |---|---|
 | `portable` | no errors: test and run it now |
-| `dialect` | errors, and the file uses constructs RootPLC does not take yet (`UNION`, `VAR_INST`, `SIZEOF`, `__` system calls, vendor pragmas, implicit narrowing, …), listed with lines |
+| `dialect` | errors, and the file uses constructs RootPLC does not take yet (`UNION`, `VAR_STAT`, `__` system calls, `__` system calls, vendor pragmas, implicit narrowing, …), listed with lines |
 | `dependent` | its only errors are unknown names declared in files that fail (`blocked_by`) |
 | `blocked` | other errors: see `rootplc check` |
 

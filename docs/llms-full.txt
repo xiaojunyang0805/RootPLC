@@ -142,7 +142,7 @@ Checks the files as one project and gives each file one status:
 | Status | Meaning |
 |---|---|
 | `portable` | no errors: test and run it now |
-| `dialect` | errors, and the file uses constructs RootPLC does not take yet (`UNION`, `VAR_INST`, `SIZEOF`, `__` system calls, vendor pragmas, implicit narrowing, …), listed with lines |
+| `dialect` | errors, and the file uses constructs RootPLC does not take yet (`UNION`, `VAR_STAT`, `__` system calls, `__` system calls, vendor pragmas, implicit narrowing, …), listed with lines |
 | `dependent` | its only errors are unknown names declared in files that fail (`blocked_by`) |
 | `blocked` | other errors: see `rootplc check` |
 
@@ -1708,7 +1708,9 @@ method = 'METHOD' { modifier } name [ ':' type_spec ] { var_section } statement_
 ```
 
 Its variables are new for every call, like those of a function; the method
-name holds the result. Inside the method, the variables of its block
+name holds the result. Variables in a `VAR_INST` section (CODESYS, TwinCAT) keep
+their value between calls: they belong to the instance, visible only in
+that method. Inside the method, the variables of its block
 (inherited ones included) are visible by name after the method's own. A
 method is called on an instance, `inst.M(args)`, or inside the block or one
 of its methods without a prefix, `M(args)`; arguments bind as for functions.
@@ -1869,7 +1871,8 @@ case_label   = constant [ '..' constant ]                    (* constant: litera
 **[statements.for]**
 ```
 for_stmt     = 'FOR' name ':=' expression 'TO' expression [ 'BY' expression ] 'DO' statement_list 'END_FOR'
-```
+``` The control variable may also be an array element or a structure member of
+integer type (`FOR idx[1] := 0 TO 9 DO`), as TwinCAT accepts.
 
 **[statements.while]**
 ```
