@@ -1,0 +1,16 @@
+(* spec: [pous.oop.interface]
+   expect: ok *)
+INTERFACE I_Base
+METHOD Reset
+END_METHOD
+END_INTERFACE
+
+INTERFACE I_Motor EXTENDS I_Base
+METHOD Start : BOOL
+VAR_INPUT
+    speed : INT;
+END_VAR
+END_METHOD
+PROPERTY Running : BOOL
+END_PROPERTY
+END_INTERFACE

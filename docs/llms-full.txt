@@ -1526,8 +1526,78 @@ is called as a statement and has no value.
 
 **[pous.function-block]**
 ```
-function_block = 'FUNCTION_BLOCK' name { var_section } statement_list 'END_FUNCTION_BLOCK'
+function_block = 'FUNCTION_BLOCK' { modifier } name [ 'EXTENDS' name ] [ 'IMPLEMENTS' name { ',' name } ]
+                 { var_section } { member } statement_list { member } 'END_FUNCTION_BLOCK'
+member         = method | property
 ```
+
+Methods and properties may stand before or after the body (IEC 61131-3 puts
+them before it, TwinCAT exports them after it). A PROGRAM may have members too.
+
+## Object orientation
+
+**[pous.oop.modifiers]** `PUBLIC`, `PRIVATE`, `PROTECTED`, `INTERNAL`,
+`ABSTRACT`, `FINAL` and, on methods, `OVERRIDE` may precede the name of a
+function block, program, method or property. They are accepted and recorded;
+access checks and the rules for abstract and final blocks follow in a later
+revision.
+
+**[pous.oop.method]** A method is a function that belongs to a function
+block or program and runs on one of its instances:
+
+```
+method = 'METHOD' { modifier } name [ ':' type_spec ] { var_section } statement_list 'END_METHOD'
+```
+
+Its variables are new for every call, like those of a function; the method
+name holds the result. Inside the method, the variables of its block
+(inherited ones included) are visible by name after the method's own. A
+method is called on an instance, `inst.M(args)`, or inside the block or one
+of its methods without a prefix, `M(args)`; arguments bind as for functions.
+
+**[pous.oop.extends]** `FUNCTION_BLOCK B EXTENDS A` makes B a function block
+with all variables and methods of A, followed by its own. The base must be a
+function block (otherwise RP0111). A variable of B with the name of a
+variable of A is RP0204. The body of B replaces the body of A; `SUPER^()`
+runs the body of A on the same instance.
+
+**[pous.oop.override]** A method of B with the name of a method of A
+overrides it. Every call on an instance runs the method of the instance's own
+block, also when the call is made inside a method inherited from A
+(`THIS^.M()` or `M()`): this is dynamic dispatch. `SUPER^.M()` runs A's
+method without dispatch.
+
+**[pous.oop.this]** Inside a function block, program or method, `THIS` is a
+reference to the current instance and `SUPER` the same instance seen as its
+base block: `THIS^.x`, `THIS^.M()`, `SUPER^.M()`. Through `THIS^` all
+variables of the instance are accessible, not only its inputs and outputs.
+Elsewhere `THIS` and `SUPER` are RP0203.
+
+**[pous.oop.interface]** An interface declares methods and properties
+without bodies:
+
+```
+interface = 'INTERFACE' name [ 'EXTENDS' name { ',' name } ] { method | property } 'END_INTERFACE'
+```
+
+Interfaces are parsed; interface types, `IMPLEMENTS` checks and calls through
+interface references follow in the next revision.
+
+**[pous.oop.implements]** `IMPLEMENTS I1, I2` names the interfaces a function
+block provides. It is accepted and recorded; that every method of the
+interface exists is checked in the next revision.
+
+**[pous.oop.property]** A property is a value with access methods (a CODESYS
+and TwinCAT extension):
+
+```
+property = 'PROPERTY' { modifier } name ':' type_spec { var_section }
+           [ 'GET' { var_section } statement_list 'END_GET' ]
+           [ 'SET' { var_section } statement_list 'END_SET' ] 'END_PROPERTY'
+```
+
+`PROPERTY`, `GET` and `SET` are not reserved words. Properties are parsed;
+reading and writing them follows in a later revision.
 
 **[pous.call.in-out]** A `VAR_IN_OUT` parameter refers to the caller's
 variable: changes made by the called function or function block are visible

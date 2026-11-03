@@ -32,6 +32,7 @@ pub fn parse(source: &str) -> Parse {
         pos: 0,
         b: Builder::default(),
         diags: Vec::new(),
+        in_property: false,
     };
     p.source_file();
     Parse {
@@ -52,7 +53,24 @@ const SECTION_KWS: &[&str] = &[
     "VAR_GLOBAL",
     "VAR_EXTERNAL",
 ];
-const POU_KWS: &[&str] = &["PROGRAM", "FUNCTION", "FUNCTION_BLOCK", "TYPE", "TEST"];
+const POU_KWS: &[&str] = &[
+    "PROGRAM",
+    "FUNCTION",
+    "FUNCTION_BLOCK",
+    "TYPE",
+    "TEST",
+    "INTERFACE",
+];
+/// Access and inheritance modifiers, [pous.oop.modifiers].
+const MODIFIER_KWS: &[&str] = &[
+    "PUBLIC",
+    "PRIVATE",
+    "PROTECTED",
+    "INTERNAL",
+    "ABSTRACT",
+    "FINAL",
+    "OVERRIDE",
+];
 const STMT_KWS: &[&str] = &[
     "IF", "CASE", "FOR", "WHILE", "REPEAT", "EXIT", "CONTINUE", "RETURN",
 ];
@@ -62,6 +80,7 @@ const LIST_END_KWS: &[&str] = &[
     "END_FUNCTION",
     "END_FUNCTION_BLOCK",
     "END_TEST",
+    "END_METHOD",
     "END_IF",
     "END_CASE",
     "END_FOR",
@@ -78,6 +97,8 @@ struct Parser<'a> {
     pos: usize,
     b: Builder,
     diags: Vec<Diagnostic>,
+    /// Inside a PROPERTY: GET, SET, END_GET and END_SET end statement lists.
+    in_property: bool,
 }
 
 fn is_trivia(k: TokenKind) -> bool {
@@ -131,6 +152,36 @@ impl<'a> Parser<'a> {
 
     fn at_kw(&self, kw: &str) -> bool {
         self.nth_is_kw(0, kw)
+    }
+
+    /// The next token is `word` (a keyword or a plain name), for the
+    /// CODESYS words PROPERTY, GET, SET that IEC 61131-3 does not reserve.
+    fn at_word(&self, word: &str) -> bool {
+        self.nth_index(0).is_some_and(|i| {
+            matches!(self.toks[i].kind, TokenKind::Keyword | TokenKind::Ident)
+                && self.text_at(i).eq_ignore_ascii_case(word)
+        })
+    }
+
+    fn eat_word(&mut self, word: &str) -> bool {
+        if self.at_word(word) {
+            self.bump();
+            true
+        } else {
+            false
+        }
+    }
+
+    /// At the start of a method or property, or at a word closing one.
+    fn at_member_boundary(&self) -> bool {
+        if self.at_kw("METHOD") || self.at_word("PROPERTY") || self.at_word("END_PROPERTY") {
+            return true;
+        }
+        // a method may be called Get or Set; these words only matter in a property
+        self.in_property
+            && ["GET", "END_GET", "SET", "END_SET"]
+                .iter()
+                .any(|w| self.at_word(w))
     }
 
     fn at_any_kw(&self, kws: &[&str]) -> bool {
@@ -317,6 +368,8 @@ impl<'a> Parser<'a> {
                 self.pou(N::Test, "TEST", "END_TEST", false);
             } else if self.at_kw("TYPE") {
                 self.type_block();
+            } else if self.at_kw("INTERFACE") {
+                self.interface();
             } else if self.at_kw("VAR_GLOBAL") {
                 self.b.start(N::GlobalVarList);
                 self.var_section();
@@ -346,7 +399,16 @@ impl<'a> Parser<'a> {
         self.b.start(kind);
         let open_span = self.span_here();
         self.bump();
+        let oop = matches!(kind, N::FunctionBlock | N::Program);
+        if oop {
+            while self.at_any_kw(MODIFIER_KWS) {
+                self.bump();
+            }
+        }
         self.name();
+        if oop {
+            self.extends_implements();
+        }
         if has_type {
             if self.eat(TokenKind::Colon) {
                 self.type_spec();
@@ -366,7 +428,13 @@ impl<'a> Parser<'a> {
         while self.at_any_kw(SECTION_KWS) {
             self.var_section();
         }
+        if oop {
+            self.members(close);
+        }
         self.stmt_list(&[close]);
+        if oop {
+            self.members(close);
+        }
         if !self.eat_kw(close) {
             if self.at_eof() {
                 self.error(
@@ -465,6 +533,150 @@ impl<'a> Parser<'a> {
                 self.unexpected(&format!("'{close}'"));
             }
         }
+    }
+
+    /// `EXTENDS base` and `IMPLEMENTS I1, I2`, [pous.oop.extends], [pous.oop.implements].
+    fn extends_implements(&mut self) {
+        if self.at_kw("EXTENDS") {
+            self.b.start(N::Extends);
+            self.bump();
+            self.name();
+            while self.eat(TokenKind::Comma) {
+                self.name();
+            }
+            self.b.finish();
+        }
+        if self.at_kw("IMPLEMENTS") {
+            self.b.start(N::Implements);
+            self.bump();
+            self.name();
+            while self.eat(TokenKind::Comma) {
+                self.name();
+            }
+            self.b.finish();
+        }
+    }
+
+    /// Methods and properties of a function block, program or interface.
+    fn members(&mut self, close: &str) {
+        loop {
+            if self.at_kw("METHOD") {
+                self.method();
+            } else if self.at_word("PROPERTY") {
+                self.property();
+            } else if self.at_word("END_PROPERTY") {
+                // a closing word without its opening: report and skip it
+                self.unexpected(&format!("a METHOD, PROPERTY or '{close}'"));
+                self.b.start(N::Error);
+                self.bump();
+                self.b.finish();
+            } else {
+                break;
+            }
+        }
+    }
+
+    /// [pous.oop.method]: `METHOD {modifier} name [: type] … END_METHOD`.
+    fn method(&mut self) {
+        self.b.start(N::Method);
+        let open_span = self.span_here();
+        self.bump();
+        while self.at_any_kw(MODIFIER_KWS) {
+            self.bump();
+        }
+        self.name();
+        if self.eat(TokenKind::Colon) {
+            self.type_spec();
+        }
+        while self.at_any_kw(SECTION_KWS) {
+            self.var_section();
+        }
+        self.stmt_list(&["END_METHOD"]);
+        if !self.eat_kw("END_METHOD") {
+            if self.at_eof() {
+                self.error(
+                    codes::MISSING_END,
+                    "METHOD is never closed: missing END_METHOD".into(),
+                    open_span,
+                );
+            } else {
+                self.unexpected("'END_METHOD'");
+            }
+        }
+        self.b.finish();
+    }
+
+    /// [pous.oop.property]: `PROPERTY {modifier} name : type [GET …] [SET …] END_PROPERTY`.
+    fn property(&mut self) {
+        self.b.start(N::Property);
+        let open_span = self.span_here();
+        self.bump();
+        while self.at_any_kw(MODIFIER_KWS) {
+            self.bump();
+        }
+        self.name();
+        if self.expect(TokenKind::Colon, "':' and the property type") {
+            self.type_spec();
+        }
+        while self.at_any_kw(SECTION_KWS) {
+            self.var_section();
+        }
+        let saved = self.in_property;
+        self.in_property = true;
+        for (open, close, kind) in [
+            ("GET", "END_GET", N::PropertyGet),
+            ("SET", "END_SET", N::PropertySet),
+        ] {
+            if self.at_word(open) {
+                self.b.start(kind);
+                self.bump();
+                while self.at_any_kw(SECTION_KWS) {
+                    self.var_section();
+                }
+                self.stmt_list(&[]);
+                if !self.eat_word(close) {
+                    self.unexpected(&format!("'{close}'"));
+                }
+                self.b.finish();
+            }
+        }
+        self.in_property = saved;
+        if !self.eat_word("END_PROPERTY") {
+            if self.at_eof() {
+                self.error(
+                    codes::MISSING_END,
+                    "PROPERTY is never closed: missing END_PROPERTY".into(),
+                    open_span,
+                );
+            } else {
+                self.unexpected("'END_PROPERTY'");
+            }
+        }
+        self.b.finish();
+    }
+
+    /// [pous.oop.interface]: `INTERFACE name [EXTENDS I {, I}] {method | property} END_INTERFACE`.
+    fn interface(&mut self) {
+        self.b.start(N::Interface);
+        let open_span = self.span_here();
+        self.bump();
+        self.name();
+        self.extends_implements();
+        self.members("END_INTERFACE");
+        if !self.eat_kw("END_INTERFACE") {
+            if self.at_eof() {
+                self.error(
+                    codes::MISSING_END,
+                    "INTERFACE is never closed: missing END_INTERFACE".into(),
+                    open_span,
+                );
+            } else {
+                self.unexpected("'END_INTERFACE'");
+                self.recover(&["END_INTERFACE"]);
+                self.eat_kw("END_INTERFACE");
+            }
+        }
+        self.b.finish();
     }
 
     /// [pous.type-block].
@@ -750,6 +962,7 @@ impl<'a> Parser<'a> {
             && !self.at_any_kw(LIST_END_KWS)
             && !self.at_any_kw(extra_end)
             && !self.at_any_kw(POU_KWS)
+            && !self.at_member_boundary()
         {
             let before = self.pos;
             self.statement();
@@ -784,7 +997,9 @@ impl<'a> Parser<'a> {
             self.simple_kw_stmt(N::ContinueStmt);
         } else if self.at_kw("RETURN") {
             self.simple_kw_stmt(N::ReturnStmt);
-        } else if matches!(self.kind(), Some(TokenKind::Ident)) {
+        } else if matches!(self.kind(), Some(TokenKind::Ident))
+            || self.at_any_kw(&["THIS", "SUPER"])
+        {
             self.assign_or_call();
         } else {
             self.unexpected("a statement");
@@ -997,7 +1212,9 @@ impl<'a> Parser<'a> {
                 | TokenKind::Minus
                 | TokenKind::Plus,
             ) => true,
-            Some(TokenKind::Keyword) => self.at_any_kw(&["NOT", "TRUE", "FALSE", "NULL", "REF"]),
+            Some(TokenKind::Keyword) => {
+                self.at_any_kw(&["NOT", "TRUE", "FALSE", "NULL", "REF", "THIS", "SUPER"])
+            }
             _ => false,
         }
     }
@@ -1150,6 +1367,13 @@ impl<'a> Parser<'a> {
                 true
             }
             Some(TokenKind::Ident) => {
+                self.b.start(N::NameRef);
+                self.bump();
+                self.b.finish();
+                true
+            }
+            // [pous.oop.this]: THIS and SUPER, dereferenced with ^
+            Some(TokenKind::Keyword) if self.at_any_kw(&["THIS", "SUPER"]) => {
                 self.b.start(N::NameRef);
                 self.bump();
                 self.b.finish();

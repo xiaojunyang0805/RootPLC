@@ -17,6 +17,8 @@ pub enum PouKind {
     Function,
     FunctionBlock,
     Test,
+    /// A method of a function block or program, [pous.oop.method].
+    Method,
 }
 
 /// Variable section.
@@ -126,6 +128,13 @@ pub struct Pou {
     pub body: Vec<Stmt>,
     /// A standard block implemented natively by the back end.
     pub builtin: bool,
+    /// For a method: the function block or program it belongs to.
+    pub owner: Option<usize>,
+    /// The function block this one extends, [pous.oop.extends].
+    pub base: Option<usize>,
+    /// Methods callable on an instance, inherited ones included, with
+    /// overrides applied: (name, method definition), [pous.oop.override].
+    pub methods: Vec<(String, usize)>,
 }
 
 /// Initial value.
@@ -159,6 +168,9 @@ pub enum ExprKind {
     Const(Const),
     /// Slot of the current frame.
     Var(usize),
+    /// The function-block or program instance a method or body runs on
+    /// (its type is that block), [pous.oop.this].
+    This,
     /// Global variable `slot`, [config.global-list].
     Global(usize),
     /// Member `index` of a structure or instance.
@@ -255,6 +267,21 @@ pub enum CallTarget {
     Instance(Expr, usize),
     /// A user function (definition index).
     Function(usize),
+    /// A method call on the instance `inst` of function block `fb`. With
+    /// `dispatch`, the method is looked up by `name` in the instance's own
+    /// method table (overrides apply); otherwise `method` runs (SUPER^.M()).
+    Method {
+        /// Place of the instance.
+        inst: Expr,
+        /// Static type of the instance.
+        fb: usize,
+        /// Method found at compile time.
+        method: usize,
+        /// Method name, for dispatch.
+        name: String,
+        /// Look the method up in the instance's table at run time.
+        dispatch: bool,
+    },
     /// A standard function, by upper-case name. `ty` is the parameter type of
     /// a conversion (`INT` in `INT_TO_SINT`) or the common type of the
     /// arguments of an overloaded function.

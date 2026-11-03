@@ -168,7 +168,11 @@ def twincat_units(path: Path) -> list[tuple[str, str]]:
                 for acc in ("Get", "Set"):
                     a = pr.find(acc)
                     if a is not None:
+                        # GET/SET with their own declarations ([pous.oop.property])
+                        parts.append(acc.upper())
+                        parts.append(text_of(a.find("Declaration")).strip())
                         parts.append(text_of(a.find("Implementation/ST")).strip())
+                        parts.append("END_" + acc.upper())
                 parts.append("END_PROPERTY")
             if kind == "POU":
                 # the declaration may start with comments or {attribute} pragmas

@@ -17,6 +17,20 @@ pub enum NodeKind {
     Test,
     TypeBlock,
     TypeDecl,
+    /// `EXTENDS base`, [pous.oop.extends].
+    Extends,
+    /// `IMPLEMENTS I1, I2`, [pous.oop.implements].
+    Implements,
+    /// `METHOD … END_METHOD`, [pous.oop.method].
+    Method,
+    /// `PROPERTY … END_PROPERTY`, [pous.oop.property].
+    Property,
+    /// `GET … END_GET` of a property.
+    PropertyGet,
+    /// `SET … END_SET` of a property.
+    PropertySet,
+    /// `INTERFACE … END_INTERFACE`, [pous.oop.interface].
+    Interface,
     /// A `VAR_GLOBAL … END_VAR` list outside any POU, [config.global-list].
     GlobalVarList,
     /// `CONFIGURATION … END_CONFIGURATION`, [config.configuration].

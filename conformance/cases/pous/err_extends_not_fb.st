@@ -1,0 +1,6 @@
+(* spec: [pous.oop.extends]
+   expect: error RP0111 *)
+TYPE S : STRUCT a : INT; END_STRUCT END_TYPE
+
+FUNCTION_BLOCK FB_X EXTENDS S
+END_FUNCTION_BLOCK

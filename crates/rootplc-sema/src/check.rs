@@ -56,6 +56,10 @@ struct Pou<'a> {
     kind: PouKind,
     vars: Vec<Var<'a>>,
     ret: Option<Ty>,
+    /// The function block this one extends; its variables come first.
+    base: Option<usize>,
+    /// Number of leading variables inherited from `base`.
+    inherited: usize,
 }
 
 #[derive(Clone)]
@@ -204,6 +208,8 @@ pub(crate) struct Checker<'a> {
     globals_def: Option<usize>,
     /// CONFIGURATION blocks: (file, node), [config.configuration].
     configs: Vec<(usize, &'a Node)>,
+    /// Method definition -> the function block or program it belongs to.
+    owner: HashMap<usize, usize>,
     /// Diagnostics with the index of their file.
     pub(crate) diags: Vec<(usize, Diagnostic)>,
 }
@@ -262,6 +268,7 @@ impl<'a> Checker<'a> {
             globals: Vec::new(),
             globals_def: None,
             configs: Vec::new(),
+            owner: HashMap::new(),
             diags: Vec::new(),
         };
         // [stdlib.fbs]
@@ -316,6 +323,8 @@ impl<'a> Checker<'a> {
             kind: PouKind::FunctionBlock,
             vars,
             ret: None,
+            base: None,
+            inherited: 0,
         };
         self.add_def(name, Kind::Pou(pou), None, Span::new(0, 0));
     }
@@ -369,9 +378,22 @@ impl<'a> Checker<'a> {
 
     /// The typed IR of the project.
     pub(crate) fn into_program(mut self) -> ir::Program {
+        let mut memo = HashMap::new();
+        let full: Vec<Vec<Option<Init>>> = (0..self.defs.len())
+            .map(|id| self.full_inits(id, &mut memo))
+            .collect();
+        let tables: Vec<Vec<(String, usize)>> = (0..self.defs.len())
+            .map(|id| match &self.defs[id].kind {
+                Kind::Pou(p) if matches!(p.kind, PouKind::FunctionBlock | PouKind::Program) => {
+                    self.method_table(id)
+                }
+                _ => Vec::new(),
+            })
+            .collect();
         let mut defs = Vec::with_capacity(self.defs.len());
         for (id, d) in self.defs.iter().enumerate() {
             let mut irs = self.irs.remove(&id).unwrap_or_default();
+            irs.var_inits = full[id].clone();
             let mut inits = std::mem::take(&mut irs.var_inits).into_iter();
             let mut var = |v: &Var<'a>| ir::Var {
                 name: v.name.clone(),
@@ -391,7 +413,7 @@ impl<'a> Checker<'a> {
                 },
                 Kind::Pou(p) => {
                     let mut vars: Vec<ir::Var> = p.vars.iter().map(&mut var).collect();
-                    if let (PouKind::Function, Some(t)) = (p.kind, &p.ret) {
+                    if let (PouKind::Function | PouKind::Method, Some(t)) = (p.kind, &p.ret) {
                         vars.push(ir::Var {
                             name: d.name.clone(),
                             ty: t.clone(),
@@ -405,6 +427,9 @@ impl<'a> Checker<'a> {
                         ret: p.ret.clone(),
                         body: std::mem::take(&mut irs.body),
                         builtin: d.node.is_none(),
+                        owner: self.owner.get(&id).copied(),
+                        base: p.base,
+                        methods: tables[id].clone(),
                     })
                 }
             };
@@ -418,6 +443,34 @@ impl<'a> Checker<'a> {
             defs,
             globals: self.globals_def,
         }
+    }
+
+    /// Initial values of every slot, inherited ones taken from the base.
+    fn full_inits(
+        &self,
+        id: usize,
+        memo: &mut HashMap<usize, Vec<Option<Init>>>,
+    ) -> Vec<Option<Init>> {
+        if let Some(v) = memo.get(&id) {
+            return v.clone();
+        }
+        let mut own = self
+            .irs
+            .get(&id)
+            .map(|x| x.var_inits.clone())
+            .unwrap_or_default();
+        if let Kind::Pou(p) = &self.defs[id].kind {
+            if let Some(b) = p.base.filter(|&b| b != id) {
+                let inherited = self.full_inits(b, memo);
+                for (k, v) in inherited.into_iter().enumerate().take(p.inherited) {
+                    if let Some(slot) = own.get_mut(k) {
+                        *slot = v;
+                    }
+                }
+            }
+        }
+        memo.insert(id, own.clone());
+        own
     }
 
     // ---------------------------------------------------------------- tree access
@@ -539,10 +592,17 @@ impl<'a> Checker<'a> {
                     }
                 }
                 N::Program | N::Function | N::FunctionBlock | N::Test => {
-                    if let Some(Item::Tok(t)) = self.items(n).get(1).copied() {
-                        if self.tkind(t) == T::Ident {
-                            let span = self.tok_span(t);
-                            self.add_def(self.text(t), Kind::Pending, Some(n), span);
+                    if let Some(t) = self.decl_name(n) {
+                        let span = self.tok_span(t);
+                        let fb = self.add_def(self.text(t), Kind::Pending, Some(n), span);
+                        // [pous.oop.method]
+                        for m in self.child_nodes(n, N::Method) {
+                            if let Some(mt) = self.decl_name(m) {
+                                let full = format!("{}.{}", self.text(t), self.text(mt));
+                                let ms = self.tok_span(mt);
+                                let mid = self.add_def(&full, Kind::Pending, Some(m), ms);
+                                self.owner.insert(mid, fb);
+                            }
                         }
                     }
                 }
@@ -554,6 +614,154 @@ impl<'a> Checker<'a> {
                 _ => {}
             }
         }
+    }
+
+    /// The declared name of a POU or method: the first identifier after its
+    /// keyword and any modifiers.
+    fn decl_name(&self, n: &'a Node) -> Option<usize> {
+        self.items(n)
+            .into_iter()
+            .skip(1)
+            .find_map(|i| match i {
+                Item::Tok(t) if self.tkind(t) != T::Keyword => Some(t),
+                _ => None,
+            })
+            .filter(|&t| self.tkind(t) == T::Ident)
+    }
+
+    /// Short name of a method definition ("FB.M" -> "M").
+    fn method_name(&self, id: usize) -> &str {
+        let n = &self.defs[id].name;
+        n.rsplit_once('.').map_or(n.as_str(), |(_, m)| m)
+    }
+
+    /// Methods callable on an instance of `fb`: inherited first, overrides
+    /// replacing them, [pous.oop.override].
+    fn method_table(&self, fb: usize) -> Vec<(String, usize)> {
+        let mut table = match &self.defs[fb].kind {
+            Kind::Pou(p) => p.base.map(|b| self.method_table(b)).unwrap_or_default(),
+            _ => Vec::new(),
+        };
+        let mut own: Vec<usize> = self
+            .owner
+            .iter()
+            .filter(|&(_, &o)| o == fb)
+            .map(|(&m, _)| m)
+            .collect();
+        own.sort_unstable();
+        for m in own {
+            let name = self.method_name(m).to_string();
+            match table
+                .iter_mut()
+                .find(|(n, _)| n.eq_ignore_ascii_case(&name))
+            {
+                Some(slot) => slot.1 = m,
+                None => table.push((name, m)),
+            }
+        }
+        table
+    }
+
+    fn method_lookup(&self, fb: usize, name: &str) -> Option<usize> {
+        self.method_table(fb)
+            .into_iter()
+            .find(|(n, _)| n.eq_ignore_ascii_case(name))
+            .map(|(_, m)| m)
+    }
+
+    /// The function block or program whose instance the current scope runs on.
+    fn current_fb(&self) -> Option<usize> {
+        let id = self.scope?;
+        match &self.defs[id].kind {
+            Kind::Pou(p) if p.kind == PouKind::Method => self.owner.get(&id).copied(),
+            Kind::Pou(p) if matches!(p.kind, PouKind::FunctionBlock | PouKind::Program) => Some(id),
+            _ => None,
+        }
+    }
+
+    /// `anc` is `fb` or one of its bases.
+    fn is_self_or_base(&self, anc: usize, fb: usize) -> bool {
+        let mut cur = Some(fb);
+        let mut guard = 0;
+        while let Some(c) = cur {
+            if c == anc {
+                return true;
+            }
+            guard += 1;
+            if guard > 64 {
+                return false;
+            }
+            cur = match &self.defs[c].kind {
+                Kind::Pou(p) => p.base,
+                _ => None,
+            };
+        }
+        false
+    }
+
+    fn this_ir(&self, fb: usize, span: Span) -> ir::Expr {
+        ir::Expr {
+            ty: Ty::Named(fb),
+            kind: ExprKind::This,
+            span,
+        }
+    }
+
+    /// Inside a method: a variable of its function block (inherited ones too).
+    fn lookup_owner_var(&self, name: &str) -> Option<(Ty, usize, usize)> {
+        let id = self.scope?;
+        let Kind::Pou(m) = &self.defs[id].kind else {
+            return None;
+        };
+        if m.kind != PouKind::Method {
+            return None;
+        }
+        let fb = *self.owner.get(&id)?;
+        let Kind::Pou(p) = &self.defs[fb].kind else {
+            return None;
+        };
+        let slot = p
+            .vars
+            .iter()
+            .position(|v| v.name.eq_ignore_ascii_case(name))?;
+        Some((p.vars[slot].ty.clone(), slot, fb))
+    }
+
+    /// `THIS` or `SUPER`: a reference to the current instance, typed as the
+    /// block itself or its base, [pous.oop.this].
+    fn this_ref(&mut self, tok: usize, span: Span) -> V {
+        let word = self.text(tok).to_ascii_uppercase();
+        let Some(fb) = self.current_fb() else {
+            let msg = format!("{word} is only available in a function block, program or method");
+            self.diag(codes::UNKNOWN_NAME, msg, span, None);
+            return V::unknown(span);
+        };
+        let target = if word == "SUPER" {
+            match &self.defs[fb].kind {
+                Kind::Pou(p) if p.base.is_some() => p.base.unwrap_or(fb),
+                _ => {
+                    let msg = format!("'{}' has no base block (EXTENDS)", self.defs[fb].name);
+                    self.diag(codes::UNKNOWN_NAME, msg, span, None);
+                    return V::unknown(span);
+                }
+            }
+        } else {
+            fb
+        };
+        let inst = self.this_ir(target, span);
+        V::with(
+            Ty::Ref(Box::new(Ty::Named(target))),
+            span,
+            ExprKind::Ref(Box::new(inst)),
+        )
+    }
+
+    /// `SUPER^` as the base of a call: the base method runs without dispatch.
+    fn is_super(&self, n: &'a Node) -> bool {
+        n.kind == N::DerefExpr && self.first_node(n).is_some_and(|x| {
+            x.kind == N::NameRef
+                && matches!(self.items(x).first(), Some(Item::Tok(t)) if self.is_kw(*t, "SUPER"))
+        })
     }
 
     /// VAR_GLOBAL sections of a global list, a configuration or its resources.
@@ -602,6 +810,8 @@ impl<'a> Checker<'a> {
             kind: PouKind::FunctionBlock,
             vars,
             ret: None,
+            base: None,
+            inherited: 0,
         });
     }
 
@@ -731,9 +941,38 @@ impl<'a> Checker<'a> {
             N::Program => PouKind::Program,
             N::Function => PouKind::Function,
             N::FunctionBlock => PouKind::FunctionBlock,
+            N::Method => PouKind::Method,
             _ => PouKind::Test,
         };
-        let (mut vars, mut ret) = (Vec::new(), None);
+        let (mut vars, mut ret, mut base) = (Vec::new(), None, None);
+        // [pous.oop.extends]: the base block's variables come first
+        if let Some(ext) = self.child_nodes(node, N::Extends).first().copied() {
+            let name = self.items(ext).into_iter().find_map(|i| match i {
+                Item::Tok(t) if self.tkind(t) == T::Ident => Some(t),
+                _ => None,
+            });
+            if let Some(t) = name {
+                let bname = self.text(t);
+                let found = self.types.get(&bname.to_ascii_lowercase()).copied();
+                if let Some(b) = found {
+                    self.resolve(b);
+                }
+                match found.map(|b| (b, &self.defs[b].kind)) {
+                    Some((b, Kind::Pou(bp)))
+                        if matches!(bp.kind, PouKind::FunctionBlock) && b != id =>
+                    {
+                        vars = bp.vars.clone();
+                        base = Some(b);
+                    }
+                    _ => {
+                        let sp = self.tok_span(t);
+                        let msg = format!("'{bname}' is not a function block that can be extended");
+                        self.diag(codes::UNKNOWN_TYPE, msg, sp, None);
+                    }
+                }
+            }
+        }
+        let inherited = vars.len();
         for it in self.items(node) {
             let Item::Node(n) = it else { continue };
             match n.kind {
@@ -757,7 +996,13 @@ impl<'a> Checker<'a> {
                 _ => {}
             }
         }
-        self.defs[id].kind = Kind::Pou(Pou { kind, vars, ret });
+        self.defs[id].kind = Kind::Pou(Pou {
+            kind,
+            vars,
+            ret,
+            base,
+            inherited,
+        });
     }
 
     fn var_decl(&mut self, d: &'a Node, section: Section, out: &mut Vec<Var<'a>>) {
@@ -1142,8 +1387,13 @@ impl<'a> Checker<'a> {
                         self.diag(codes::DUPLICATE_NAME, msg, v.span, None);
                     }
                 }
-                for v in &p.vars {
-                    let init = v.init.and_then(|i| self.initializer(&v.ty, i));
+                for (k, v) in p.vars.iter().enumerate() {
+                    // inherited variables: their initial values come from the base
+                    let init = if k < p.inherited {
+                        None
+                    } else {
+                        v.init.and_then(|i| self.initializer(&v.ty, i))
+                    };
                     out.var_inits.push(init);
                 }
                 for s in self.child_nodes(node, N::StmtList) {
@@ -1461,7 +1711,12 @@ impl<'a> Checker<'a> {
         {
             return Some((p.vars[i].ty.clone(), i));
         }
-        if p.kind == PouKind::Function && self.defs[id].name.eq_ignore_ascii_case(name) {
+        let is_result = match p.kind {
+            PouKind::Function => self.defs[id].name.eq_ignore_ascii_case(name),
+            PouKind::Method => self.method_name(id).eq_ignore_ascii_case(name),
+            _ => false,
+        };
+        if is_result {
             return p.ret.clone().map(|t| (t, p.vars.len()));
         }
         None
@@ -1472,7 +1727,13 @@ impl<'a> Checker<'a> {
         use ir::ExprKind as K;
         let is_var = matches!(
             arg.kind,
-            K::Var(_) | K::Global(_) | K::Member(..) | K::Index(..) | K::Deref(_) | K::Invalid
+            K::Var(_)
+                | K::Global(_)
+                | K::This
+                | K::Member(..)
+                | K::Index(..)
+                | K::Deref(_)
+                | K::Invalid
         );
         if section == Section::InOut && !is_var {
             self.diag(
@@ -1742,9 +2003,16 @@ impl<'a> Checker<'a> {
             },
             N::NameRef => match its.first().copied() {
                 Some(Item::Tok(i)) => {
+                    if self.is_kw(i, "THIS") || self.is_kw(i, "SUPER") {
+                        return self.this_ref(i, span);
+                    }
                     let name = self.text(i);
                     if let Some((t, slot)) = self.lookup_var(name) {
                         return V::with(t, span, ExprKind::Var(slot));
+                    }
+                    if let Some((t, slot, fb)) = self.lookup_owner_var(name) {
+                        let inst = self.this_ir(fb, span);
+                        return V::with(t, span, ExprKind::Member(Box::new(inst), slot));
                     }
                     if let Some((t, slot)) = self.lookup_global(name) {
                         let mut v = V::with(t, span, ExprKind::Global(slot));
@@ -2208,6 +2476,10 @@ impl<'a> Checker<'a> {
             return V::unknown(span);
         };
         let base = self.expr(b);
+        self.member_on(base, m, span)
+    }
+
+    fn member_on(&mut self, base: V, m: usize, span: Span) -> V {
         let bt = self.strip(&base.ty);
         if self.tkind(m) == T::Integer {
             // bit access x.3
@@ -2227,6 +2499,10 @@ impl<'a> Checker<'a> {
         let tname = self.defs[id].name.clone();
         // [tests.whitebox]: TEST blocks may read every variable of an instance.
         let whitebox = self.scope_kind() == Some(PouKind::Test);
+        // THIS^.x: an instance's own variables, also inherited ones
+        let own = self
+            .current_fb()
+            .is_some_and(|f| self.is_self_or_base(id, f));
         let found = match &self.defs[id].kind {
             Kind::Struct(ms) => Some(
                 ms.iter()
@@ -2237,7 +2513,7 @@ impl<'a> Checker<'a> {
                 p.vars
                     .iter()
                     .position(|v| {
-                        (whitebox || v.section != Section::Local)
+                        (whitebox || v.section != Section::Local || own)
                             && v.name.eq_ignore_ascii_case(name)
                     })
                     .map(|i| (i, p.vars[i].ty.clone())),
@@ -2329,9 +2605,29 @@ impl<'a> Checker<'a> {
 
     fn call(&mut self, callee: &'a Node, list: &'a Node, span: Span) -> V {
         let args = self.args(list);
+        if callee.kind == N::MemberExpr {
+            let its = self.items(callee);
+            if let (Some(Item::Node(b)), Some(Item::Tok(m))) =
+                (its.first().copied(), its.get(2).copied())
+            {
+                let base = self.expr(b);
+                // [pous.oop.method]: inst.M(...), THIS^.M(...), SUPER^.M(...)
+                if let Ty::Named(fb) = self.strip(&base.ty) {
+                    if let Some(mdef) = self.method_lookup(fb, self.text(m)) {
+                        let dispatch = !self.is_super(b);
+                        let ms = self.tok_span(m);
+                        let recv = Some((base.ir(), fb, dispatch));
+                        return self.bind_call(V::of(Ty::Named(mdef), ms), &args, span, recv);
+                    }
+                }
+                let cspan = self.span(callee);
+                let mv = self.member_on(base, m, cspan);
+                return self.bind_call(mv, &args, span, None);
+            }
+        }
         if callee.kind != N::NameRef {
             let b = self.expr(callee);
-            return self.bind_call(b, &args, span);
+            return self.bind_call(b, &args, span, None);
         }
         let Some(Item::Tok(i)) = self.items(callee).first().copied() else {
             return V::unknown(span);
@@ -2339,11 +2635,23 @@ impl<'a> Checker<'a> {
         let name = self.text(i);
         let cspan = self.tok_span(i);
         if let Some((t, slot)) = self.lookup_var(name) {
-            return self.bind_call(V::with(t, cspan, ExprKind::Var(slot)), &args, span);
+            return self.bind_call(V::with(t, cspan, ExprKind::Var(slot)), &args, span, None);
+        }
+        if let Some((t, slot, fb)) = self.lookup_owner_var(name) {
+            let inst = self.this_ir(fb, cspan);
+            let v = V::with(t, cspan, ExprKind::Member(Box::new(inst), slot));
+            return self.bind_call(v, &args, span, None);
+        }
+        // a method of the current block, called without THIS^
+        if let Some(fb) = self.current_fb() {
+            if let Some(mdef) = self.method_lookup(fb, name) {
+                let recv = Some((self.this_ir(fb, cspan), fb, true));
+                return self.bind_call(V::of(Ty::Named(mdef), cspan), &args, span, recv);
+            }
         }
         if let Some(&id) = self.types.get(&name.to_ascii_lowercase()) {
             if matches!(&self.defs[id].kind, Kind::Pou(p) if p.kind == PouKind::Function) {
-                return self.bind_call(V::of(Ty::Named(id), cspan), &args, span);
+                return self.bind_call(V::of(Ty::Named(id), cspan), &args, span, None);
             }
         }
         let up = name.to_ascii_uppercase();
@@ -2364,7 +2672,13 @@ impl<'a> Checker<'a> {
 
     /// Call of a function-block or program instance (`callee` is a place),
     /// or of a user function (`callee` has the function's type, no place).
-    fn bind_call(&mut self, callee: V, args: &[Arg<'a>], span: Span) -> V {
+    fn bind_call(
+        &mut self,
+        callee: V,
+        args: &[Arg<'a>],
+        span: Span,
+        recv: Option<(ir::Expr, usize, bool)>,
+    ) -> V {
         let pou = match self.strip(&callee.ty) {
             Ty::Named(id) => match &self.defs[id].kind {
                 Kind::Pou(p) => Some((id, self.defs[id].name.clone(), p.clone())),
@@ -2435,7 +2749,18 @@ impl<'a> Checker<'a> {
                 }
             }
         }
-        let (target, ty) = if p.kind == PouKind::Function {
+        let (target, ty) = if let Some((inst, fb, dispatch)) = recv {
+            (
+                CallTarget::Method {
+                    inst,
+                    fb,
+                    method: id,
+                    name: self.method_name(id).to_string(),
+                    dispatch,
+                },
+                p.ret.clone().unwrap_or(Ty::Unknown),
+            )
+        } else if p.kind == PouKind::Function {
             (
                 CallTarget::Function(id),
                 p.ret.clone().unwrap_or(Ty::Unknown),

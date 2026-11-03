@@ -111,7 +111,10 @@ enum Flow {
 }
 
 struct Ctx {
+    /// The current frame: a program, block or test instance, or a call frame.
     this: Loc,
+    /// The instance a body or method runs on, and its type, [pous.oop.this].
+    inst: Option<(Loc, usize)>,
 }
 
 /// Statements one cycle (or one test) may execute before the watchdog fires.
@@ -474,11 +477,13 @@ impl<'p> Vm<'p> {
             return Ok(());
         };
         self.file = self.prog.defs[def].file;
+        let here = Loc {
+            root,
+            path: Vec::new(),
+        };
         let cx = Ctx {
-            this: Loc {
-                root,
-                path: Vec::new(),
-            },
+            this: here.clone(),
+            inst: Some((here, def)),
         };
         self.exec_block(&pou.body, &cx).map(|_| ())
     }
@@ -687,6 +692,10 @@ impl<'p> Vm<'p> {
     fn place(&mut self, e: &Expr, cx: &Ctx) -> R<Loc> {
         match &e.kind {
             ExprKind::Var(i) => Ok(cx.this.child(*i)),
+            ExprKind::This => match &cx.inst {
+                Some((l, _)) => Ok(l.clone()),
+                None => Err(self.fault(FaultKind::Unsupported, e.span, "THIS outside an instance")),
+            },
             ExprKind::Global(i) => Ok(Loc {
                 root: self.globals.unwrap_or(0),
                 path: vec![*i as u32],
@@ -739,6 +748,7 @@ impl<'p> Vm<'p> {
             ExprKind::Null => Ok(Value::Ref(None)),
             ExprKind::Var(_)
             | ExprKind::Global(_)
+            | ExprKind::This
             | ExprKind::Member(..)
             | ExprKind::Index(..)
             | ExprKind::Deref(_) => {
@@ -923,7 +933,11 @@ impl<'p> Vm<'p> {
                 } else {
                     let saved = self.file;
                     self.file = prog.defs[*id].file;
-                    self.exec_block(&pou.body, &Ctx { this: loc.clone() })?;
+                    let inner = Ctx {
+                        this: loc.clone(),
+                        inst: Some((loc.clone(), *id)),
+                    };
+                    self.exec_block(&pou.body, &inner)?;
                     self.file = saved;
                 }
                 self.write_back_in_out(c, pou, &loc, e.span, cx)?;
@@ -934,48 +948,36 @@ impl<'p> Vm<'p> {
                 }
                 Ok(Value::Int(0))
             }
-            CallTarget::Function(id) => {
-                let Some(pou) = prog.pou(*id) else {
-                    return Ok(Value::Int(0));
+            CallTarget::Function(id) => self.call_frame(c, e, cx, *id, None),
+            CallTarget::Method {
+                inst,
+                fb,
+                method,
+                name,
+                dispatch,
+            } => {
+                let loc = self.place(inst, cx)?;
+                // the instance's own type: for THIS, the block the caller runs on
+                // THIS, or THIS^ (a dereferenced reference to it)
+                let is_this = match &inst.kind {
+                    ExprKind::This => true,
+                    ExprKind::Deref(r) => {
+                        matches!(&r.kind, ExprKind::Ref(x) if matches!(x.kind, ExprKind::This))
+                    }
+                    _ => false,
                 };
-                if self.roots.len() > MAX_DEPTH + 64 {
-                    return Err(self.fault(
-                        FaultKind::Watchdog,
-                        e.span,
-                        "call depth exceeded (recursion?)",
-                    ));
-                }
-                let mut vals = Vec::new();
-                for (slot, ex) in &c.inputs {
-                    vals.push((*slot, self.eval(ex, cx)?, ex.span));
-                }
-                let frame = self.default_named(*id);
-                self.roots.push(frame);
-                let root = self.roots.len() - 1;
-                let floc = Loc {
-                    root,
-                    path: Vec::new(),
+                let rt = match &cx.inst {
+                    Some((_, d)) if is_this => *d,
+                    _ => *fb,
                 };
-                for (slot, v, span) in vals {
-                    self.store(&floc.child(slot), v, &pou.vars[slot].ty, span)?;
-                }
-                let saved = self.file;
-                self.file = prog.defs[*id].file;
-                self.exec_block(&pou.body, &Ctx { this: floc.clone() })?;
-                self.file = saved;
-                self.write_back_in_out(c, pou, &floc, e.span, cx)?;
-                let result = if pou.ret.is_some() {
-                    self.get(&floc.child(pou.vars.len() - 1), e.span)?.clone()
+                let m = if *dispatch {
+                    prog.pou(rt)
+                        .and_then(|p| p.methods.iter().find(|(n, _)| n.eq_ignore_ascii_case(name)))
+                        .map_or(*method, |x| x.1)
                 } else {
-                    Value::Int(0)
+                    *method
                 };
-                for (slot, target) in &c.outputs {
-                    let v = self.get(&floc.child(*slot), e.span)?.clone();
-                    let tl = self.place(target, cx)?;
-                    self.store(&tl, v, &target.ty, target.span)?;
-                }
-                self.roots.truncate(root);
-                Ok(result)
+                self.call_frame(c, e, cx, m, Some((loc, rt)))
             }
             CallTarget::Builtin { name, ty } => {
                 let mut args = Vec::with_capacity(c.args.len());
@@ -985,6 +987,66 @@ impl<'p> Vm<'p> {
                 self.builtin(name, ty.as_ref(), args, &c.args, e)
             }
         }
+    }
+
+    /// Run a function or method in a fresh frame; a method also gets the
+    /// instance it runs on.
+    fn call_frame(
+        &mut self,
+        c: &Call,
+        e: &Expr,
+        cx: &Ctx,
+        id: usize,
+        inst: Option<(Loc, usize)>,
+    ) -> R<Value> {
+        let prog = self.prog;
+        let Some(pou) = prog.pou(id) else {
+            return Ok(Value::Int(0));
+        };
+        if self.roots.len() > MAX_DEPTH + 64 {
+            return Err(self.fault(
+                FaultKind::Watchdog,
+                e.span,
+                "call depth exceeded (recursion?)",
+            ));
+        }
+        let mut vals = Vec::new();
+        for (slot, ex) in &c.inputs {
+            vals.push((*slot, self.eval(ex, cx)?, ex.span));
+        }
+        let frame = self.default_named(id);
+        self.roots.push(frame);
+        let root = self.roots.len() - 1;
+        let floc = Loc {
+            root,
+            path: Vec::new(),
+        };
+        for (slot, v, span) in vals {
+            self.store(&floc.child(slot), v, &pou.vars[slot].ty, span)?;
+        }
+        let saved = self.file;
+        self.file = prog.defs[id].file;
+        self.exec_block(
+            &pou.body,
+            &Ctx {
+                this: floc.clone(),
+                inst,
+            },
+        )?;
+        self.file = saved;
+        self.write_back_in_out(c, pou, &floc, e.span, cx)?;
+        let result = if pou.ret.is_some() {
+            self.get(&floc.child(pou.vars.len() - 1), e.span)?.clone()
+        } else {
+            Value::Int(0)
+        };
+        for (slot, target) in &c.outputs {
+            let v = self.get(&floc.child(*slot), e.span)?.clone();
+            let tl = self.place(target, cx)?;
+            self.store(&tl, v, &target.ty, target.span)?;
+        }
+        self.roots.truncate(root);
+        Ok(result)
     }
 
     fn builtin(
