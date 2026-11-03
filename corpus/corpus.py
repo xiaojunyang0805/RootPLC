@@ -33,7 +33,6 @@ SYNTAX_CODES = {f"RP{n:04d}" for n in list(range(1, 17)) + [201, 202, 301]}
 # Constructs RootPLC does not support yet (counted in extracted code). Keep in
 # step with the RULES list in crates/rootplc-driver/src/coverage.rs.
 FEATURES = {
-    "ACTION": r"^\s*ACTION\b",
     "VAR_INST / VAR_STAT": r"\bVAR_(INST|STAT)\b",
     "UNION": r"\bUNION\b",
     "SIZEOF": r"\bSIZEOF\s*\(",
@@ -170,6 +169,11 @@ def twincat_units(path: Path) -> list[tuple[str, str]]:
                         parts.append("END_" + acc.upper())
                 parts.append("END_PROPERTY")
             if kind == "POU":
+                # [pous.action]: actions as ACTION name: ... END_ACTION
+                for act in el.iter("Action"):
+                    parts.append(f"ACTION {act.get('Name', 'Action')}:")
+                    parts.append(text_of(act.find("Implementation/ST")).strip())
+                    parts.append("END_ACTION")
                 # the declaration may start with comments or {attribute} pragmas
                 code = re.sub(r"\(\*.*?\*\)|/\*.*?\*/|//[^\n]*|\{[^}]*\}", " ", decl, flags=re.S)
                 m = re.match(r"\s*(FUNCTION_BLOCK|FUNCTION|PROGRAM)\b", code, re.I)

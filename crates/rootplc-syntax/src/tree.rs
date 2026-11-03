@@ -31,6 +31,12 @@ pub enum NodeKind {
     PropertySet,
     /// `INTERFACE … END_INTERFACE`, [pous.oop.interface].
     Interface,
+    /// `ACTION name: … END_ACTION`, [pous.action].
+    Action,
+    /// `NAMESPACE name … END_NAMESPACE`, [pous.namespace].
+    Namespace,
+    /// `USING name {, name};`, [pous.namespace].
+    Using,
     /// A `VAR_GLOBAL … END_VAR` list outside any POU, [config.global-list].
     GlobalVarList,
     /// `CONFIGURATION … END_CONFIGURATION`, [config.configuration].

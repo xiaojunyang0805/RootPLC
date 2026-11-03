@@ -58,9 +58,30 @@ them before it, TwinCAT exports them after it). A PROGRAM may have members too.
 
 ## Object orientation
 
+**[pous.action]** An action is a named piece of code of a function block or
+program that works on its variables (a CODESYS and TwinCAT extension):
+
+```
+action = 'ACTION' name [ ':' ] { var_section } statement_list 'END_ACTION'
+```
+
+It behaves like a method without parameters or result: `inst.A()` or, inside
+the block, `A()`. Methods, properties and actions written after the end of
+their block at the top level of the same file (as CODESYS exports them)
+belong to the block before them.
+
+**[pous.namespace]** `NAMESPACE name … END_NAMESPACE` groups declarations and
+`USING name;` opens a namespace (IEC 61131-3 ed.3). Declarations inside a
+namespace are collected as usual and qualified names resolve by their last
+part ([pous.type-spec]); namespace-level name separation is not modelled yet.
+
+**[pous.oop.class]** `CLASS … END_CLASS` (IEC 61131-3 ed.3) declares a class:
+a function block without a body, with variables, methods and properties.
+
 **[pous.oop.modifiers]** `PUBLIC`, `PRIVATE`, `PROTECTED`, `INTERNAL`,
 `ABSTRACT`, `FINAL` and, on methods, `OVERRIDE` may precede the name of a
-function block, program, method or property. They are accepted and recorded;
+function block, program, method or property (some toolchains write them
+before METHOD or PROPERTY; that order is accepted too). They are accepted and recorded;
 access checks and the rules for abstract and final blocks follow in a later
 revision.
 

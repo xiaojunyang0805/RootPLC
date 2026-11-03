@@ -81,6 +81,8 @@ const LIST_END_KWS: &[&str] = &[
     "END_FUNCTION_BLOCK",
     "END_TEST",
     "END_METHOD",
+    "END_ACTION",
+    "END_CLASS",
     "END_IF",
     "END_CASE",
     "END_FOR",
@@ -179,7 +181,12 @@ impl<'a> Parser<'a> {
 
     /// At the start of a method or property, or at a word closing one.
     fn at_member_boundary(&self) -> bool {
-        if self.at_kw("METHOD") || self.at_word("PROPERTY") || self.at_word("END_PROPERTY") {
+        if self.at_kw("METHOD")
+            || self.at_kw("ACTION")
+            || self.at_word("PROPERTY")
+            || self.at_word("END_PROPERTY")
+            || self.at_modified_member()
+        {
             return true;
         }
         // a method may be called Get or Set; these words only matter in a property
@@ -368,45 +375,133 @@ impl<'a> Parser<'a> {
     fn source_file(&mut self) {
         self.b.start(N::SourceFile);
         while !self.at_eof() {
-            if self.at_kw("PROGRAM") {
-                self.pou(N::Program, "PROGRAM", "END_PROGRAM", false);
-            } else if self.at_kw("FUNCTION_BLOCK") {
-                self.pou(
-                    N::FunctionBlock,
-                    "FUNCTION_BLOCK",
-                    "END_FUNCTION_BLOCK",
-                    false,
-                );
-            } else if self.at_kw("FUNCTION") {
-                self.pou(N::Function, "FUNCTION", "END_FUNCTION", true);
-            } else if self.at_kw("TEST") {
-                self.pou(N::Test, "TEST", "END_TEST", false);
-            } else if self.at_kw("TYPE") {
-                self.type_block();
-            } else if self.at_kw("INTERFACE") {
-                self.interface();
-            } else if self.at_kw("VAR_GLOBAL") {
-                self.b.start(N::GlobalVarList);
-                self.var_section();
-                self.b.finish();
-            } else if self.at_kw("CONFIGURATION") {
-                self.configuration();
-            } else {
-                self.unexpected(
-                    "PROGRAM, FUNCTION, FUNCTION_BLOCK, TYPE, TEST, VAR_GLOBAL or CONFIGURATION",
-                );
-                self.b.start(N::Error);
-                self.bump();
-                while !self.at_eof()
-                    && !self.at_any_kw(POU_KWS)
-                    && !self.at_any_kw(&["VAR_GLOBAL", "CONFIGURATION"])
-                {
-                    self.bump();
-                }
-                self.b.finish();
-            }
+            self.top_item();
         }
         self.eat_trivia();
+    }
+
+    /// Keywords that start a declaration at the top level (or in a namespace).
+    fn at_top_start(&self) -> bool {
+        self.at_any_kw(POU_KWS)
+            || self.at_any_kw(&[
+                "VAR_GLOBAL",
+                "CONFIGURATION",
+                "CLASS",
+                "NAMESPACE",
+                "END_NAMESPACE",
+                "USING",
+                "METHOD",
+                "ACTION",
+            ])
+            || self.at_word("PROPERTY")
+            || self.at_modified_member()
+    }
+
+    /// One declaration at the top level or inside a namespace.
+    fn top_item(&mut self) {
+        if self.at_kw("PROGRAM") {
+            self.pou(N::Program, "PROGRAM", "END_PROGRAM", false);
+        } else if self.at_kw("FUNCTION_BLOCK") {
+            self.pou(
+                N::FunctionBlock,
+                "FUNCTION_BLOCK",
+                "END_FUNCTION_BLOCK",
+                false,
+            );
+        } else if self.at_kw("CLASS") {
+            // [pous.oop.class]: a class is a function block without a body
+            self.pou(N::FunctionBlock, "CLASS", "END_CLASS", false);
+        } else if self.at_kw("FUNCTION") {
+            self.pou(N::Function, "FUNCTION", "END_FUNCTION", true);
+        } else if self.at_kw("TEST") {
+            self.pou(N::Test, "TEST", "END_TEST", false);
+        } else if self.at_kw("TYPE") {
+            self.type_block();
+        } else if self.at_kw("INTERFACE") {
+            self.interface();
+        } else if self.at_kw("VAR_GLOBAL") {
+            self.b.start(N::GlobalVarList);
+            self.var_section();
+            self.b.finish();
+        } else if self.at_kw("CONFIGURATION") {
+            self.configuration();
+        } else if self.at_kw("NAMESPACE") {
+            self.namespace();
+        } else if self.at_kw("USING") {
+            self.using();
+        } else if self.at_kw("METHOD")
+            || self.at_kw("ACTION")
+            || self.at_word("PROPERTY")
+            || self.at_modified_member()
+        {
+            // [pous.action]: CODESYS exports members after their block
+            self.members("END_FUNCTION_BLOCK");
+        } else {
+            self.unexpected(
+                "PROGRAM, FUNCTION, FUNCTION_BLOCK, TYPE, TEST, VAR_GLOBAL or CONFIGURATION",
+            );
+            self.b.start(N::Error);
+            self.bump();
+            while !self.at_eof() && !self.at_top_start() {
+                self.bump();
+            }
+            self.b.finish();
+        }
+    }
+
+    /// [pous.namespace]: `NAMESPACE name … END_NAMESPACE`.
+    fn namespace(&mut self) {
+        self.b.start(N::Namespace);
+        let open_span = self.span_here();
+        self.bump();
+        self.qualified_name();
+        while !self.at_eof() && !self.at_kw("END_NAMESPACE") {
+            let before = self.pos;
+            self.top_item();
+            if self.pos == before {
+                self.bump();
+            }
+        }
+        if !self.eat_kw("END_NAMESPACE") {
+            self.error(
+                codes::MISSING_END,
+                "NAMESPACE is never closed: missing END_NAMESPACE".into(),
+                open_span,
+            );
+        }
+        self.b.finish();
+    }
+
+    /// [pous.namespace]: `USING name {, name};`.
+    fn using(&mut self) {
+        self.b.start(N::Using);
+        self.bump();
+        self.qualified_name();
+        while self.eat(TokenKind::Comma) {
+            self.qualified_name();
+        }
+        self.terminator();
+        self.b.finish();
+    }
+
+    /// Modifiers, then METHOD, PROPERTY or ACTION (truST style: `PUBLIC METHOD M`).
+    fn at_modified_member(&self) -> bool {
+        let mut k = 0;
+        while self.nth_index(k).is_some_and(|i| {
+            self.toks[i].kind == TokenKind::Keyword
+                && MODIFIER_KWS
+                    .iter()
+                    .any(|m| self.text_at(i).eq_ignore_ascii_case(m))
+        }) {
+            k += 1;
+        }
+        k > 0
+            && self.nth_index(k).is_some_and(|i| {
+                let t = self.text_at(i);
+                ["METHOD", "PROPERTY", "ACTION"]
+                    .iter()
+                    .any(|w| t.eq_ignore_ascii_case(w))
+            })
     }
 
     /// [pous.program], [pous.function], [pous.function-block], [pous.test], [pous.end].
@@ -575,9 +670,27 @@ impl<'a> Parser<'a> {
     /// Methods and properties of a function block, program or interface.
     fn members(&mut self, close: &str) {
         loop {
-            if self.at_kw("METHOD") {
+            let lead = self.at_modified_member();
+            let mut k = 0;
+            if lead {
+                while self.nth_index(k).is_some_and(|i| {
+                    self.toks[i].kind == TokenKind::Keyword
+                        && MODIFIER_KWS
+                            .iter()
+                            .any(|m| self.text_at(i).eq_ignore_ascii_case(m))
+                }) {
+                    k += 1;
+                }
+            }
+            let word = self
+                .nth_index(k)
+                .map(|i| self.text_at(i).to_ascii_uppercase())
+                .unwrap_or_default();
+            if word == "METHOD" && (lead || self.at_kw("METHOD")) {
                 self.method();
-            } else if self.at_word("PROPERTY") {
+            } else if word == "ACTION" && (lead || self.at_kw("ACTION")) {
+                self.action();
+            } else if word == "PROPERTY" && (lead || self.at_word("PROPERTY")) {
                 self.property();
             } else if self.at_word("END_PROPERTY") {
                 // a closing word without its opening: report and skip it
@@ -595,6 +708,9 @@ impl<'a> Parser<'a> {
     fn method(&mut self) {
         self.b.start(N::Method);
         let open_span = self.span_here();
+        while self.at_any_kw(MODIFIER_KWS) {
+            self.bump();
+        }
         self.bump();
         while self.at_any_kw(MODIFIER_KWS) {
             self.bump();
@@ -621,10 +737,41 @@ impl<'a> Parser<'a> {
         self.b.finish();
     }
 
+    /// [pous.action]: `ACTION name [:] statement_list END_ACTION`.
+    fn action(&mut self) {
+        self.b.start(N::Action);
+        let open_span = self.span_here();
+        while self.at_any_kw(MODIFIER_KWS) {
+            self.bump();
+        }
+        self.bump();
+        self.name();
+        self.eat(TokenKind::Colon);
+        while self.at_any_kw(SECTION_KWS) {
+            self.var_section();
+        }
+        self.stmt_list(&["END_ACTION"]);
+        if !self.eat_kw("END_ACTION") {
+            if self.at_eof() {
+                self.error(
+                    codes::MISSING_END,
+                    "ACTION is never closed: missing END_ACTION".into(),
+                    open_span,
+                );
+            } else {
+                self.unexpected("'END_ACTION'");
+            }
+        }
+        self.b.finish();
+    }
+
     /// [pous.oop.property]: `PROPERTY {modifier} name : type [GET …] [SET …] END_PROPERTY`.
     fn property(&mut self) {
         self.b.start(N::Property);
         let open_span = self.span_here();
+        while self.at_any_kw(MODIFIER_KWS) {
+            self.bump();
+        }
         self.bump();
         while self.at_any_kw(MODIFIER_KWS) {
             self.bump();

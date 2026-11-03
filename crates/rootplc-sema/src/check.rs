@@ -222,6 +222,8 @@ pub(crate) struct Checker<'a> {
     struct_base: HashMap<usize, (usize, usize)>,
     /// While set, a REFERENCE TO variable denotes the reference itself.
     raw_alias: bool,
+    /// The last function block or program collected in the current file.
+    last_block: Option<(usize, String)>,
     /// Property accessor definition -> (its PROPERTY node, is the getter).
     prop_info: HashMap<usize, (&'a Node, bool)>,
     /// Diagnostics with the index of their file.
@@ -288,6 +290,7 @@ impl<'a> Checker<'a> {
             abstract_fbs: HashSet::new(),
             struct_base: HashMap::new(),
             raw_alias: false,
+            last_block: None,
             prop_info: HashMap::new(),
             diags: Vec::new(),
         };
@@ -379,6 +382,7 @@ impl<'a> Checker<'a> {
     pub(crate) fn run(&mut self, roots: &[&'a Node]) {
         for (f, root) in roots.iter().enumerate() {
             self.cur = f;
+            self.last_block = None;
             self.collect(root);
         }
         if !self.global_sections.is_empty() {
@@ -618,45 +622,28 @@ impl<'a> Checker<'a> {
                         }
                     }
                 }
+                // [pous.namespace]: declarations inside a namespace are collected as usual
+                N::Namespace => self.collect(n),
+                // [pous.action]: a member after its block belongs to that block
+                N::Method | N::Property | N::Action => {
+                    if let Some((fb, fbname)) = self.last_block.clone() {
+                        self.register_member(fb, &fbname, n);
+                    }
+                }
                 N::Program | N::Function | N::FunctionBlock | N::Test | N::Interface => {
                     if let Some(t) = self.decl_name(n) {
                         let span = self.tok_span(t);
                         let fb = self.add_def(self.text(t), Kind::Pending, Some(n), span);
-                        // [pous.oop.method]
-                        for m in self.child_nodes(n, N::Method) {
-                            if let Some(mt) = self.decl_name(m) {
-                                let full = format!("{}.{}", self.text(t), self.text(mt));
-                                let ms = self.tok_span(mt);
-                                let mid = self.add_def(&full, Kind::Pending, Some(m), ms);
-                                self.owner.insert(mid, fb);
-                            }
+                        if matches!(n.kind, N::Program | N::FunctionBlock) {
+                            self.last_block = Some((fb, self.text(t).to_string()));
                         }
-                        // [pous.oop.property]: GET and SET become methods P#get / P#set
-                        for pr in self.child_nodes(n, N::Property) {
-                            let Some(pt) = self.decl_name(pr) else {
-                                continue;
-                            };
-                            let mut accs: Vec<(&'a Node, bool)> = Vec::new();
-                            accs.extend(
-                                self.child_nodes(pr, N::PropertyGet)
-                                    .into_iter()
-                                    .map(|a| (a, true)),
-                            );
-                            accs.extend(
-                                self.child_nodes(pr, N::PropertySet)
-                                    .into_iter()
-                                    .map(|a| (a, false)),
-                            );
-                            if accs.is_empty() {
-                                accs.push((pr, true)); // an interface property: its getter
-                            }
-                            for (acc, get) in accs {
-                                let suffix = if get { "get" } else { "set" };
-                                let full = format!("{}.{}#{suffix}", self.text(t), self.text(pt));
-                                let ps = self.tok_span(pt);
-                                let aid = self.add_def(&full, Kind::Pending, Some(acc), ps);
-                                self.owner.insert(aid, fb);
-                                self.prop_info.insert(aid, (pr, get));
+                        // [pous.oop.method], [pous.action], [pous.oop.property]
+                        let fbname = self.text(t).to_string();
+                        for m in self.items(n) {
+                            if let Item::Node(m) = m {
+                                if matches!(m.kind, N::Method | N::Action | N::Property) {
+                                    self.register_member(fb, &fbname, m);
+                                }
                             }
                         }
                     }
@@ -671,14 +658,66 @@ impl<'a> Checker<'a> {
         }
     }
 
+    /// A method, action or property of block `fb` becomes a definition
+    /// named "FB.M" (accessors "FB.P#get" / "FB.P#set").
+    fn register_member(&mut self, fb: usize, fbname: &str, m: &'a Node) {
+        if matches!(m.kind, N::Method | N::Action) {
+            if let Some(mt) = self.decl_name(m) {
+                let full = format!("{fbname}.{}", self.text(mt));
+                let ms = self.tok_span(mt);
+                let mid = self.add_def(&full, Kind::Pending, Some(m), ms);
+                self.owner.insert(mid, fb);
+            }
+            return;
+        }
+        {
+            {
+                // [pous.oop.property]: GET and SET become methods P#get / P#set
+                for pr in [m] {
+                    let Some(pt) = self.decl_name(pr) else {
+                        continue;
+                    };
+                    let mut accs: Vec<(&'a Node, bool)> = Vec::new();
+                    accs.extend(
+                        self.child_nodes(pr, N::PropertyGet)
+                            .into_iter()
+                            .map(|a| (a, true)),
+                    );
+                    accs.extend(
+                        self.child_nodes(pr, N::PropertySet)
+                            .into_iter()
+                            .map(|a| (a, false)),
+                    );
+                    if accs.is_empty() {
+                        accs.push((pr, true)); // an interface property: its getter
+                    }
+                    for (acc, get) in accs {
+                        let suffix = if get { "get" } else { "set" };
+                        let full = format!("{fbname}.{}#{suffix}", self.text(pt));
+                        let ps = self.tok_span(pt);
+                        let aid = self.add_def(&full, Kind::Pending, Some(acc), ps);
+                        self.owner.insert(aid, fb);
+                        self.prop_info.insert(aid, (pr, get));
+                    }
+                }
+            }
+        }
+    }
+
     /// The declared name of a POU or method: the first identifier after its
     /// keyword and any modifiers.
     fn decl_name(&self, n: &'a Node) -> Option<usize> {
+        // modifiers and keywords (including PROPERTY, a plain word) come first
         self.items(n)
             .into_iter()
-            .skip(1)
             .find_map(|i| match i {
-                Item::Tok(t) if self.tkind(t) != T::Keyword => Some(t),
+                Item::Tok(t)
+                    if self.tkind(t) != T::Keyword
+                        && !(n.kind == N::Property
+                            && self.text(t).eq_ignore_ascii_case("PROPERTY")) =>
+                {
+                    Some(t)
+                }
                 _ => None,
             })
             .filter(|&t| self.tkind(t) == T::Ident)
@@ -1420,7 +1459,7 @@ impl<'a> Checker<'a> {
             N::Program => PouKind::Program,
             N::Function => PouKind::Function,
             N::FunctionBlock => PouKind::FunctionBlock,
-            N::Method => PouKind::Method,
+            N::Method | N::Action => PouKind::Method,
             _ => PouKind::Test,
         };
         let (mut vars, mut ret, mut base) = (Vec::new(), None, None);

@@ -3,7 +3,7 @@
 //!
 //! - `portable`: checks without errors; tests and the VM can run it.
 //! - `dialect`: has errors and uses constructs RootPLC does not support yet
-//!   (vendor extensions such as actions, unions, SIZEOF). The
+//!   (vendor extensions such as unions, VAR_INST, SIZEOF). The
 //!   constructs are listed with their lines, so the cause is visible.
 //!   Implicit narrowing conversions (RP0103), which vendor compilers accept
 //!   and strict IEC 61131-3 does not, count as a dialect trait here.
@@ -115,23 +115,9 @@ impl Ctx<'_> {
     fn kind(&self, i: usize) -> Option<TokenKind> {
         self.toks.get(i).map(|t| t.kind)
     }
-
-    /// The token is the first thing on its line.
-    fn at_line_start(&self, i: usize) -> bool {
-        let start = self.toks[i].span.start as usize;
-        self.src[..start]
-            .rsplit('\n')
-            .next()
-            .is_some_and(|l| l.trim().is_empty())
-    }
-
-    fn decl(&self, i: usize, w: &str) -> bool {
-        self.is(i, w) && self.at_line_start(i)
-    }
 }
 
 const RULES: &[Rule] = &[
-    ("ACTION", false, |c, i| c.decl(i, "ACTION")),
     ("UNION", false, |c, i| c.is(i, "UNION")),
     ("VAR_INST / VAR_STAT", false, |c, i| {
         c.is(i, "VAR_INST") || c.is(i, "VAR_STAT")
@@ -325,7 +311,7 @@ mod tests {
     #[test]
     fn detects_constructs_on_tokens_only() {
         let src = "FUNCTION_BLOCK FB_A EXTENDS FB_Base\nVAR n : INT; u : UNION a : INT; END_UNION; END_VAR\n\
-                   n := SIZEOF(n); (* SIZEOF(n) in a comment *) s := 'UNION';\nTHIS^.x := __NEW(INT);\n{region main}\n{attribute 'hide'}\nEND_FUNCTION_BLOCK\nACTION Act:\nEND_ACTION";
+                   n := SIZEOF(n); (* SIZEOF(n) in a comment *) s := 'UNION';\nTHIS^.x := __NEW(INT);\nVAR_INST\n{region main}\n{attribute 'hide'}\nEND_FUNCTION_BLOCK";
         let found = constructs(src);
         let n: Vec<_> = found.iter().map(|c| c.name).collect();
         assert_eq!(
@@ -334,8 +320,8 @@ mod tests {
                 "UNION",
                 "SIZEOF",
                 "__ system calls",
-                "vendor pragmas {..}",
-                "ACTION"
+                "VAR_INST / VAR_STAT",
+                "vendor pragmas {..}"
             ]
         );
         assert_eq!(found[1].line, 3);
@@ -345,8 +331,8 @@ mod tests {
     }
 
     #[test]
-    fn action_only_as_declaration() {
-        assert!(names("PROGRAM p VAR action : INT; END_VAR END_PROGRAM").is_empty());
+    fn identifiers_are_not_constructs() {
+        assert!(names("PROGRAM p VAR union_count : INT; END_VAR END_PROGRAM").is_empty());
     }
 
     #[test]
