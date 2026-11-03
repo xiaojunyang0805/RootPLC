@@ -216,6 +216,8 @@ pub(crate) struct Checker<'a> {
     implements: HashMap<usize, Vec<usize>>,
     /// Function blocks declared ABSTRACT.
     abstract_fbs: HashSet<usize>,
+    /// Structure -> (base structure, number of inherited members).
+    struct_base: HashMap<usize, (usize, usize)>,
     /// Diagnostics with the index of their file.
     pub(crate) diags: Vec<(usize, Diagnostic)>,
 }
@@ -278,6 +280,7 @@ impl<'a> Checker<'a> {
             itf_bases: HashMap::new(),
             implements: HashMap::new(),
             abstract_fbs: HashSet::new(),
+            struct_base: HashMap::new(),
             diags: Vec::new(),
         };
         // [stdlib.fbs]
@@ -469,13 +472,16 @@ impl<'a> Checker<'a> {
             .get(&id)
             .map(|x| x.var_inits.clone())
             .unwrap_or_default();
-        if let Kind::Pou(p) = &self.defs[id].kind {
-            if let Some(b) = p.base.filter(|&b| b != id) {
-                let inherited = self.full_inits(b, memo);
-                for (k, v) in inherited.into_iter().enumerate().take(p.inherited) {
-                    if let Some(slot) = own.get_mut(k) {
-                        *slot = v;
-                    }
+        let base = match &self.defs[id].kind {
+            Kind::Pou(p) => p.base.map(|b| (b, p.inherited)),
+            Kind::Struct(_) => self.struct_base.get(&id).copied(),
+            _ => None,
+        };
+        if let Some((b, count)) = base.filter(|&(b, _)| b != id) {
+            let inherited = self.full_inits(b, memo);
+            for (k, v) in inherited.into_iter().enumerate().take(count) {
+                if let Some(slot) = own.get_mut(k) {
+                    *slot = v;
                 }
             }
         }
@@ -789,14 +795,7 @@ impl<'a> Checker<'a> {
         let Some(list) = self.child_nodes(node, kind).first().copied() else {
             return Vec::new();
         };
-        let toks: Vec<usize> = self
-            .items(list)
-            .into_iter()
-            .filter_map(|i| match i {
-                Item::Tok(t) if self.tkind(t) == T::Ident => Some(t),
-                _ => None,
-            })
-            .collect();
+        let toks = self.list_names(list);
         let mut out = Vec::new();
         for t in toks {
             let name = self.text(t).to_string();
@@ -818,6 +817,57 @@ impl<'a> Checker<'a> {
             }
         }
         out
+    }
+
+    /// The names of a comma-separated list; of a qualified name `Lib.Type`
+    /// the last part, [pous.type-spec].
+    fn list_names(&self, list: &'a Node) -> Vec<usize> {
+        let mut out = Vec::new();
+        let mut cur = None;
+        for i in self.items(list) {
+            if let Item::Tok(t) = i {
+                match self.tkind(t) {
+                    T::Ident => cur = Some(t),
+                    T::Comma => out.extend(cur.take()),
+                    _ => {}
+                }
+            }
+        }
+        out.extend(cur);
+        out
+    }
+
+    /// [types.derived.struct]: a structure that extends another has the
+    /// base's members first; their initial values come from the base.
+    fn struct_extends(&mut self, id: usize, ext: &'a Node) {
+        let Some(t) = self.list_names(ext).first().copied() else {
+            return;
+        };
+        let name = self.text(t).to_string();
+        let found = self.types.get(&name.to_ascii_lowercase()).copied();
+        if let Some(b) = found {
+            self.resolve(b);
+        }
+        let base_members = match found.map(|b| (b, &self.defs[b].kind)) {
+            Some((b, Kind::Struct(m))) if b != id => Some((b, m.clone())),
+            _ => None,
+        };
+        match (base_members, &self.defs[id].kind) {
+            (Some((b, mut members)), Kind::Struct(own)) => {
+                for m in &mut members {
+                    m.init = None;
+                }
+                let count = members.len();
+                members.extend(own.iter().cloned());
+                self.defs[id].kind = Kind::Struct(members);
+                self.struct_base.insert(id, (b, count));
+            }
+            _ => {
+                let sp = self.tok_span(t);
+                let msg = format!("'{name}' is not a structure that can be extended");
+                self.diag(codes::UNKNOWN_TYPE, msg, sp, None);
+            }
+        }
     }
 
     /// The type is an interface.
@@ -1105,6 +1155,9 @@ impl<'a> Checker<'a> {
             if matches!(self.defs[id].kind, Kind::Resolving) {
                 self.defs[id].kind = Kind::Alias(ty);
             }
+            if let Some(ext) = find(N::Extends) {
+                self.struct_extends(id, ext);
+            }
             return;
         }
         if node.kind == N::Interface {
@@ -1141,10 +1194,7 @@ impl<'a> Checker<'a> {
         let (mut vars, mut ret, mut base) = (Vec::new(), None, None);
         // [pous.oop.extends]: the base block's variables come first
         if let Some(ext) = self.child_nodes(node, N::Extends).first().copied() {
-            let name = self.items(ext).into_iter().find_map(|i| match i {
-                Item::Tok(t) if self.tkind(t) == T::Ident => Some(t),
-                _ => None,
-            });
+            let name = self.list_names(ext).first().copied();
             if let Some(t) = name {
                 let bname = self.text(t);
                 let found = self.types.get(&bname.to_ascii_lowercase()).copied();
@@ -1344,7 +1394,28 @@ impl<'a> Checker<'a> {
                 }
                 ty
             }
-            Item::Tok(i) if self.tkind(i) == T::Ident => self.type_name(i),
+            // [types.reference]: POINTER TO T is read as REF_TO T
+            Item::Tok(i)
+                if self.text(i).eq_ignore_ascii_case("POINTER")
+                    && matches!(its.get(1), Some(Item::Tok(t)) if self.is_kw(*t, "TO")) =>
+            {
+                match its.get(2).copied() {
+                    Some(Item::Node(s)) => Ty::Ref(Box::new(self.type_spec(s, None))),
+                    _ => Ty::Unknown,
+                }
+            }
+            // Lib.Type: the last part names the type
+            Item::Tok(i) if self.tkind(i) == T::Ident => {
+                let last = its
+                    .iter()
+                    .rev()
+                    .find_map(|x| match x {
+                        Item::Tok(t) if self.tkind(*t) == T::Ident => Some(*t),
+                        _ => None,
+                    })
+                    .unwrap_or(i);
+                self.type_name(last)
+            }
             Item::Tok(i) if self.is_kw(i, "REF_TO") => match its.get(1).copied() {
                 Some(Item::Node(s)) => Ty::Ref(Box::new(self.type_spec(s, None))),
                 _ => Ty::Unknown,
@@ -2875,6 +2946,21 @@ impl<'a> Checker<'a> {
             }
         }
         let up = name.to_ascii_uppercase();
+        if up == "ADR" && args.len() == 1 && args[0].name.is_none() {
+            // [types.reference]: CODESYS ADR(x) is read as REF(x)
+            self.diag(
+                codes::ADR_FUNCTION,
+                "ADR is a vendor function; RootPLC reads it as REF (no pointer arithmetic)".into(),
+                cspan,
+                None,
+            );
+            let v = self.expr(args[0].expr);
+            return V::with(
+                Ty::Ref(Box::new(v.ty.clone())),
+                span,
+                ExprKind::Ref(Box::new(v.ir())),
+            );
+        }
         if let Some(b) = builtin(&up) {
             return self.builtin_call(&up, b, &args, span);
         }

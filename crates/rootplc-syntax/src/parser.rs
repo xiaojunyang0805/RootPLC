@@ -319,6 +319,16 @@ impl<'a> Parser<'a> {
         }
     }
 
+    /// A name, possibly qualified by namespaces: `Lib.Type`, [pous.type-spec].
+    fn qualified_name(&mut self) -> bool {
+        let ok = self.name();
+        while ok && self.at(TokenKind::Dot) && self.nth_kind(1) == Some(TokenKind::Ident) {
+            self.bump();
+            self.bump();
+        }
+        ok
+    }
+
     /// Skip tokens into an Error node until a sync point, [syntax.recovery].
     /// Always consumes at least one token unless at a sync point already.
     fn recover(&mut self, extra_stop: &[&str]) {
@@ -540,18 +550,18 @@ impl<'a> Parser<'a> {
         if self.at_kw("EXTENDS") {
             self.b.start(N::Extends);
             self.bump();
-            self.name();
+            self.qualified_name();
             while self.eat(TokenKind::Comma) {
-                self.name();
+                self.qualified_name();
             }
             self.b.finish();
         }
         if self.at_kw("IMPLEMENTS") {
             self.b.start(N::Implements);
             self.bump();
-            self.name();
+            self.qualified_name();
             while self.eat(TokenKind::Comma) {
-                self.name();
+                self.qualified_name();
             }
             self.b.finish();
         }
@@ -687,7 +697,12 @@ impl<'a> Parser<'a> {
         while !self.at_eof() && !self.at_kw("END_TYPE") && !self.at_any_kw(POU_KWS) {
             let before = self.pos;
             self.b.start(N::TypeDecl);
-            if self.name() && self.expect(TokenKind::Colon, "':'") {
+            let named = self.name();
+            if named {
+                // [types.derived.struct]: TYPE B EXTENDS A : STRUCT … END_STRUCT
+                self.extends_implements();
+            }
+            if named && self.expect(TokenKind::Colon, "':'") {
                 self.type_spec();
                 if self.eat(TokenKind::Assign) {
                     self.initializer();
@@ -806,8 +821,20 @@ impl<'a> Parser<'a> {
                     self.subrange_or_enum();
                 }
             }
-            Some(TokenKind::Ident) => {
+            // [types.reference]: CODESYS POINTER TO T is read as REF_TO T
+            Some(TokenKind::Ident) if self.at_word("POINTER") && self.nth_is_kw(1, "TO") => {
+                let span = self.span_here();
                 self.bump();
+                self.bump();
+                self.error(
+                    codes::POINTER_TYPE,
+                    "POINTER TO is a vendor type; RootPLC reads it as REF_TO (no pointer arithmetic)".into(),
+                    span,
+                );
+                self.type_spec();
+            }
+            Some(TokenKind::Ident) => {
+                self.qualified_name();
             }
             Some(TokenKind::LParen) => self.subrange_or_enum(),
             Some(TokenKind::Keyword) if self.at_kw("ARRAY") => self.array_type(),

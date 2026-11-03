@@ -220,6 +220,20 @@ spec = "types.derived.string"
 stage = "sema"
 
 [[code]]
+id = "RP0116"
+severity = "warning"
+summary = "POINTER TO is read as REF_TO (not portable; no pointer arithmetic)"
+spec = "types.reference"
+stage = "parse"
+
+[[code]]
+id = "RP0117"
+severity = "warning"
+summary = "ADR(x) is read as REF(x) (not portable; no pointer arithmetic)"
+spec = "types.reference"
+stage = "sema"
+
+[[code]]
 id = "RP0115"
 severity = "warning"
 summary = "enumeration base type after the values (not portable); write UINT (...)"

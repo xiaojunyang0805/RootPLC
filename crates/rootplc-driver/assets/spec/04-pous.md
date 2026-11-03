@@ -171,5 +171,9 @@ subrange_or_enum = expression '..' expression | enum_value { ',' enum_value }
 enum_value   = name [ ':=' expression ]
 ```
 
+A type name may be qualified by library namespaces, `Tc2_System.T_MaxString`
+or `TcUnit.FB_TestSuite`; RootPLC resolves the last part (library namespaces
+are not modelled yet), also in EXTENDS and IMPLEMENTS.
+
 Ed3 object orientation (`CLASS`, `METHOD`, `INTERFACE`, `PROPERTY`) is
 reserved for a later revision.

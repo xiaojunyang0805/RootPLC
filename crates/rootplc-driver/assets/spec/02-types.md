@@ -153,7 +153,9 @@ Enumerations do not convert implicitly to integers (RP0103); use `TO_INT`.
 **[types.derived.struct]** `STRUCT ... END_STRUCT` declares members with
 optional initial values. A structure that contains itself, directly or
 through other structures or arrays, is error RP0107. (`REF_TO` to itself is
-allowed.)
+allowed.) `TYPE B EXTENDS A : STRUCT … END_STRUCT` (CODESYS and TwinCAT) gives
+B the members of A first, with A's initial values, then its own; the base
+must be a structure (RP0111).
 
 **[types.derived.array]** `ARRAY[l1..u1, l2..u2] OF T`. Bounds are constant
 `DINT` expressions with l <= u, otherwise error RP0108. A constant index
@@ -171,5 +173,8 @@ warning RP0110.
 **[types.reference]** `REF_TO T` is a reference to a variable of type T.
 `REF(x)` takes a reference, `r^` dereferences it, and `NULL` is the empty
 reference. Dereferencing `NULL` raises the fault `NULL_REF`. CODESYS
-`POINTER TO` is not part of the language. The importer maps it to `REF_TO`
+`POINTER TO T` is read as `REF_TO T` with warning RP0116, and `ADR(x)` as
+`REF(x)` with warning RP0117; pointer arithmetic is not supported (an
+arithmetic operator on a reference is RP0103). `POINTER TO` is not part of
+the language. The importer maps it to `REF_TO`
 where it can and reports the rest.

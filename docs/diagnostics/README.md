@@ -37,6 +37,8 @@ Codes RP00xx are lexical, RP01xx types, RP02xx names and structure, RP03xx synta
 | [RP0108](#rp0108) | error | invalid bounds or length |
 | [RP0109](#rp0109) | error | constant array index out of bounds |
 | [RP0110](#rp0110) | warning | string literal longer than declared length; it will be truncated |
+| [RP0116](#rp0116) | warning | POINTER TO is read as REF_TO (not portable; no pointer arithmetic) |
+| [RP0117](#rp0117) | warning | ADR(x) is read as REF(x) (not portable; no pointer arithmetic) |
 | [RP0115](#rp0115) | warning | enumeration base type after the values (not portable); write UINT (...) |
 | [RP0114](#rp0114) | error | a VAR_IN_OUT argument must be a variable |
 | [RP0113](#rp0113) | warning | FUNCTION without a result type (not portable); call it as a statement |
@@ -417,7 +419,9 @@ Rule `types.derived.struct` in `spec/02-types.md`:
 **[types.derived.struct]** `STRUCT ... END_STRUCT` declares members with
 optional initial values. A structure that contains itself, directly or
 through other structures or arrays, is error RP0107. (`REF_TO` to itself is
-allowed.)
+allowed.) `TYPE B EXTENDS A : STRUCT … END_STRUCT` (CODESYS and TwinCAT) gives
+B the members of A first, with A's initial values, then its own; the base
+must be a structure (RP0111).
 
 ## RP0108
 
@@ -455,6 +459,36 @@ same and is accepted with warning RP0112, because real code uses it widely;
 the portable spelling is `STRING[n]`. Assigning a longer string truncates it to n characters.
 A string literal longer than n in a declaration or constant assignment is
 warning RP0110.
+
+## RP0116
+
+warning: POINTER TO is read as REF_TO (not portable; no pointer arithmetic)
+
+Rule `types.reference` in `spec/02-types.md`:
+
+**[types.reference]** `REF_TO T` is a reference to a variable of type T.
+`REF(x)` takes a reference, `r^` dereferences it, and `NULL` is the empty
+reference. Dereferencing `NULL` raises the fault `NULL_REF`. CODESYS
+`POINTER TO T` is read as `REF_TO T` with warning RP0116, and `ADR(x)` as
+`REF(x)` with warning RP0117; pointer arithmetic is not supported (an
+arithmetic operator on a reference is RP0103). `POINTER TO` is not part of
+the language. The importer maps it to `REF_TO`
+where it can and reports the rest.
+
+## RP0117
+
+warning: ADR(x) is read as REF(x) (not portable; no pointer arithmetic)
+
+Rule `types.reference` in `spec/02-types.md`:
+
+**[types.reference]** `REF_TO T` is a reference to a variable of type T.
+`REF(x)` takes a reference, `r^` dereferences it, and `NULL` is the empty
+reference. Dereferencing `NULL` raises the fault `NULL_REF`. CODESYS
+`POINTER TO T` is read as `REF_TO T` with warning RP0116, and `ADR(x)` as
+`REF(x)` with warning RP0117; pointer arithmetic is not supported (an
+arithmetic operator on a reference is RP0103). `POINTER TO` is not part of
+the language. The importer maps it to `REF_TO`
+where it can and reports the rest.
 
 ## RP0115
 

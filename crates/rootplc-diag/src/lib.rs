@@ -203,6 +203,8 @@ pub mod codes {
         FUNCTION_WITHOUT_RESULT = 113, Warning;
         IN_OUT_NOT_VARIABLE = 114, Error;
         ENUM_BASE_TYPE_AFTER = 115, Warning;
+        POINTER_TYPE = 116, Warning;
+        ADR_FUNCTION = 117, Warning;
     }
 
     /// Severity of a code, if the code exists.
