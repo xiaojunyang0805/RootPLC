@@ -243,6 +243,8 @@ pub(crate) struct Checker<'a> {
     enum_base: HashMap<usize, Elem>,
     /// Property accessor definition -> (its PROPERTY node, is the getter).
     prop_info: HashMap<usize, (&'a Node, bool)>,
+    /// Structure types declared as UNION ([types.derived.union]).
+    unions: HashSet<usize>,
     /// Diagnostics with the index of their file.
     pub(crate) diags: Vec<(usize, Diagnostic)>,
 }
@@ -316,6 +318,7 @@ impl<'a> Checker<'a> {
             intrinsics: HashSet::new(),
             enum_base: HashMap::new(),
             prop_info: HashMap::new(),
+            unions: HashSet::new(),
             diags: Vec::new(),
         };
         // [stdlib.fbs]
@@ -549,9 +552,12 @@ impl<'a> Checker<'a> {
                 kind,
             });
         }
+        let mut unions: Vec<usize> = self.unions.iter().copied().collect();
+        unions.sort_unstable();
         ir::Program {
             defs,
             globals: self.globals_def,
+            unions,
         }
     }
 
@@ -1210,10 +1216,12 @@ impl<'a> Checker<'a> {
             Ty::Named(id) => match &self.defs[*id].kind {
                 Kind::Struct(members) => {
                     let (mut off, mut max_a) = (0u128, 1u128);
+                    let union = self.unions.contains(id);
                     for m in members {
                         let (s, a) = self.layout(&m.ty, depth + 1)?;
                         let a = a.min(8);
-                        off = round(off, a) + s;
+                        // a union's members share storage: its size is the largest
+                        off = if union { off.max(s) } else { round(off, a) + s };
                         max_a = max_a.max(a);
                     }
                     Some((round(off, max_a), max_a))
@@ -1539,7 +1547,8 @@ impl<'a> Checker<'a> {
             .child_nodes(node, N::TaskConfig)
             .into_iter()
             .filter_map(|t| {
-                self.items(t).iter().find_map(|i| match i {
+                // skip the word TASK itself (an identifier token, [lexical.keywords.soft])
+                self.items(t).iter().skip(1).find_map(|i| match i {
                     Item::Tok(k) if self.tkind(*k) == T::Ident => {
                         Some(self.text(*k).to_ascii_lowercase())
                     }
@@ -1552,7 +1561,7 @@ impl<'a> Checker<'a> {
             let (mut task, mut ty, mut after_with, mut after_colon) = (None, None, false, false);
             for it in &its {
                 if let Item::Tok(t) = *it {
-                    if self.is_kw(t, "WITH") {
+                    if self.text(t).eq_ignore_ascii_case("WITH") {
                         after_with = true;
                     } else if self.tkind(t) == T::Colon {
                         after_colon = true;
@@ -1795,6 +1804,15 @@ impl<'a> Checker<'a> {
         for it in &its {
             match *it {
                 Item::Tok(t) if self.tkind(t) == T::Colon => before_colon = false,
+                // x AT %IX0.0: AT is the word before the address, not a name
+                Item::Tok(t) if self.tkind(t) == T::DirectVariable => {
+                    if names
+                        .last()
+                        .is_some_and(|&a| self.text(a).eq_ignore_ascii_case("AT"))
+                    {
+                        names.pop();
+                    }
+                }
                 Item::Tok(t)
                     if before_colon && (self.tkind(t) == T::Ident || self.is_kw(t, "TEST")) =>
                 {
@@ -1983,7 +2001,13 @@ impl<'a> Checker<'a> {
                     for d in self.child_nodes(e, N::VarDecl) {
                         self.var_decl(d, Section::Local, &mut members);
                     }
-                    self.make_def(decl, Kind::Struct(members))
+                    let union = matches!(self.items(e).first(), Some(Item::Tok(t))
+                        if self.text(*t).eq_ignore_ascii_case("UNION"));
+                    let ty = self.make_def(decl, Kind::Struct(members));
+                    if let (true, Ty::Named(id)) = (union, &ty) {
+                        self.unions.insert(*id);
+                    }
+                    ty
                 }
                 _ => Ty::Unknown,
             },
@@ -2348,6 +2372,39 @@ impl<'a> Checker<'a> {
                 );
                 self.coerce(&target.ty, &r);
                 Some(Stmt::Assign(target.ir(), r.ir()))
+            }
+            N::AssignStmt
+                if matches!(its.get(1), Some(Item::Tok(t))
+                    if self.tkind(*t) == T::Ident && matches!(self.text(*t), "S" | "s" | "R" | "r")) =>
+            {
+                // [statements.assignment.set-reset]: x S= c is IF c THEN x := TRUE
+                let (Some(Item::Node(t)), Some(Item::Tok(op)), Some(Item::Node(e))) = (
+                    its.first().copied(),
+                    its.get(1).copied(),
+                    its.get(3).copied(),
+                ) else {
+                    return None;
+                };
+                let set = self.text(op).eq_ignore_ascii_case("S");
+                let span = self.span(n);
+                let msg = format!(
+                    "'{}=' is a vendor spelling; IEC 61131-3 writes IF ... THEN ... := {}; END_IF",
+                    self.text(op).to_ascii_uppercase(),
+                    if set { "TRUE" } else { "FALSE" }
+                );
+                self.diag(codes::SET_RESET_ASSIGN, msg, span, None);
+                let target = self.expr(t);
+                self.coerce(&Ty::Elem(Elem::Bool), &target);
+                let cond = self.condition(e);
+                let value = ir::Expr {
+                    ty: Ty::Elem(Elem::Bool),
+                    kind: ExprKind::Const(Const::Bool(set)),
+                    span,
+                };
+                Some(Stmt::If(
+                    vec![(cond, vec![Stmt::Assign(target.ir(), value)])],
+                    Vec::new(),
+                ))
             }
             N::AssignStmt => {
                 let (Some(Item::Node(t)), Some(Item::Tok(op)), Some(Item::Node(e))) = (

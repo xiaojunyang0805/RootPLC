@@ -2,8 +2,8 @@
 //! by unit. Each file is a unit and gets one status:
 //!
 //! - `portable`: checks without errors; tests and the VM can run it.
-//! - `dialect`: has errors and uses constructs RootPLC does not support yet
-//!   (vendor extensions such as unions, VAR_STAT, vendor pragmas). The
+//! - `dialect`: has errors and uses vendor constructs (unions, VAR_STAT,
+//!   `__` system calls, vendor pragmas), which explain them. The
 //!   constructs are listed with their lines, so the cause is visible.
 //!   Implicit narrowing conversions (RP0103), which vendor compilers accept
 //!   and strict IEC 61131-3 does not, count as a dialect trait here.
@@ -355,7 +355,7 @@ mod tests {
             ),
             (
                 PathBuf::from("b.st"),
-                "PROGRAM b VAR u : UNION a : INT; END_UNION; END_VAR END_PROGRAM".into(),
+                "PROGRAM b VAR p : REF_TO INT; END_VAR p := __NEW(INT); END_PROGRAM".into(),
             ),
             (
                 PathBuf::from("c.st"),
@@ -373,7 +373,7 @@ mod tests {
         let r = coverage_sources(vec![
             (
                 PathBuf::from("lib.st"),
-                "FUNCTION_BLOCK FB_Lib\nVAR u : UNION a : INT; END_UNION; END_VAR\nEND_FUNCTION_BLOCK"
+                "FUNCTION_BLOCK FB_Lib\nVAR_INPUT\n    a : INT\n    b : __NEW(INT);\nEND_VAR\nEND_FUNCTION_BLOCK"
                     .into(),
             ),
             (

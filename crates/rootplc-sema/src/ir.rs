@@ -43,6 +43,8 @@ pub struct Program {
     /// The definition holding the global variables (instantiated once per
     /// VM), if the project declares any, [config.global-list].
     pub globals: Option<usize>,
+    /// Structure definitions declared as UNION, sorted ([types.derived.union]).
+    pub unions: Vec<usize>,
 }
 
 impl Program {

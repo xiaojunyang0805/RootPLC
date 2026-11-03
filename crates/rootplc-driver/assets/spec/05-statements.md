@@ -20,6 +20,11 @@ the statement. A lone `;` is an empty statement.
 assignment   = variable ':=' expression ';'
 ```
 
+**[statements.assignment.set-reset]** The CODESYS and TwinCAT set and reset
+assignments `x S= c;` and `x R= c;` mean `IF c THEN x := TRUE; END_IF` and
+`IF c THEN x := FALSE; END_IF`; `x` and `c` are `BOOL`. They are accepted
+with warning RP0123.
+
 **[statements.call]** A call to a function or function-block instance as a
 statement. Arguments are positional, or named with `:=` (input) and `=>`
 (output):

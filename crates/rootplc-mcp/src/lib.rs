@@ -532,7 +532,7 @@ mod tests {
 
         let rep = tool(
             "rootplc_coverage",
-            r#"{"source":"PROGRAM p VAR u : UNION a : INT; END_UNION; END_VAR END_PROGRAM"}"#,
+            r#"{"source":"PROGRAM p VAR r : REF_TO INT; END_VAR r := __NEW(INT); END_PROGRAM"}"#,
         );
         assert_eq!(rep.get("dialect").and_then(Json::as_f64), Some(1.0));
     }

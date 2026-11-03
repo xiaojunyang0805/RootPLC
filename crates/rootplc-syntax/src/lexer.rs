@@ -3,7 +3,9 @@
 //! It never stops at an error. Every byte ends up in exactly one token, and
 //! each problem is reported once with its stable code.
 
-use crate::token::{Token, TokenKind, is_elementary_type, is_keyword, is_known_pragma};
+use crate::token::{
+    Token, TokenKind, is_elementary_type, is_keyword, is_known_pragma, is_soft_keyword,
+};
 use rootplc_diag::{Diagnostic, Span, codes};
 
 /// Output of the lexer.
@@ -412,7 +414,7 @@ impl<'a> Lexer<'a> {
                 self.pos,
             );
         }
-        if is_keyword(word) {
+        if is_keyword(word) && !is_soft_keyword(word) {
             TokenKind::Keyword
         } else if is_elementary_type(word) {
             TokenKind::TypeName

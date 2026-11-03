@@ -6,7 +6,7 @@
 //! a synchronisation point and continues, [syntax.recovery].
 
 use crate::lexer::lex;
-use crate::token::{Token, TokenKind};
+use crate::token::{Token, TokenKind, is_soft_keyword};
 use crate::tree::{Builder, Node, NodeKind as N};
 use rootplc_diag::{Code, Diagnostic, Span, codes};
 
@@ -341,6 +341,14 @@ impl<'a> Parser<'a> {
     fn name(&mut self) -> bool {
         match self.kind() {
             Some(TokenKind::Ident) => {
+                let i = self.nth_index(0).unwrap_or(self.pos);
+                if is_soft_keyword(self.text_at(i)) {
+                    let msg = format!(
+                        "'{}' is reserved in IEC 61131-3; RootPLC accepts it as a name",
+                        self.text_at(i)
+                    );
+                    self.error(codes::SOFT_KEYWORD_NAME, msg, self.toks[i].span);
+                }
                 self.bump();
                 true
             }
@@ -638,13 +646,15 @@ impl<'a> Parser<'a> {
                 let open_span = self.span_here();
                 self.bump();
                 self.name();
-                if self.expect_kw("ON") {
+                if self.eat_word("ON") {
                     self.name();
+                } else {
+                    self.unexpected("'ON'");
                 }
                 self.config_items("END_RESOURCE");
                 self.close_config("RESOURCE", "END_RESOURCE", open_span);
                 self.b.finish();
-            } else if self.at_kw("TASK") {
+            } else if self.at_word("TASK") {
                 // [config.task]
                 self.b.start(N::TaskConfig);
                 self.bump();
@@ -660,7 +670,7 @@ impl<'a> Parser<'a> {
                 self.bump();
                 let _ = self.eat_kw("RETAIN") || self.eat_kw("NON_RETAIN");
                 self.name();
-                if self.eat_kw("WITH") {
+                if self.eat_word("WITH") {
                     self.name();
                 }
                 if self.expect(TokenKind::Colon, "':' and the program type") {
@@ -844,6 +854,10 @@ impl<'a> Parser<'a> {
             if self.at_word(open) {
                 self.b.start(kind);
                 self.bump();
+                // [pous.oop.modifiers]: GET PUBLIC (TwinCAT access per accessor)
+                while self.at_any_kw(MODIFIER_KWS) {
+                    self.bump();
+                }
                 while self.at_section() {
                     self.var_section();
                 }
@@ -993,7 +1007,8 @@ impl<'a> Parser<'a> {
         while self.eat(TokenKind::Comma) {
             self.name();
         }
-        if self.eat_kw("AT") {
+        if self.at_word("AT") && self.nth_kind(1) == Some(TokenKind::DirectVariable) {
+            self.bump();
             self.expect(TokenKind::DirectVariable, "a direct address such as %IX0.0");
         }
         if self.expect(TokenKind::Colon, "':' and a type") {
@@ -1075,6 +1090,8 @@ impl<'a> Parser<'a> {
                 );
                 self.type_spec();
             }
+            // [types.derived.union] (CODESYS / TwinCAT)
+            Some(TokenKind::Ident) if self.at_word("UNION") => self.struct_type(),
             Some(TokenKind::Ident) => {
                 self.qualified_name();
             }
@@ -1157,29 +1174,35 @@ impl<'a> Parser<'a> {
         self.b.finish();
     }
 
+    /// `STRUCT ... END_STRUCT`, or `UNION ... END_UNION` ([types.derived.union]).
     fn struct_type(&mut self) {
         self.b.start(N::StructType);
         let open_span = self.span_here();
-        self.bump(); // STRUCT
-        while !self.at_eof() && !self.at_kw("END_STRUCT") && !self.at_any_kw(&["END_TYPE"]) {
+        let (open, close) = if self.at_word("UNION") {
+            ("UNION", "END_UNION")
+        } else {
+            ("STRUCT", "END_STRUCT")
+        };
+        self.bump(); // STRUCT or UNION
+        while !self.at_eof() && !self.at_word(close) && !self.at_any_kw(&["END_TYPE"]) {
             let before = self.pos;
             self.var_decl();
             if self.pos == before {
-                self.recover(&["END_STRUCT"]);
+                self.recover(&[close]);
                 if self.pos == before {
                     self.bump();
                 }
             }
         }
-        if !self.eat_kw("END_STRUCT") {
+        if !self.eat_word(close) {
             if self.at_eof() {
                 self.error(
                     codes::MISSING_END,
-                    "STRUCT is never closed: missing END_STRUCT".into(),
+                    format!("{open} is never closed: missing {close}"),
                     open_span,
                 );
             } else {
-                self.unexpected("'END_STRUCT'");
+                self.unexpected(&format!("'{close}'"));
             }
         }
         self.b.finish();
@@ -1290,11 +1313,18 @@ impl<'a> Parser<'a> {
         let cp = self.b.checkpoint();
         self.postfix_expr();
         let ref_assign = self.at_kw("REF") && self.nth_kind(1) == Some(TokenKind::Eq);
-        if self.at(TokenKind::Assign) || self.at(TokenKind::AssignAttempt) || ref_assign {
+        // [statements.assignment.set-reset]: x S= c; x R= c; (CODESYS / TwinCAT)
+        let set_reset =
+            (self.at_word("S") || self.at_word("R")) && self.nth_kind(1) == Some(TokenKind::Eq);
+        if self.at(TokenKind::Assign)
+            || self.at(TokenKind::AssignAttempt)
+            || ref_assign
+            || set_reset
+        {
             self.b.start_at(cp, N::AssignStmt);
             self.bump();
-            if ref_assign {
-                self.bump(); // the '=' of REF=
+            if ref_assign || set_reset {
+                self.bump(); // the '=' of REF=, S=, R=
             }
             if self.expr_start() {
                 self.expr();
@@ -1363,7 +1393,9 @@ impl<'a> Parser<'a> {
                     | TokenKind::Minus
                     | TokenKind::Plus
                     | TokenKind::Comma
-                    | TokenKind::DotDot,
+                    | TokenKind::DotDot
+                    // E.V (CODESYS / TwinCAT enumeration value)
+                    | TokenKind::Dot,
                 ) => n += 1,
                 _ => return false,
             }

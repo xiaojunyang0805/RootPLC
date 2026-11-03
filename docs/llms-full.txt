@@ -524,6 +524,8 @@ Codes RP00xx are lexical, RP01xx types, RP02xx names and structure, RP03xx synta
 | [RP0120](#rp0120) | warning | call of a library function that RootPLC declares but does not implement |
 | [RP0121](#rp0121) | error | SIZEOF of a value whose size is not known (function-block instance, open array) |
 | [RP0122](#rp0122) | warning | enumeration value written E.V (not portable); write E#V |
+| [RP0123](#rp0123) | warning | set/reset assignment S= or R= (not portable); write IF ... THEN ... END_IF |
+| [RP0124](#rp0124) | warning | reserved word declared as a name (AT, ON, STEP, TASK, TRANSITION, INITIAL_STEP, WITH) |
 | [RP0115](#rp0115) | warning | enumeration base type after the values (not portable); write UINT (...) |
 | [RP0114](#rp0114) | error | a VAR_IN_OUT argument must be a variable |
 | [RP0113](#rp0113) | warning | FUNCTION without a result type (not portable); call it as a statement |
@@ -895,7 +897,7 @@ warning RP0115. The default is the first value. `Mode#Auto` names a value; plain
 allowed when exactly one enumeration in scope has it, otherwise error RP0106.
 The CODESYS and TwinCAT spelling `Mode.Auto` (also qualified by a namespace,
 `NS.Mode.Auto`) means `Mode#Auto` and is accepted with warning RP0122 when
-`Mode` is not the name of a variable.
+`Mode` is not the name of a variable, also as a CASE label.
 Enumerations do not convert implicitly to integers (RP0103); use `TO_INT`.
 
 ## RP0107
@@ -1050,8 +1052,32 @@ warning RP0115. The default is the first value. `Mode#Auto` names a value; plain
 allowed when exactly one enumeration in scope has it, otherwise error RP0106.
 The CODESYS and TwinCAT spelling `Mode.Auto` (also qualified by a namespace,
 `NS.Mode.Auto`) means `Mode#Auto` and is accepted with warning RP0122 when
-`Mode` is not the name of a variable.
+`Mode` is not the name of a variable, also as a CASE label.
 Enumerations do not convert implicitly to integers (RP0103); use `TO_INT`.
+
+## RP0123
+
+warning: set/reset assignment S= or R= (not portable); write IF ... THEN ... END_IF
+
+Rule `statements.assignment.set-reset` in `spec/05-statements.md`:
+
+**[statements.assignment.set-reset]** The CODESYS and TwinCAT set and reset
+assignments `x S= c;` and `x R= c;` mean `IF c THEN x := TRUE; END_IF` and
+`IF c THEN x := FALSE; END_IF`; `x` and `c` are `BOOL`. They are accepted
+with warning RP0123.
+
+## RP0124
+
+warning: reserved word declared as a name (AT, ON, STEP, TASK, TRANSITION, INITIAL_STEP, WITH)
+
+Rule `lexical.keywords.soft` in `spec/01-lexical.md`:
+
+**[lexical.keywords.soft]** `AT`, `ON`, `STEP`, `TASK`, `TRANSITION`,
+`INITIAL_STEP` and `WITH` start constructs only in a few places (a located
+variable, a configuration, SFC, which RootPLC does not parse), and CODESYS
+and TwinCAT code uses them as ordinary names. RootPLC reads them as names
+everywhere else; declaring one as a name is warning RP0124 instead of
+RP0004.
 
 ## RP0115
 
@@ -1068,7 +1094,7 @@ warning RP0115. The default is the first value. `Mode#Auto` names a value; plain
 allowed when exactly one enumeration in scope has it, otherwise error RP0106.
 The CODESYS and TwinCAT spelling `Mode.Auto` (also qualified by a namespace,
 `NS.Mode.Auto`) means `Mode#Auto` and is accepted with warning RP0122 when
-`Mode` is not the name of a variable.
+`Mode` is not the name of a variable, also as a CASE label.
 Enumerations do not convert implicitly to integers (RP0103); use `TO_INT`.
 
 ## RP0114
@@ -1233,6 +1259,13 @@ VAR_GLOBAL VAR_INPUT VAR_IN_OUT VAR_OUTPUT VAR_STAT VAR_TEMP WHILE WITH XOR
 ```
 
 Elementary type names (spec/02-types.md) are also reserved.
+
+**[lexical.keywords.soft]** `AT`, `ON`, `STEP`, `TASK`, `TRANSITION`,
+`INITIAL_STEP` and `WITH` start constructs only in a few places (a located
+variable, a configuration, SFC, which RootPLC does not parse), and CODESYS
+and TwinCAT code uses them as ordinary names. RootPLC reads them as names
+everywhere else; declaring one as a name is warning RP0124 instead of
+RP0004.
 
 ## 4. Numeric literals
 
@@ -1514,7 +1547,7 @@ warning RP0115. The default is the first value. `Mode#Auto` names a value; plain
 allowed when exactly one enumeration in scope has it, otherwise error RP0106.
 The CODESYS and TwinCAT spelling `Mode.Auto` (also qualified by a namespace,
 `NS.Mode.Auto`) means `Mode#Auto` and is accepted with warning RP0122 when
-`Mode` is not the name of a variable.
+`Mode` is not the name of a variable, also as a CASE label.
 Enumerations do not convert implicitly to integers (RP0103); use `TO_INT`.
 
 **[types.derived.struct]** `STRUCT ... END_STRUCT` declares members with
@@ -1523,6 +1556,12 @@ through other structures or arrays, is error RP0107. (`REF_TO` to itself is
 allowed.) `TYPE B EXTENDS A : STRUCT … END_STRUCT` (CODESYS and TwinCAT) gives
 B the members of A first, with A's initial values, then its own; the base
 must be a structure (RP0111).
+
+**[types.derived.union]** `UNION ... END_UNION` (CODESYS and TwinCAT) declares
+members that share one storage area; it is checked like a structure and its
+size (`SIZEOF`) is that of its largest member, rounded to its alignment. The
+VM does not model shared storage yet: accessing a member while running stops
+with the fault `UNSUPPORTED`.
 
 **[types.derived.array]** `ARRAY[l1..u1, l2..u2] OF T`. Bounds are constant
 `DINT` expressions with l <= u, otherwise error RP0108. A constant index
@@ -1728,7 +1767,8 @@ a function block without a body, with variables, methods and properties.
 **[pous.oop.modifiers]** `PUBLIC`, `PRIVATE`, `PROTECTED`, `INTERNAL`,
 `ABSTRACT`, `FINAL` and, on methods, `OVERRIDE` may precede the name of a
 function block, program, method or property (some toolchains write them
-before METHOD or PROPERTY; that order is accepted too). They are accepted and recorded;
+before METHOD or PROPERTY; that order is accepted too), and an access
+modifier may follow `GET` or `SET` of a property. They are accepted and recorded;
 access checks and the rules for abstract and final blocks follow in a later
 revision.
 
@@ -1879,6 +1919,11 @@ the statement. A lone `;` is an empty statement.
 ```
 assignment   = variable ':=' expression ';'
 ```
+
+**[statements.assignment.set-reset]** The CODESYS and TwinCAT set and reset
+assignments `x S= c;` and `x R= c;` mean `IF c THEN x := TRUE; END_IF` and
+`IF c THEN x := FALSE; END_IF`; `x` and `c` are `BOOL`. They are accepted
+with warning RP0123.
 
 **[statements.call]** A call to a function or function-block instance as a
 statement. Arguments are positional, or named with `:=` (input) and `=>`

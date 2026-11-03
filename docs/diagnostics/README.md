@@ -44,6 +44,8 @@ Codes RP00xx are lexical, RP01xx types, RP02xx names and structure, RP03xx synta
 | [RP0120](#rp0120) | warning | call of a library function that RootPLC declares but does not implement |
 | [RP0121](#rp0121) | error | SIZEOF of a value whose size is not known (function-block instance, open array) |
 | [RP0122](#rp0122) | warning | enumeration value written E.V (not portable); write E#V |
+| [RP0123](#rp0123) | warning | set/reset assignment S= or R= (not portable); write IF ... THEN ... END_IF |
+| [RP0124](#rp0124) | warning | reserved word declared as a name (AT, ON, STEP, TASK, TRANSITION, INITIAL_STEP, WITH) |
 | [RP0115](#rp0115) | warning | enumeration base type after the values (not portable); write UINT (...) |
 | [RP0114](#rp0114) | error | a VAR_IN_OUT argument must be a variable |
 | [RP0113](#rp0113) | warning | FUNCTION without a result type (not portable); call it as a statement |
@@ -415,7 +417,7 @@ warning RP0115. The default is the first value. `Mode#Auto` names a value; plain
 allowed when exactly one enumeration in scope has it, otherwise error RP0106.
 The CODESYS and TwinCAT spelling `Mode.Auto` (also qualified by a namespace,
 `NS.Mode.Auto`) means `Mode#Auto` and is accepted with warning RP0122 when
-`Mode` is not the name of a variable.
+`Mode` is not the name of a variable, also as a CASE label.
 Enumerations do not convert implicitly to integers (RP0103); use `TO_INT`.
 
 ## RP0107
@@ -570,8 +572,32 @@ warning RP0115. The default is the first value. `Mode#Auto` names a value; plain
 allowed when exactly one enumeration in scope has it, otherwise error RP0106.
 The CODESYS and TwinCAT spelling `Mode.Auto` (also qualified by a namespace,
 `NS.Mode.Auto`) means `Mode#Auto` and is accepted with warning RP0122 when
-`Mode` is not the name of a variable.
+`Mode` is not the name of a variable, also as a CASE label.
 Enumerations do not convert implicitly to integers (RP0103); use `TO_INT`.
+
+## RP0123
+
+warning: set/reset assignment S= or R= (not portable); write IF ... THEN ... END_IF
+
+Rule `statements.assignment.set-reset` in `spec/05-statements.md`:
+
+**[statements.assignment.set-reset]** The CODESYS and TwinCAT set and reset
+assignments `x S= c;` and `x R= c;` mean `IF c THEN x := TRUE; END_IF` and
+`IF c THEN x := FALSE; END_IF`; `x` and `c` are `BOOL`. They are accepted
+with warning RP0123.
+
+## RP0124
+
+warning: reserved word declared as a name (AT, ON, STEP, TASK, TRANSITION, INITIAL_STEP, WITH)
+
+Rule `lexical.keywords.soft` in `spec/01-lexical.md`:
+
+**[lexical.keywords.soft]** `AT`, `ON`, `STEP`, `TASK`, `TRANSITION`,
+`INITIAL_STEP` and `WITH` start constructs only in a few places (a located
+variable, a configuration, SFC, which RootPLC does not parse), and CODESYS
+and TwinCAT code uses them as ordinary names. RootPLC reads them as names
+everywhere else; declaring one as a name is warning RP0124 instead of
+RP0004.
 
 ## RP0115
 
@@ -588,7 +614,7 @@ warning RP0115. The default is the first value. `Mode#Auto` names a value; plain
 allowed when exactly one enumeration in scope has it, otherwise error RP0106.
 The CODESYS and TwinCAT spelling `Mode.Auto` (also qualified by a namespace,
 `NS.Mode.Auto`) means `Mode#Auto` and is accepted with warning RP0122 when
-`Mode` is not the name of a variable.
+`Mode` is not the name of a variable, also as a CASE label.
 Enumerations do not convert implicitly to integers (RP0103); use `TO_INT`.
 
 ## RP0114

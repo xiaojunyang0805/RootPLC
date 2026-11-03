@@ -277,6 +277,25 @@ pub fn is_keyword(word: &str) -> bool {
     contains_ci(KEYWORDS, word)
 }
 
+/// Reserved words that RootPLC reads as names where no construct of theirs
+/// can start ([lexical.keywords.soft]): SFC (not parsed) and configuration
+/// words, common names in CODESYS / TwinCAT code. Declaring one as a name is
+/// warning RP0124.
+pub const SOFT_KEYWORDS: &[&str] = &[
+    "STEP",
+    "TRANSITION",
+    "INITIAL_STEP",
+    "TASK",
+    "ON",
+    "WITH",
+    "AT",
+];
+
+/// Is `word` a soft keyword ([`SOFT_KEYWORDS`])? Case-insensitive.
+pub fn is_soft_keyword(word: &str) -> bool {
+    contains_ci(SOFT_KEYWORDS, word)
+}
+
 /// Is `word` an elementary type name? Case-insensitive.
 pub fn is_elementary_type(word: &str) -> bool {
     contains_ci(ELEMENTARY_TYPES, word)

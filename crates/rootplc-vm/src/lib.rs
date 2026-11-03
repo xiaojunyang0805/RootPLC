@@ -794,7 +794,20 @@ impl<'p> Vm<'p> {
                 root: self.globals.unwrap_or(0),
                 path: vec![*i as u32],
             }),
-            ExprKind::Member(b, i) => Ok(self.place(b, cx)?.child(*i)),
+            ExprKind::Member(b, i) => {
+                // [types.derived.union]: members share storage, which the VM
+                // does not model yet
+                if let Ty::Named(id) = self.strip(&b.ty) {
+                    if self.prog.unions.binary_search(&id).is_ok() {
+                        return Err(self.fault(
+                            FaultKind::Unsupported,
+                            e.span,
+                            "UNION members share storage; the VM does not run unions yet",
+                        ));
+                    }
+                }
+                Ok(self.place(b, cx)?.child(*i))
+            }
             ExprKind::Index(b, idx) => {
                 let static_ty = self.strip(&b.ty);
                 if !matches!(static_ty, Ty::Array { .. }) {

@@ -150,7 +150,7 @@ warning RP0115. The default is the first value. `Mode#Auto` names a value; plain
 allowed when exactly one enumeration in scope has it, otherwise error RP0106.
 The CODESYS and TwinCAT spelling `Mode.Auto` (also qualified by a namespace,
 `NS.Mode.Auto`) means `Mode#Auto` and is accepted with warning RP0122 when
-`Mode` is not the name of a variable.
+`Mode` is not the name of a variable, also as a CASE label.
 Enumerations do not convert implicitly to integers (RP0103); use `TO_INT`.
 
 **[types.derived.struct]** `STRUCT ... END_STRUCT` declares members with
@@ -159,6 +159,12 @@ through other structures or arrays, is error RP0107. (`REF_TO` to itself is
 allowed.) `TYPE B EXTENDS A : STRUCT … END_STRUCT` (CODESYS and TwinCAT) gives
 B the members of A first, with A's initial values, then its own; the base
 must be a structure (RP0111).
+
+**[types.derived.union]** `UNION ... END_UNION` (CODESYS and TwinCAT) declares
+members that share one storage area; it is checked like a structure and its
+size (`SIZEOF`) is that of its largest member, rounded to its alignment. The
+VM does not model shared storage yet: accessing a member while running stops
+with the fault `UNSUPPORTED`.
 
 **[types.derived.array]** `ARRAY[l1..u1, l2..u2] OF T`. Bounds are constant
 `DINT` expressions with l <= u, otherwise error RP0108. A constant index

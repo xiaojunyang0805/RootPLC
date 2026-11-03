@@ -210,6 +210,8 @@ pub mod codes {
         DECLARE_ONLY_CALL = 120, Warning;
         SIZEOF_UNKNOWN = 121, Error;
         ENUM_DOT_VALUE = 122, Warning;
+        SET_RESET_ASSIGN = 123, Warning;
+        SOFT_KEYWORD_NAME = 124, Warning;
     }
 
     /// Severity of a code, if the code exists.
