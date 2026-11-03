@@ -523,6 +523,7 @@ Codes RP00xx are lexical, RP01xx types, RP02xx names and structure, RP03xx synta
 | [RP0119](#rp0119) | warning | FB_init arguments in a declaration are accepted but not run |
 | [RP0120](#rp0120) | warning | call of a library function that RootPLC declares but does not implement |
 | [RP0121](#rp0121) | error | SIZEOF of a value whose size is not known (function-block instance, open array) |
+| [RP0122](#rp0122) | warning | enumeration value written E.V (not portable); write E#V |
 | [RP0115](#rp0115) | warning | enumeration base type after the values (not portable); write UINT (...) |
 | [RP0114](#rp0114) | error | a VAR_IN_OUT argument must be a variable |
 | [RP0113](#rp0113) | warning | FUNCTION without a result type (not portable); call it as a statement |
@@ -892,6 +893,9 @@ in order. The CODESYS and TwinCAT spelling with the base type after the
 values, `(Off := 0, Auto := 10) UINT`, means the same and is accepted with
 warning RP0115. The default is the first value. `Mode#Auto` names a value; plain `Auto` is
 allowed when exactly one enumeration in scope has it, otherwise error RP0106.
+The CODESYS and TwinCAT spelling `Mode.Auto` (also qualified by a namespace,
+`NS.Mode.Auto`) means `Mode#Auto` and is accepted with warning RP0122 when
+`Mode` is not the name of a variable.
 Enumerations do not convert implicitly to integers (RP0103); use `TO_INT`.
 
 ## RP0107
@@ -1031,6 +1035,24 @@ hidden data) or an open array is not known and is error RP0121. `BIT`
 members count one byte each (TwinCAT packs them into shared bytes; this is
 not modelled yet).
 
+## RP0122
+
+warning: enumeration value written E.V (not portable); write E#V
+
+Rule `types.derived.enum` in `spec/02-types.md`:
+
+**[types.derived.enum]** `TYPE Mode : (Off, Manual, Auto); END_TYPE`, or with
+a base type and values: `TYPE Mode : INT (Off := 0, Auto := 10); END_TYPE`.
+Without explicit values the base type is `INT` and the values are 0, 1, 2...
+in order. The CODESYS and TwinCAT spelling with the base type after the
+values, `(Off := 0, Auto := 10) UINT`, means the same and is accepted with
+warning RP0115. The default is the first value. `Mode#Auto` names a value; plain `Auto` is
+allowed when exactly one enumeration in scope has it, otherwise error RP0106.
+The CODESYS and TwinCAT spelling `Mode.Auto` (also qualified by a namespace,
+`NS.Mode.Auto`) means `Mode#Auto` and is accepted with warning RP0122 when
+`Mode` is not the name of a variable.
+Enumerations do not convert implicitly to integers (RP0103); use `TO_INT`.
+
 ## RP0115
 
 warning: enumeration base type after the values (not portable); write UINT (...)
@@ -1044,6 +1066,9 @@ in order. The CODESYS and TwinCAT spelling with the base type after the
 values, `(Off := 0, Auto := 10) UINT`, means the same and is accepted with
 warning RP0115. The default is the first value. `Mode#Auto` names a value; plain `Auto` is
 allowed when exactly one enumeration in scope has it, otherwise error RP0106.
+The CODESYS and TwinCAT spelling `Mode.Auto` (also qualified by a namespace,
+`NS.Mode.Auto`) means `Mode#Auto` and is accepted with warning RP0122 when
+`Mode` is not the name of a variable.
 Enumerations do not convert implicitly to integers (RP0103); use `TO_INT`.
 
 ## RP0114
@@ -1487,6 +1512,9 @@ in order. The CODESYS and TwinCAT spelling with the base type after the
 values, `(Off := 0, Auto := 10) UINT`, means the same and is accepted with
 warning RP0115. The default is the first value. `Mode#Auto` names a value; plain `Auto` is
 allowed when exactly one enumeration in scope has it, otherwise error RP0106.
+The CODESYS and TwinCAT spelling `Mode.Auto` (also qualified by a namespace,
+`NS.Mode.Auto`) means `Mode#Auto` and is accepted with warning RP0122 when
+`Mode` is not the name of a variable.
 Enumerations do not convert implicitly to integers (RP0103); use `TO_INT`.
 
 **[types.derived.struct]** `STRUCT ... END_STRUCT` declares members with
@@ -1690,6 +1718,9 @@ belong to the block before them.
 `USING name;` opens a namespace (IEC 61131-3 ed.3). Declarations inside a
 namespace are collected as usual and qualified names resolve by their last
 part ([pous.type-spec]); namespace-level name separation is not modelled yet.
+Namespaces nest; a global variable may be qualified by any trailing part of
+its namespace path (`Lib.Params.x` and `Params.x` for `x` in `Params` inside
+`Lib`).
 
 **[pous.oop.class]** `CLASS … END_CLASS` (IEC 61131-3 ed.3) declares a class:
 a function block without a body, with variables, methods and properties.
@@ -2103,10 +2134,15 @@ variable hides a library global). A library name may qualify its
 declarations: `Tc2_System.PI`. `rootplc libraries` lists the bundled
 libraries with their vendor, version and the public references they were
 written from (clean-room; RootPLC is not affiliated with the vendors).
-Bundled: `Tc2_System` and `Tc2_Utilities` (TwinCAT; `Tc2_Utilities`
+Bundled: `Tc2_System` (also `ST_LibVersion`, `F_CmpLibVersion`, the AMS
+address types and the task index; RootPLC runs one task, index 1) and
+`Tc2_Utilities` (TwinCAT; `Tc2_Utilities`
 requires `Tc2_System` and activating it activates both) and
 `TwinCAT_BuiltIns` (names every TwinCAT project has: `BIT`, the 64-bit
-special types `XINT`, `UXINT`, `XWORD`, `PVOID`, `__SYSTEM.IQueryInterface`)
+special types `XINT`, `UXINT`, `XWORD`, `PVOID`, `__SYSTEM.IQueryInterface`,
+`__SYSTEM.TYPE_CLASS`, and the system information `_TaskInfo` and `_AppInfo`
+of namespace `TwinCAT_SystemInfoVarList`, declared but not filled at run
+time)
 and `Tc2_Standard` (TwinCAT's `CTU`, `CTD` and `CTUD` with `RESET`, `LOAD`
 and `WORD` counts, the `LTIME` timers `LTON`, `LTOF`, `LTP`, and the
 `WSTRING` functions `WLEN`, `WMID`, `WCONCAT`, ...). A library may replace a

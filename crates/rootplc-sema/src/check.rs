@@ -389,6 +389,31 @@ impl<'a> Checker<'a> {
             && self.lookup_global(name).is_none()
     }
 
+    /// `b` is a qualifier (`Lib`) or a chain of them (`Lib.GVL`): its path,
+    /// lower case and dot separated.
+    fn qualifier_path(&self, b: &'a Node) -> Option<String> {
+        if self.is_qualifier(b) {
+            return match self.items(b).first().copied() {
+                Some(Item::Tok(t)) => Some(self.text(t).to_ascii_lowercase()),
+                _ => None,
+            };
+        }
+        if b.kind != N::MemberExpr {
+            return None;
+        }
+        let its = self.items(b);
+        let (Some(Item::Node(base)), Some(Item::Tok(m))) =
+            (its.first().copied(), its.get(2).copied())
+        else {
+            return None;
+        };
+        let m = self.text(m).to_ascii_lowercase();
+        if !self.qualifiers.contains(&m) {
+            return None;
+        }
+        Some(format!("{}.{m}", self.qualifier_path(base)?))
+    }
+
     fn builtin_fb(&mut self, name: &str, inputs: &[(&str, Elem)], outputs: &[(&str, Elem)]) {
         let var = |(n, e): &(&str, Elem), section| Var {
             name: (*n).to_string(),
@@ -511,7 +536,7 @@ impl<'a> Checker<'a> {
                         body: std::mem::take(&mut irs.body),
                         builtin: d.node.is_none(),
                         owner: self.owner.get(&id).copied(),
-                        declare_only: p.kind == PouKind::Function
+                        declare_only: matches!(p.kind, PouKind::Function | PouKind::FunctionBlock)
                             && self.declare_only.contains(&d.name.to_ascii_lowercase()),
                         base: p.base,
                         methods: tables[id].clone(),
@@ -692,7 +717,12 @@ impl<'a> Checker<'a> {
                             }
                         }
                     }
-                    let saved = self.cur_ns.replace(parts.join("."));
+                    // nested namespaces: the full path, outer first
+                    let path = match &self.cur_ns {
+                        Some(outer) => format!("{outer}.{}", parts.join(".")),
+                        None => parts.join("."),
+                    };
+                    let saved = self.cur_ns.replace(path);
                     self.collect(n);
                     self.cur_ns = saved;
                 }
@@ -3366,19 +3396,57 @@ impl<'a> Checker<'a> {
         else {
             return V::unknown(span);
         };
-        if self.is_qualifier(b) {
-            // [stdlib.compat]: Tc2_System.PI names PI
-            let q = match self.items(b).first().copied() {
-                Some(Item::Tok(t)) => Some(self.text(t).to_ascii_lowercase()),
-                _ => None,
-            };
-            let saved = std::mem::replace(&mut self.qualifier, q);
+        if let Some(q) = self.qualifier_path(b) {
+            // [stdlib.compat]: Tc2_System.PI names PI; [pous.namespace]:
+            // Outer.Inner.x the x of the nested namespace
+            let saved = self.qualifier.replace(q);
             let v = self.name_ref(m, span);
             self.qualifier = saved;
             return v;
         }
+        if let Some(id) = self.enum_type_ref(b) {
+            // [types.enum]: E.V, also qualified (NS.E.V), names a value of E
+            let text = format!("{}#{}", self.defs[id].name, self.text(m));
+            let v = self.enum_literal(&text, span);
+            if v.k.is_some() {
+                let msg = format!("enumeration value written with '.'; IEC 61131-3 writes {text}");
+                self.diag(codes::ENUM_DOT_VALUE, msg, span, None);
+            }
+            return v;
+        }
         let base = self.expr(b);
         self.member_on(base, m, span)
+    }
+
+    /// `b` names an enumeration type (`E`, `NS.E`) rather than a variable.
+    fn enum_type_ref(&self, b: &'a Node) -> Option<usize> {
+        let ident = |it: Option<&Item<'a>>| match it.copied() {
+            Some(Item::Tok(t)) if self.tkind(t) == T::Ident => Some(self.text(t)),
+            _ => None,
+        };
+        let its = self.items(b);
+        let last = match b.kind {
+            N::NameRef => ident(its.first())?,
+            N::MemberExpr => ident(its.get(2))?,
+            _ => return None,
+        };
+        // the leftmost name must not be a variable
+        let mut left = b;
+        while left.kind == N::MemberExpr {
+            match self.items(left).first().copied() {
+                Some(Item::Node(n)) => left = n,
+                _ => return None,
+            }
+        }
+        if left.kind != N::NameRef {
+            return None;
+        }
+        let first = ident(self.items(left).first())?;
+        if self.lookup_var(first).is_some() || self.lookup_global(first).is_some() {
+            return None;
+        }
+        let &id = self.types.get(&last.to_ascii_lowercase())?;
+        matches!(self.defs[id].kind, Kind::Enum(_)).then_some(id)
     }
 
     fn member_on(&mut self, base: V, m: usize, span: Span) -> V {
@@ -3712,7 +3780,9 @@ impl<'a> Checker<'a> {
                 }
             }
         }
-        if p.kind == PouKind::Function && self.declare_only.contains(&pname.to_ascii_lowercase()) {
+        if matches!(p.kind, PouKind::Function | PouKind::FunctionBlock)
+            && self.declare_only.contains(&pname.to_ascii_lowercase())
+        {
             let msg = format!(
                 "'{pname}' is declared by a compatibility library but not implemented by RootPLC; running it stops with UNSUPPORTED"
             );

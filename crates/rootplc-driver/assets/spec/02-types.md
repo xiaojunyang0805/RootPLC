@@ -148,6 +148,9 @@ in order. The CODESYS and TwinCAT spelling with the base type after the
 values, `(Off := 0, Auto := 10) UINT`, means the same and is accepted with
 warning RP0115. The default is the first value. `Mode#Auto` names a value; plain `Auto` is
 allowed when exactly one enumeration in scope has it, otherwise error RP0106.
+The CODESYS and TwinCAT spelling `Mode.Auto` (also qualified by a namespace,
+`NS.Mode.Auto`) means `Mode#Auto` and is accepted with warning RP0122 when
+`Mode` is not the name of a variable.
 Enumerations do not convert implicitly to integers (RP0103); use `TO_INT`.
 
 **[types.derived.struct]** `STRUCT ... END_STRUCT` declares members with

@@ -82,3 +82,81 @@ VAR_INPUT
     lrealArg : LREAL;
 END_VAR
 END_FUNCTION
+
+(* Library versions: every TwinCAT library has a constant of this type
+   (stLibVersion_<name>); F_CmpLibVersion returns -1, 0 or +1 as the given
+   version is lower than, equal to or higher than the required one. *)
+TYPE
+    ST_LibVersion : STRUCT
+        iMajor : UINT;
+        iMinor : UINT;
+        iBuild : UINT;
+        iRevision : UINT;
+        nFlags : DWORD;
+        sVersion : STRING[23];
+    END_STRUCT;
+END_TYPE
+
+FUNCTION F_CmpLibVersion : DINT
+VAR_INPUT
+    stVersion : ST_LibVersion;
+    iMajor : UINT;
+    iMinor : UINT;
+    iBuild : UINT;
+    iRevision : UINT;
+END_VAR
+VAR
+    have : ARRAY[0..3] OF UINT;
+    want : ARRAY[0..3] OF UINT;
+    i : INT;
+END_VAR
+have[0] := stVersion.iMajor;
+have[1] := stVersion.iMinor;
+have[2] := stVersion.iBuild;
+have[3] := stVersion.iRevision;
+want[0] := iMajor;
+want[1] := iMinor;
+want[2] := iBuild;
+want[3] := iRevision;
+F_CmpLibVersion := 0;
+FOR i := 0 TO 3 DO
+    IF have[i] < want[i] THEN
+        F_CmpLibVersion := -1;
+        RETURN;
+    ELSIF have[i] > want[i] THEN
+        F_CmpLibVersion := 1;
+        RETURN;
+    END_IF
+END_FOR
+END_FUNCTION
+
+(* AMS addressing *)
+TYPE
+    T_AmsNetId : STRING[23];
+    T_AmsNetIdArr : ARRAY[0..5] OF BYTE;
+    T_AmsPort : UINT;
+    ST_AmsAddr : STRUCT
+        netId : T_AmsNetIdArr;
+        port : T_AmsPort;
+    END_STRUCT;
+END_TYPE
+
+(* Task index: RootPLC runs one cyclic task, index 1. *)
+FUNCTION_BLOCK GETCURTASKINDEX
+VAR_OUTPUT
+    index : BYTE;
+END_VAR
+index := 1;
+END_FUNCTION_BLOCK
+
+FUNCTION GETCURTASKINDEXEX : DINT
+GETCURTASKINDEXEX := 1;
+END_FUNCTION
+
+(* CPU cycle counter in 100 ns units, low and high double word. *)
+FUNCTION_BLOCK GETCPUCOUNTER
+VAR_OUTPUT
+    cpuCntLoDW : UDINT;
+    cpuCntHiDW : UDINT;
+END_VAR
+END_FUNCTION_BLOCK

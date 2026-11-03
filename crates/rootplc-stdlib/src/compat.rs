@@ -192,15 +192,19 @@ mod tests {
                 assert!(
                     l.files
                         .iter()
-                        .any(|(_, s)| s.contains(&format!("FUNCTION {d} "))),
+                        .any(|(_, s)| s.contains(&format!("FUNCTION {d} "))
+                            || s.lines().any(|x| x.trim() == format!("FUNCTION_BLOCK {d}"))),
                     "{}: declare_only {d} is not declared",
                     l.name
                 );
             }
         }
         let tc = find("tc2_system").expect("Tc2_System");
-        assert_eq!(tc.declare_only, ["ADSLOGSTR", "ADSLOGDINT", "ADSLOGLREAL"]);
-        assert_eq!(tc.references.len(), 5);
+        assert_eq!(
+            tc.declare_only,
+            ["ADSLOGSTR", "ADSLOGDINT", "ADSLOGLREAL", "GETCPUCOUNTER"]
+        );
+        assert_eq!(tc.references.len(), 14);
         assert!(find("nope").is_none());
         let r = resolve(&["Tc2_Utilities".into()]).expect("resolve");
         let names: Vec<&str> = r.iter().map(|l| l.name.as_str()).collect();

@@ -64,10 +64,15 @@ variable hides a library global). A library name may qualify its
 declarations: `Tc2_System.PI`. `rootplc libraries` lists the bundled
 libraries with their vendor, version and the public references they were
 written from (clean-room; RootPLC is not affiliated with the vendors).
-Bundled: `Tc2_System` and `Tc2_Utilities` (TwinCAT; `Tc2_Utilities`
+Bundled: `Tc2_System` (also `ST_LibVersion`, `F_CmpLibVersion`, the AMS
+address types and the task index; RootPLC runs one task, index 1) and
+`Tc2_Utilities` (TwinCAT; `Tc2_Utilities`
 requires `Tc2_System` and activating it activates both) and
 `TwinCAT_BuiltIns` (names every TwinCAT project has: `BIT`, the 64-bit
-special types `XINT`, `UXINT`, `XWORD`, `PVOID`, `__SYSTEM.IQueryInterface`)
+special types `XINT`, `UXINT`, `XWORD`, `PVOID`, `__SYSTEM.IQueryInterface`,
+`__SYSTEM.TYPE_CLASS`, and the system information `_TaskInfo` and `_AppInfo`
+of namespace `TwinCAT_SystemInfoVarList`, declared but not filled at run
+time)
 and `Tc2_Standard` (TwinCAT's `CTU`, `CTD` and `CTUD` with `RESET`, `LOAD`
 and `WORD` counts, the `LTIME` timers `LTON`, `LTOF`, `LTP`, and the
 `WSTRING` functions `WLEN`, `WMID`, `WCONCAT`, ...). A library may replace a

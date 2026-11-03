@@ -75,6 +75,9 @@ belong to the block before them.
 `USING name;` opens a namespace (IEC 61131-3 ed.3). Declarations inside a
 namespace are collected as usual and qualified names resolve by their last
 part ([pous.type-spec]); namespace-level name separation is not modelled yet.
+Namespaces nest; a global variable may be qualified by any trailing part of
+its namespace path (`Lib.Params.x` and `Params.x` for `x` in `Params` inside
+`Lib`).
 
 **[pous.oop.class]** `CLASS … END_CLASS` (IEC 61131-3 ed.3) declares a class:
 a function block without a body, with variables, methods and properties.

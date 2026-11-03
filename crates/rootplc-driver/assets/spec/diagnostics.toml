@@ -262,6 +262,13 @@ spec = "stdlib.compat.sizeof"
 stage = "sema"
 
 [[code]]
+id = "RP0122"
+severity = "warning"
+summary = "enumeration value written E.V (not portable); write E#V"
+spec = "types.derived.enum"
+stage = "sema"
+
+[[code]]
 id = "RP0115"
 severity = "warning"
 summary = "enumeration base type after the values (not portable); write UINT (...)"

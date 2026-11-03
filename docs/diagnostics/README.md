@@ -43,6 +43,7 @@ Codes RP00xx are lexical, RP01xx types, RP02xx names and structure, RP03xx synta
 | [RP0119](#rp0119) | warning | FB_init arguments in a declaration are accepted but not run |
 | [RP0120](#rp0120) | warning | call of a library function that RootPLC declares but does not implement |
 | [RP0121](#rp0121) | error | SIZEOF of a value whose size is not known (function-block instance, open array) |
+| [RP0122](#rp0122) | warning | enumeration value written E.V (not portable); write E#V |
 | [RP0115](#rp0115) | warning | enumeration base type after the values (not portable); write UINT (...) |
 | [RP0114](#rp0114) | error | a VAR_IN_OUT argument must be a variable |
 | [RP0113](#rp0113) | warning | FUNCTION without a result type (not portable); call it as a statement |
@@ -412,6 +413,9 @@ in order. The CODESYS and TwinCAT spelling with the base type after the
 values, `(Off := 0, Auto := 10) UINT`, means the same and is accepted with
 warning RP0115. The default is the first value. `Mode#Auto` names a value; plain `Auto` is
 allowed when exactly one enumeration in scope has it, otherwise error RP0106.
+The CODESYS and TwinCAT spelling `Mode.Auto` (also qualified by a namespace,
+`NS.Mode.Auto`) means `Mode#Auto` and is accepted with warning RP0122 when
+`Mode` is not the name of a variable.
 Enumerations do not convert implicitly to integers (RP0103); use `TO_INT`.
 
 ## RP0107
@@ -551,6 +555,24 @@ hidden data) or an open array is not known and is error RP0121. `BIT`
 members count one byte each (TwinCAT packs them into shared bytes; this is
 not modelled yet).
 
+## RP0122
+
+warning: enumeration value written E.V (not portable); write E#V
+
+Rule `types.derived.enum` in `spec/02-types.md`:
+
+**[types.derived.enum]** `TYPE Mode : (Off, Manual, Auto); END_TYPE`, or with
+a base type and values: `TYPE Mode : INT (Off := 0, Auto := 10); END_TYPE`.
+Without explicit values the base type is `INT` and the values are 0, 1, 2...
+in order. The CODESYS and TwinCAT spelling with the base type after the
+values, `(Off := 0, Auto := 10) UINT`, means the same and is accepted with
+warning RP0115. The default is the first value. `Mode#Auto` names a value; plain `Auto` is
+allowed when exactly one enumeration in scope has it, otherwise error RP0106.
+The CODESYS and TwinCAT spelling `Mode.Auto` (also qualified by a namespace,
+`NS.Mode.Auto`) means `Mode#Auto` and is accepted with warning RP0122 when
+`Mode` is not the name of a variable.
+Enumerations do not convert implicitly to integers (RP0103); use `TO_INT`.
+
 ## RP0115
 
 warning: enumeration base type after the values (not portable); write UINT (...)
@@ -564,6 +586,9 @@ in order. The CODESYS and TwinCAT spelling with the base type after the
 values, `(Off := 0, Auto := 10) UINT`, means the same and is accepted with
 warning RP0115. The default is the first value. `Mode#Auto` names a value; plain `Auto` is
 allowed when exactly one enumeration in scope has it, otherwise error RP0106.
+The CODESYS and TwinCAT spelling `Mode.Auto` (also qualified by a namespace,
+`NS.Mode.Auto`) means `Mode#Auto` and is accepted with warning RP0122 when
+`Mode` is not the name of a variable.
 Enumerations do not convert implicitly to integers (RP0103); use `TO_INT`.
 
 ## RP0114

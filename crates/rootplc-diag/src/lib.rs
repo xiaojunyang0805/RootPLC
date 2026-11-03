@@ -209,6 +209,7 @@ pub mod codes {
         INIT_ARGUMENTS_IGNORED = 119, Warning;
         DECLARE_ONLY_CALL = 120, Warning;
         SIZEOF_UNKNOWN = 121, Error;
+        ENUM_DOT_VALUE = 122, Warning;
     }
 
     /// Severity of a code, if the code exists.

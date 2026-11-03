@@ -5,12 +5,21 @@
 name = "Tc2_System"
 vendor = "Beckhoff Automation GmbH"
 version = "1.0.0"
-description = "TwinCAT Tc2_System: string type T_MaxString, system constants, ADS logging functions"
-declare_only = ["ADSLOGSTR", "ADSLOGDINT", "ADSLOGLREAL"]
+description = "TwinCAT Tc2_System: T_MaxString, system constants, ADS logging, ST_LibVersion, AMS address types, task index, CPU counter"
+declare_only = ["ADSLOGSTR", "ADSLOGDINT", "ADSLOGLREAL", "GETCPUCOUNTER"]
 references = [
   "https://infosys.beckhoff.com/content/1033/tcplclib_tc2_system/31084171.html (global constants)",
   "https://infosys.beckhoff.com/content/1033/tcplclib_tc2_system/31062795.html (T_MaxString)",
   "https://infosys.beckhoff.com/content/1033/tcplclib_tc2_system/31033611.html (ADSLOGSTR)",
   "https://infosys.beckhoff.com/content/1033/tcplclib_tc2_system/31030539.html (ADSLOGDINT)",
   "https://infosys.beckhoff.com/content/1033/tcplclib_tc2_system/31032075.html (ADSLOGLREAL)",
+  "https://infosys.beckhoff.com/content/1033/tc3_plc_intro/714823819.html (ST_LibVersion)",
+  "https://infosys.beckhoff.com/content/1033/tcplclib_tc2_system/31006219.html (F_CmpLibVersion)",
+  "https://infosys.beckhoff.de/content/1033/tcplclib_tc2_system/31059723.html (T_AmsNetId)",
+  "https://infosys.beckhoff.com/content/1033/tcplclib_tc2_system/31061259.html (T_AmsNetIdArr)",
+  "https://infosys.beckhoff.com/content/1033/tcplclib_tc2_system/31064331.html (T_AmsPort)",
+  "https://infosys.beckhoff.com/content/1033/tcplclib_tc2_system/27021597795291915.html (ST_AmsAddr)",
+  "https://infosys.beckhoff.com/content/1033/tcplclib_tc2_system/30957963.html (GETCURTASKINDEX)",
+  "https://infosys.beckhoff.com/content/1033/tcplclib_tc2_system/31018507.html (GETCURTASKINDEXEX)",
+  "https://infosys.beckhoff.com/content/1033/tcplclib_tc2_system/30963979.html (GETCPUCOUNTER)",
 ]
