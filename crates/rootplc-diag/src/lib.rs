@@ -207,6 +207,7 @@ pub mod codes {
         ADR_FUNCTION = 117, Warning;
         REFERENCE_TYPE = 118, Warning;
         INIT_ARGUMENTS_IGNORED = 119, Warning;
+        DECLARE_ONLY_CALL = 120, Warning;
     }
 
     /// Severity of a code, if the code exists.

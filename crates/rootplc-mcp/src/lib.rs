@@ -39,7 +39,7 @@ Deployment to real PLCs is not available to agents; a human approves it.";
 const MAX_CYCLES: f64 = 1_000_000.0;
 
 fn source_props() -> &'static str {
-    r#""paths":{"type":"array","items":{"type":"string"},"description":"Project files or directories (.st, searched recursively). All files form one project."},"source":{"type":"string","description":"Structured Text to check without writing a file. Combined with paths if both are given."},"files":{"type":"array","description":"Several in-memory files.","items":{"type":"object","properties":{"name":{"type":"string"},"source":{"type":"string"}},"required":["name","source"]}}"#
+    r#""libraries":{"type":"array","items":{"type":"string"},"description":"Compatibility libraries to activate, e.g. [\"Tc2_System\", \"TwinCAT_BuiltIns\"] for TwinCAT code."},"paths":{"type":"array","items":{"type":"string"},"description":"Project files or directories (.st, searched recursively). All files form one project."},"source":{"type":"string","description":"Structured Text to check without writing a file. Combined with paths if both are given."},"files":{"type":"array","description":"Several in-memory files.","items":{"type":"object","properties":{"name":{"type":"string"},"source":{"type":"string"}},"required":["name","source"]}}"#
 }
 
 fn tools() -> String {
@@ -111,26 +111,38 @@ fn sources(args: &Json) -> Result<Vec<(PathBuf, String)>, String> {
     Ok(out)
 }
 
+/// Check sources with the `libraries` argument ([stdlib.compat]).
+fn checked(s: Vec<(PathBuf, String)>, args: &Json) -> Result<rootplc_driver::CheckReport, String> {
+    let libs: Vec<String> = args
+        .get("libraries")
+        .and_then(Json::as_array)
+        .map(|v| {
+            v.iter()
+                .filter_map(Json::as_str)
+                .map(str::to_string)
+                .collect()
+        })
+        .unwrap_or_default();
+    rootplc_driver::check_sources_with(s, &libs)
+}
+
 fn call_tool(name: &str, args: &Json) -> String {
     let fail = |cmd: &str, msg: &str| tool_result(&rootplc_driver::json::error(cmd, msg), true);
     match name {
-        "rootplc_check" => match sources(args) {
-            Ok(s) => tool_result(
-                &rootplc_driver::json::check(&rootplc_driver::check_sources(s)),
-                false,
-            ),
+        "rootplc_check" => match sources(args).and_then(|s| checked(s, args)) {
+            Ok(c) => tool_result(&rootplc_driver::json::check(&c), false),
             Err(e) => fail("check", &e),
         },
-        "rootplc_test" => match sources(args) {
-            Ok(s) => {
+        "rootplc_test" => match sources(args).and_then(|s| checked(s, args)) {
+            Ok(c) => {
                 let filter = args.get("filter").and_then(Json::as_str);
-                let r = rootplc_driver::test_report(rootplc_driver::check_sources(s), filter);
+                let r = rootplc_driver::test_report(c, filter);
                 tool_result(&rootplc_driver::json::test(&r), false)
             }
             Err(e) => fail("test", &e),
         },
-        "rootplc_run" => match sources(args) {
-            Ok(s) => {
+        "rootplc_run" => match sources(args).and_then(|s| checked(s, args)) {
+            Ok(c) => {
                 let program = args.get("program").and_then(Json::as_str);
                 let cycles = args
                     .get("cycles")
@@ -142,12 +154,7 @@ fn call_tool(name: &str, args: &Json) -> String {
                     .and_then(Json::as_f64)
                     .unwrap_or(10.0)
                     .max(0.0) as i128;
-                match rootplc_driver::run_report(
-                    rootplc_driver::check_sources(s),
-                    program,
-                    cycles,
-                    cycle_ms * 1_000_000,
-                ) {
+                match rootplc_driver::run_report(c, program, cycles, cycle_ms * 1_000_000) {
                     Ok(r) => tool_result(&rootplc_driver::json::run(&r), false),
                     Err(e) => fail("run", &e),
                 }
@@ -171,13 +178,24 @@ fn call_tool(name: &str, args: &Json) -> String {
                 .unwrap_or("");
             tool_result(&rootplc_driver::json::examples(query, &found, true), false)
         }
-        "rootplc_coverage" => match sources(args) {
-            Ok(s) => tool_result(
-                &rootplc_driver::json::coverage(&rootplc_driver::coverage::coverage_sources(s)),
-                false,
-            ),
-            Err(e) => fail("coverage", &e),
-        },
+        "rootplc_coverage" => {
+            let libs: Vec<String> = args
+                .get("libraries")
+                .and_then(Json::as_array)
+                .map(|v| {
+                    v.iter()
+                        .filter_map(Json::as_str)
+                        .map(str::to_string)
+                        .collect()
+                })
+                .unwrap_or_default();
+            match sources(args)
+                .and_then(|s| rootplc_driver::coverage::coverage_sources_with(s, &libs))
+            {
+                Ok(r) => tool_result(&rootplc_driver::json::coverage(&r), false),
+                Err(e) => fail("coverage", &e),
+            }
+        }
         "rootplc_explain" => {
             let code = args.get("code").and_then(Json::as_str).unwrap_or("");
             match rootplc_driver::explain::explain(code) {

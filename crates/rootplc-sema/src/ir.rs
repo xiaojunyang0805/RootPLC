@@ -132,6 +132,9 @@ pub struct Pou {
     pub builtin: bool,
     /// For a method: the function block or program it belongs to.
     pub owner: Option<usize>,
+    /// Declared by a compatibility library but not implemented: running it
+    /// is the fault UNSUPPORTED, [stdlib.compat].
+    pub declare_only: bool,
     /// The function block this one extends, [pous.oop.extends].
     pub base: Option<usize>,
     /// Methods callable on an instance, inherited ones included, with

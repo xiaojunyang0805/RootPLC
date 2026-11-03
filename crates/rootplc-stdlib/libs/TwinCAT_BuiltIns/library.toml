@@ -1,0 +1,12 @@
+# Compatibility library: names that every TwinCAT project has without a
+# library reference (built into the TwinCAT environment). RootPLC's own
+# library; activate it for TwinCAT code (the corpus tool does so for every
+# TwinCAT project). Clean-room: written from the public references below.
+name = "TwinCAT_BuiltIns"
+vendor = "RootPLC"
+version = "1.0.0"
+description = "TwinCAT built-in names: the BIT type, the __SYSTEM.IQueryInterface base interface"
+declare_only = []
+references = [
+  "https://infosys.beckhoff.com/content/1033/tc3_plc_intro/2529343371.html (bit access, BIT members in structures)",
+]

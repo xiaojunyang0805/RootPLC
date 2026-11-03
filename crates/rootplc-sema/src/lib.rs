@@ -46,14 +46,32 @@ impl Analysis {
     }
 }
 
+/// Settings for [`analyze_with`] that come from outside the source.
+#[derive(Debug, Clone, Default)]
+pub struct Options {
+    /// Functions declared by an active compatibility library but not
+    /// implemented by RootPLC: calls are warning RP0120, running one is the
+    /// fault UNSUPPORTED ([stdlib.compat]).
+    pub declare_only: Vec<String>,
+    /// Names that may qualify a declaration in expressions, `Tc2_System.PI`:
+    /// the active compatibility libraries ([stdlib.compat]).
+    pub qualifiers: Vec<String>,
+}
+
 /// Check a project and produce its typed IR.
 pub fn analyze(files: &[(&Parse, &str)]) -> Analysis {
+    analyze_with(files, &Options::default())
+}
+
+/// [`analyze`] with options, e.g. active compatibility libraries.
+pub fn analyze_with(files: &[(&Parse, &str)], opts: &Options) -> Analysis {
     let mut c = check::Checker::new(
         files
             .iter()
             .map(|(p, s)| (*s, p.tokens.as_slice()))
             .collect(),
     );
+    c.set_options(opts);
     let roots: Vec<&rootplc_syntax::Node> = files.iter().map(|(p, _)| &p.tree).collect();
     c.run(&roots);
     let mut diagnostics = vec![Vec::new(); files.len()];

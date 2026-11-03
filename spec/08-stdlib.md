@@ -42,3 +42,26 @@ type is error RP0103.
 | `SHL`, `SHR`, `ROL`, `ROR` `(in, n)` | `ANY_BIT`, `ANY_INT` | type of `in` |
 | `LEN(s)`, `FIND(s1, s2)` | strings | `INT` |
 | `LEFT`, `RIGHT`, `MID`, `CONCAT`, `INSERT`, `DELETE`, `REPLACE` | strings, `INT` | `STRING` (or `WSTRING` for `WSTRING` arguments) |
+
+## Compatibility libraries
+
+**[stdlib.compat]** A compatibility library provides the interface of a
+vendor library (types, constants, functions, function blocks) in ST, under
+the vendor's exact names, so that vendor code checks and runs without edits.
+Libraries are bundled with RootPLC and dormant until activated out of band:
+`--library NAME` on the command line, the `libraries` argument of the MCP
+tools, or a project setting; RootPLC never infers a library from source
+text. An active library's declarations join the project like source files
+(a user declaration with the same name in the same scope is RP0204; a local
+variable hides a library global). A library name may qualify its
+declarations: `Tc2_System.PI`. `rootplc libraries` lists the bundled
+libraries with their vendor, version and the public references they were
+written from (clean-room; RootPLC is not affiliated with the vendors).
+Bundled: `Tc2_System` (TwinCAT) and `TwinCAT_BuiltIns` (names every TwinCAT
+project has, such as `BIT` and `__SYSTEM.IQueryInterface`).
+
+**[stdlib.compat.declare-only]** A library function RootPLC can declare but
+not reproduce faithfully (for example one that writes to the vendor's event
+log) is declared only. A call is warning RP0120; executing it stops with the
+fault `UNSUPPORTED`, so a run never continues with behaviour RootPLC cannot
+guarantee.

@@ -224,6 +224,11 @@ pub(crate) struct Checker<'a> {
     raw_alias: bool,
     /// The last function block or program collected in the current file.
     last_block: Option<(usize, String)>,
+    /// Declared-only library functions (lower case), [stdlib.compat].
+    declare_only: HashSet<String>,
+    /// Names that qualify a declaration in expressions: active libraries and
+    /// declared namespaces (lower case).
+    qualifiers: HashSet<String>,
     /// Property accessor definition -> (its PROPERTY node, is the getter).
     prop_info: HashMap<usize, (&'a Node, bool)>,
     /// Diagnostics with the index of their file.
@@ -291,6 +296,8 @@ impl<'a> Checker<'a> {
             struct_base: HashMap::new(),
             raw_alias: false,
             last_block: None,
+            declare_only: HashSet::new(),
+            qualifiers: HashSet::new(),
             prop_info: HashMap::new(),
             diags: Vec::new(),
         };
@@ -330,6 +337,34 @@ impl<'a> Checker<'a> {
         c.builtin_fb("SR", &[("S1", Bool), ("R", Bool)], &[("Q1", Bool)]);
         c.builtin_fb("RS", &[("S", Bool), ("R1", Bool)], &[("Q1", Bool)]);
         c
+    }
+
+    pub(crate) fn set_options(&mut self, o: &crate::Options) {
+        self.declare_only = o
+            .declare_only
+            .iter()
+            .map(|n| n.to_ascii_lowercase())
+            .collect();
+        self.qualifiers = o
+            .qualifiers
+            .iter()
+            .map(|n| n.to_ascii_lowercase())
+            .collect();
+    }
+
+    /// `n` is a name that qualifies a declaration (`Tc2_System` in
+    /// `Tc2_System.PI`), not a variable.
+    fn is_qualifier(&self, n: &'a Node) -> bool {
+        if n.kind != N::NameRef {
+            return false;
+        }
+        let Some(Item::Tok(t)) = self.items(n).first().copied() else {
+            return false;
+        };
+        let name = self.text(t);
+        self.qualifiers.contains(&name.to_ascii_lowercase())
+            && self.lookup_var(name).is_none()
+            && self.lookup_global(name).is_none()
     }
 
     fn builtin_fb(&mut self, name: &str, inputs: &[(&str, Elem)], outputs: &[(&str, Elem)]) {
@@ -454,6 +489,8 @@ impl<'a> Checker<'a> {
                         body: std::mem::take(&mut irs.body),
                         builtin: d.node.is_none(),
                         owner: self.owner.get(&id).copied(),
+                        declare_only: p.kind == PouKind::Function
+                            && self.declare_only.contains(&d.name.to_ascii_lowercase()),
                         base: p.base,
                         methods: tables[id].clone(),
                     })
@@ -623,7 +660,16 @@ impl<'a> Checker<'a> {
                     }
                 }
                 // [pous.namespace]: declarations inside a namespace are collected as usual
-                N::Namespace => self.collect(n),
+                N::Namespace => {
+                    for i in self.items(n) {
+                        if let Item::Tok(t) = i {
+                            if self.tkind(t) == T::Ident {
+                                self.qualifiers.insert(self.text(t).to_ascii_lowercase());
+                            }
+                        }
+                    }
+                    self.collect(n);
+                }
                 // [pous.action]: a member after its block belongs to that block
                 N::Method | N::Property | N::Action => {
                     if let Some((fb, fbname)) = self.last_block.clone() {
@@ -2579,6 +2625,51 @@ impl<'a> Checker<'a> {
 
     // ---------------------------------------------------------------- expressions
 
+    /// A name used as a value, [variables.resolution].
+    fn name_ref(&mut self, i: usize, span: Span) -> V {
+        if self.is_kw(i, "THIS") || self.is_kw(i, "SUPER") {
+            return self.this_ref(i, span);
+        }
+        let name = self.text(i);
+        if let Some((t, slot)) = self.lookup_var(name) {
+            let v = V::with(t, span, ExprKind::Var(slot));
+            return self.alias_var(v, self.is_alias(name, None));
+        }
+        if let Some((t, slot, fb)) = self.lookup_owner_var(name) {
+            let inst = self.this_ir(fb, span);
+            let v = V::with(t, span, ExprKind::Member(Box::new(inst), slot));
+            return self.alias_var(v, self.is_alias(name, Some(fb)));
+        }
+        if let Some(fb) = self.current_fb() {
+            if let Some(getter) = self.method_lookup(fb, &format!("{name}#get")) {
+                let ty = match &self.defs[getter].kind {
+                    Kind::Pou(p) => p.ret.clone().unwrap_or(Ty::Unknown),
+                    _ => Ty::Unknown,
+                };
+                let inst = self.this_ir(fb, span);
+                let call = self.accessor_call(inst, fb, getter, true, Vec::new(), ty.clone(), span);
+                return V::with(ty, span, call.kind);
+            }
+        }
+        if let Some((t, slot)) = self.lookup_global(name) {
+            let mut v = V::with(t, span, ExprKind::Global(slot));
+            // a CONSTANT global with a known value is a constant
+            v.k = self.globals[slot].value.map(K::Int);
+            return v;
+        }
+        if let Some(v) = self.enum_value(name, span) {
+            return v;
+        }
+        let hint = Some("declare it in a VAR section of this POU".into());
+        self.diag(
+            codes::UNKNOWN_NAME,
+            format!("unknown name '{name}'"),
+            span,
+            hint,
+        );
+        V::unknown(span)
+    }
+
     fn expr(&mut self, n: &'a Node) -> V {
         let span = self.span(n);
         let its = self.items(n);
@@ -2588,57 +2679,7 @@ impl<'a> Checker<'a> {
                 _ => V::unknown(span),
             },
             N::NameRef => match its.first().copied() {
-                Some(Item::Tok(i)) => {
-                    if self.is_kw(i, "THIS") || self.is_kw(i, "SUPER") {
-                        return self.this_ref(i, span);
-                    }
-                    let name = self.text(i);
-                    if let Some((t, slot)) = self.lookup_var(name) {
-                        let v = V::with(t, span, ExprKind::Var(slot));
-                        return self.alias_var(v, self.is_alias(name, None));
-                    }
-                    if let Some((t, slot, fb)) = self.lookup_owner_var(name) {
-                        let inst = self.this_ir(fb, span);
-                        let v = V::with(t, span, ExprKind::Member(Box::new(inst), slot));
-                        return self.alias_var(v, self.is_alias(name, Some(fb)));
-                    }
-                    if let Some(fb) = self.current_fb() {
-                        if let Some(getter) = self.method_lookup(fb, &format!("{name}#get")) {
-                            let ty = match &self.defs[getter].kind {
-                                Kind::Pou(p) => p.ret.clone().unwrap_or(Ty::Unknown),
-                                _ => Ty::Unknown,
-                            };
-                            let inst = self.this_ir(fb, span);
-                            let call = self.accessor_call(
-                                inst,
-                                fb,
-                                getter,
-                                true,
-                                Vec::new(),
-                                ty.clone(),
-                                span,
-                            );
-                            return V::with(ty, span, call.kind);
-                        }
-                    }
-                    if let Some((t, slot)) = self.lookup_global(name) {
-                        let mut v = V::with(t, span, ExprKind::Global(slot));
-                        // a CONSTANT global with a known value is a constant
-                        v.k = self.globals[slot].value.map(K::Int);
-                        return v;
-                    }
-                    if let Some(v) = self.enum_value(name, span) {
-                        return v;
-                    }
-                    let hint = Some("declare it in a VAR section of this POU".into());
-                    self.diag(
-                        codes::UNKNOWN_NAME,
-                        format!("unknown name '{name}'"),
-                        span,
-                        hint,
-                    );
-                    V::unknown(span)
-                }
+                Some(Item::Tok(i)) => self.name_ref(i, span),
                 _ => V::unknown(span),
             },
             N::ParenExpr => match self.first_node(n) {
@@ -3105,6 +3146,10 @@ impl<'a> Checker<'a> {
         else {
             return V::unknown(span);
         };
+        if self.is_qualifier(b) {
+            // [stdlib.compat]: Tc2_System.PI names PI
+            return self.name_ref(m, span);
+        }
         let base = self.expr(b);
         self.member_on(base, m, span)
     }
@@ -3254,6 +3299,10 @@ impl<'a> Checker<'a> {
             if let (Some(Item::Node(b)), Some(Item::Tok(m))) =
                 (its.first().copied(), its.get(2).copied())
             {
+                if self.is_qualifier(b) {
+                    // [stdlib.compat]: Tc2_System.ADSLOGSTR(...)
+                    return self.call_named(m, &args, span);
+                }
                 let base = self.expr(b);
                 // [pous.oop.method]: inst.M(...), THIS^.M(...), SUPER^.M(...)
                 if let Ty::Named(fb) = self.strip(&base.ty) {
@@ -3276,26 +3325,31 @@ impl<'a> Checker<'a> {
         let Some(Item::Tok(i)) = self.items(callee).first().copied() else {
             return V::unknown(span);
         };
+        self.call_named(i, &args, span)
+    }
+
+    /// A call of a named function, block instance or method.
+    fn call_named(&mut self, i: usize, args: &[Arg<'a>], span: Span) -> V {
         let name = self.text(i);
         let cspan = self.tok_span(i);
         if let Some((t, slot)) = self.lookup_var(name) {
-            return self.bind_call(V::with(t, cspan, ExprKind::Var(slot)), &args, span, None);
+            return self.bind_call(V::with(t, cspan, ExprKind::Var(slot)), args, span, None);
         }
         if let Some((t, slot, fb)) = self.lookup_owner_var(name) {
             let inst = self.this_ir(fb, cspan);
             let v = V::with(t, cspan, ExprKind::Member(Box::new(inst), slot));
-            return self.bind_call(v, &args, span, None);
+            return self.bind_call(v, args, span, None);
         }
         // a method of the current block, called without THIS^
         if let Some(fb) = self.current_fb() {
             if let Some(mdef) = self.method_lookup(fb, name) {
                 let recv = Some((self.this_ir(fb, cspan), fb, true));
-                return self.bind_call(V::of(Ty::Named(mdef), cspan), &args, span, recv);
+                return self.bind_call(V::of(Ty::Named(mdef), cspan), args, span, recv);
             }
         }
         if let Some(&id) = self.types.get(&name.to_ascii_lowercase()) {
             if matches!(&self.defs[id].kind, Kind::Pou(p) if p.kind == PouKind::Function) {
-                return self.bind_call(V::of(Ty::Named(id), cspan), &args, span, None);
+                return self.bind_call(V::of(Ty::Named(id), cspan), args, span, None);
             }
         }
         let up = name.to_ascii_uppercase();
@@ -3333,7 +3387,7 @@ impl<'a> Checker<'a> {
             );
         }
         if let Some(b) = builtin(&up) {
-            return self.builtin_call(&up, b, &args, span);
+            return self.builtin_call(&up, b, args, span);
         }
         self.diag(
             codes::UNKNOWN_NAME,
@@ -3341,7 +3395,7 @@ impl<'a> Checker<'a> {
             cspan,
             None,
         );
-        for a in &args {
+        for a in args {
             self.expr(a.expr);
         }
         V::unknown(span)
@@ -3423,6 +3477,12 @@ impl<'a> Checker<'a> {
                     }
                 }
             }
+        }
+        if p.kind == PouKind::Function && self.declare_only.contains(&pname.to_ascii_lowercase()) {
+            let msg = format!(
+                "'{pname}' is declared by a compatibility library but not implemented by RootPLC; running it stops with UNSUPPORTED"
+            );
+            self.diag(codes::DECLARE_ONLY_CALL, msg, span, None);
         }
         let (target, ty) = if let Some((inst, fb, dispatch)) = recv {
             (

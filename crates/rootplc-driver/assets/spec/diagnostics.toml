@@ -248,6 +248,13 @@ spec = "variables.init-arguments"
 stage = "parse"
 
 [[code]]
+id = "RP0120"
+severity = "warning"
+summary = "call of a library function that RootPLC declares but does not implement"
+spec = "stdlib.compat.declare-only"
+stage = "sema"
+
+[[code]]
 id = "RP0115"
 severity = "warning"
 summary = "enumeration base type after the values (not portable); write UINT (...)"

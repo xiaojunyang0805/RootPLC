@@ -2,6 +2,8 @@
 //!
 //! Roadmap phase: 1. See `ARCHITECTURE.md`.
 
+pub mod compat;
+
 /// One ST source file of the standard library.
 pub struct StdFile {
     /// File name relative to `st/`.

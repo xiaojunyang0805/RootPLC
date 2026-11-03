@@ -41,6 +41,7 @@ Codes RP00xx are lexical, RP01xx types, RP02xx names and structure, RP03xx synta
 | [RP0117](#rp0117) | warning | ADR(x) is read as REF(x) (not portable; no pointer arithmetic) |
 | [RP0118](#rp0118) | warning | REFERENCE TO declares an alias (not portable) |
 | [RP0119](#rp0119) | warning | FB_init arguments in a declaration are accepted but not run |
+| [RP0120](#rp0120) | warning | call of a library function that RootPLC declares but does not implement |
 | [RP0115](#rp0115) | warning | enumeration base type after the values (not portable); write UINT (...) |
 | [RP0114](#rp0114) | error | a VAR_IN_OUT argument must be a variable |
 | [RP0113](#rp0113) | warning | FUNCTION without a result type (not portable); call it as a statement |
@@ -515,6 +516,18 @@ pass to the block's `FB_init` method. RootPLC accepts the form with warning
 RP0119 but does not run `FB_init` yet.
 
 `type_spec` is defined in spec/04-pous.md [pous.type-spec].
+
+## RP0120
+
+warning: call of a library function that RootPLC declares but does not implement
+
+Rule `stdlib.compat.declare-only` in `spec/08-stdlib.md`:
+
+**[stdlib.compat.declare-only]** A library function RootPLC can declare but
+not reproduce faithfully (for example one that writes to the vendor's event
+log) is declared only. A call is warning RP0120; executing it stops with the
+fault `UNSUPPORTED`, so a run never continues with behaviour RootPLC cannot
+guarantee.
 
 ## RP0115
 

@@ -1051,6 +1051,16 @@ impl<'p> Vm<'p> {
         inst: Option<(Loc, usize)>,
     ) -> R<Value> {
         let prog = self.prog;
+        if prog.pou(id).is_some_and(|p| p.declare_only) {
+            return Err(self.fault(
+                FaultKind::Unsupported,
+                e.span,
+                format!(
+                    "{} is declared by a compatibility library but not implemented by RootPLC",
+                    prog.defs[id].name
+                ),
+            ));
+        }
         let Some(pou) = prog.pou(id) else {
             return Ok(Value::Int(0));
         };

@@ -9,6 +9,7 @@ dependencies = [
  "rootplc-diag",
  "rootplc-driver",
  "rootplc-mcp",
+ "rootplc-stdlib",
 ]
 
 [[package]]
@@ -30,6 +31,7 @@ dependencies = [
  "rootplc-diag",
  "rootplc-driver",
  "rootplc-sema",
+ "rootplc-stdlib",
  "rootplc-syntax",
  "rootplc-testing",
 ]
@@ -44,6 +46,7 @@ version = "0.0.1"
 dependencies = [
  "rootplc-diag",
  "rootplc-sema",
+ "rootplc-stdlib",
  "rootplc-syntax",
  "rootplc-testing",
  "rootplc-vm",

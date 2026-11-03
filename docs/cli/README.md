@@ -8,11 +8,16 @@ rootplc run   <file.st|dir>... [--program NAME] [--cycles N] [--cycle-ms MS] [--
 rootplc explain <code> [--json]
 rootplc examples [words...] [--show ID] [--json]
 rootplc coverage <file.st|dir>... [--json]
+rootplc libraries [--json]
 rootplc mcp
 ```
 
 All `.st` files given (directories are searched recursively) form one
 project: names declared in one file are visible in the others.
+
+`check`, `test`, `run` and `coverage` take `--library NAME[,NAME]`
+(repeatable) to activate compatibility libraries, e.g.
+`rootplc check src --library Tc2_System,TwinCAT_BuiltIns` for TwinCAT code.
 
 **Exit codes:** 0 ok · 1 errors, failed tests or a run-time fault · 2 usage or I/O error.
 
@@ -121,12 +126,28 @@ vendor extension (`vendor`). Exit code 0 whatever the statuses are.
    "constructs":[{"name":"UNION","standard":"vendor","line":2,"count":1}],"blocked_by":[]}]}
 ```
 
+## libraries
+
+Lists the bundled compatibility libraries: vendor interfaces written in ST
+so that vendor code checks and runs unchanged (spec/08-stdlib.md
+[stdlib.compat]). A library is used only when activated with `--library`.
+Functions marked *declared only* are type-checked but not run: a call is
+warning RP0120 and running it stops with the fault `UNSUPPORTED`. Each
+library lists the public documentation it was written from; RootPLC is not
+affiliated with the vendors named.
+
+```json
+{"command":"libraries","ok":true,"libraries":[{"name":"Tc2_System","vendor":"Beckhoff Automation GmbH",
+ "version":"1.0.0","description":"…","declare_only":["ADSLOGSTR","ADSLOGDINT","ADSLOGLREAL"],"references":["…"]}]}
+```
+
 ## mcp
 
 Model Context Protocol server on stdio for agent hosts; see
 [agent/mcp/README.md](../../agent/mcp/README.md). Tools: `rootplc_check`,
 `rootplc_test`, `rootplc_run`, `rootplc_explain`, `rootplc_examples`,
 `rootplc_coverage`. Source tools accept `paths`, in-memory `files`, or a
-`source` string, and return the JSON reports above. Resources: the agent
+`source` string plus an optional `libraries` list, and return the JSON
+reports above. Resources: the agent
 guide, spec chapters, diagnostic registry and examples (`rootplc://…`).
 Prompts: `write_and_verify`, `fix_diagnostics`, `port_legacy`.

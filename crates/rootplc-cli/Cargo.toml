@@ -20,6 +20,7 @@ path = "src/main.rs"
 rootplc-diag.workspace = true
 rootplc-driver.workspace = true
 rootplc-mcp.workspace = true
+rootplc-stdlib.workspace = true
 
 [lints]
 workspace = true

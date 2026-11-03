@@ -211,6 +211,26 @@ def brx_units(repo: Path) -> list[tuple[str, str]]:
     return out
 
 
+def plcproj_libraries(project_dir: Path) -> list[str]:
+    """Library names a TwinCAT project references (PlaceholderReference /
+    LibraryReference in its .plcproj)."""
+    out: list[str] = []
+    for f in files(project_dir, "*.plcproj"):
+        if f.parent != project_dir:
+            continue
+        try:
+            root = ET.parse(f).getroot()
+        except ET.ParseError:
+            continue
+        for el in root.iter():
+            tag = el.tag.rsplit("}", 1)[-1]
+            if tag in ("PlaceholderReference", "LibraryReference") and el.get("Include"):
+                name = el.get("Include").split(",")[0].strip()
+                if name and name not in out:
+                    out.append(name)
+    return out
+
+
 def extract(p: dict, repo: Path | None = None) -> Path:
     """Extract the units of a cloned project into <cache>/<name>/extracted.
     Writes to a new folder first and swaps it in, so a failure never leaves
@@ -240,16 +260,25 @@ def extract(p: dict, repo: Path | None = None) -> Path:
             units.append((f.stem, f.read_text(encoding="utf-8", errors="replace")))
     distinct = sorted(set(groups))
     split = len(distinct) > 1
+
+    def folder_of(g: str) -> Path:
+        if not split:
+            return dst
+        label = Path(g).name if g else "_shared"
+        f = dst / f"{re.sub(r'[^A-Za-z0-9_.-]', '_', label)[:40]}_{distinct.index(g)}"
+        f.mkdir(exist_ok=True)
+        return f
+
+    # [compatibility libraries]: the libraries each project references,
+    # read from its .plcproj (out of band, never from POU source)
+    if p["format"] == "twincat":
+        for pj in projs:
+            refs = plcproj_libraries(pj)
+            if refs and (str(pj) in distinct or not split):
+                (folder_of(str(pj)) / "libraries.txt").write_text(chr(10).join(refs) + chr(10), encoding="utf-8")
     seen = Counter()
     for k, (name, src) in enumerate(units):
-        folder = dst
-        if split:
-            g = groups[k]
-            label = Path(g).name if g else "_shared"
-            # disambiguate projects with the same folder name
-            idx = distinct.index(g)
-            folder = dst / f"{re.sub(r'[^A-Za-z0-9_.-]', '_', label)[:40]}_{idx}"
-            folder.mkdir(exist_ok=True)
+        folder = folder_of(groups[k]) if split else dst
         safe = re.sub(r"[^A-Za-z0-9_.-]", "_", name)[:80]
         key = (str(folder), safe)
         seen[key] += 1

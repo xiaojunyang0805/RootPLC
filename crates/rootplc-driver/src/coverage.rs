@@ -221,8 +221,20 @@ fn quoted(message: &str) -> Option<String> {
 
 /// [`coverage`] on sources held in memory.
 pub fn coverage_sources(sources: Vec<(PathBuf, String)>) -> CoverageReport {
+    classify(crate::check_sources(sources))
+}
+
+/// [`coverage_sources`] with compatibility libraries ([stdlib.compat]);
+/// library files are never units.
+pub fn coverage_sources_with(
+    sources: Vec<(PathBuf, String)>,
+    libraries: &[String],
+) -> Result<CoverageReport, String> {
+    Ok(classify(crate::check_sources_with(sources, libraries)?))
+}
+
+fn classify(check: crate::CheckReport) -> CoverageReport {
     use rootplc_diag::codes::{IMPLICIT_CONVERSION, UNKNOWN_NAME, UNKNOWN_TYPE};
-    let check = crate::check_sources(sources);
     // (name, unit) for every name declared by a unit that does not compile
     let mut broken_decl: Vec<(String, usize)> = Vec::new();
     for (i, f) in check.files.iter().enumerate() {
@@ -235,6 +247,7 @@ pub fn coverage_sources(sources: Vec<(PathBuf, String)>) -> CoverageReport {
         .files
         .into_iter()
         .enumerate()
+        .filter(|(_, f)| !f.library)
         .map(|(idx, f)| {
             let errors: Vec<_> = f
                 .diagnostics

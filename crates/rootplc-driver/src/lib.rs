@@ -35,6 +35,8 @@ pub enum Command {
     Examples,
     /// Classify units as portable, dialect or blocked.
     Coverage,
+    /// List the bundled compatibility libraries.
+    Libraries,
     /// Import PLCopen / TwinCAT XML.
     Import,
     /// Deploy to a runtime. Always requires human approval.
@@ -58,6 +60,7 @@ impl Command {
         Command::Explain,
         Command::Examples,
         Command::Coverage,
+        Command::Libraries,
         Command::Import,
         Command::Deploy,
         Command::Monitor,
@@ -77,6 +80,7 @@ impl Command {
             Command::Explain => "explain",
             Command::Examples => "examples",
             Command::Coverage => "coverage",
+            Command::Libraries => "libraries",
             Command::Import => "import",
             Command::Deploy => "deploy",
             Command::Monitor => "monitor",
@@ -104,6 +108,9 @@ pub struct CheckedFile {
     pub source: String,
     /// Lexer, parser and checker diagnostics.
     pub diagnostics: Vec<rootplc_diag::Diagnostic>,
+    /// A file of an active compatibility library: checked with the project,
+    /// never reported ([stdlib.compat]).
+    pub library: bool,
 }
 
 /// Result of [`check`].
@@ -127,6 +134,7 @@ impl CheckReport {
     pub fn count(&self, sev: rootplc_diag::Severity) -> usize {
         self.files
             .iter()
+            .filter(|f| !f.library)
             .flat_map(|f| &f.diagnostics)
             .filter(|d| d.severity == sev)
             .count()
@@ -176,14 +184,71 @@ pub fn check(paths: &[PathBuf]) -> Result<CheckReport, String> {
 
 /// [`check`] on sources held in memory (name, text), e.g. from an agent.
 pub fn check_sources(sources: Vec<(PathBuf, String)>) -> CheckReport {
+    check_files(sources, &[])
+}
+
+/// [`check_sources`] with compatibility libraries activated by name
+/// ([stdlib.compat]). An unknown name is an error listing the known ones.
+pub fn check_sources_with(
+    sources: Vec<(PathBuf, String)>,
+    libraries: &[String],
+) -> Result<CheckReport, String> {
+    let mut libs = Vec::new();
+    for name in libraries.iter().flat_map(|n| n.split(',')).map(str::trim) {
+        if name.is_empty() {
+            continue;
+        }
+        match rootplc_stdlib::compat::find(name) {
+            Some(l)
+                if !libs
+                    .iter()
+                    .any(|x: &rootplc_stdlib::compat::Library| x.name == l.name) =>
+            {
+                libs.push(l)
+            }
+            Some(_) => {}
+            None => {
+                let known: Vec<String> = rootplc_stdlib::compat::libraries()
+                    .into_iter()
+                    .map(|l| l.name)
+                    .collect();
+                return Err(format!(
+                    "unknown compatibility library '{name}'; bundled: {}",
+                    known.join(", ")
+                ));
+            }
+        }
+    }
+    Ok(check_files(sources, &libs))
+}
+
+fn check_files(
+    sources: Vec<(PathBuf, String)>,
+    libs: &[rootplc_stdlib::compat::Library],
+) -> CheckReport {
     let mut files: Vec<CheckedFile> = sources
         .into_iter()
         .map(|(path, source)| CheckedFile {
             path,
             source,
             diagnostics: Vec::new(),
+            library: false,
         })
         .collect();
+    for l in libs {
+        for (name, src) in &l.files {
+            files.push(CheckedFile {
+                path: PathBuf::from(format!("<{}>/{name}", l.name)),
+                source: (*src).to_string(),
+                diagnostics: Vec::new(),
+                library: true,
+            });
+        }
+    }
+    let opts = rootplc_sema::Options {
+        declare_only: libs.iter().flat_map(|l| l.declare_only.clone()).collect(),
+        qualifiers: libs.iter().map(|l| l.name.clone()).collect(),
+    };
     let parses: Vec<_> = files
         .iter()
         .map(|f| rootplc_syntax::parse(&f.source))
@@ -204,7 +269,7 @@ pub fn check_sources(sources: Vec<(PathBuf, String)>) -> CheckReport {
         .iter()
         .map(|&i| (&parses[i], files[i].source.as_str()))
         .collect();
-    let analysis = rootplc_sema::analyze(&input);
+    let analysis = rootplc_sema::analyze_with(&input, &opts);
     for (&i, diags) in clean.iter().zip(analysis.diagnostics) {
         files[i].diagnostics.extend(diags);
     }

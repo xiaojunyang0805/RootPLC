@@ -14,6 +14,7 @@ rootplc-diag.workspace = true
 rootplc-syntax.workspace = true
 rootplc-sema.workspace = true
 rootplc-testing.workspace = true
+rootplc-stdlib.workspace = true
 
 [dev-dependencies]
 rootplc-driver.workspace = true

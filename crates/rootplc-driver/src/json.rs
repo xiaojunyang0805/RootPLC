@@ -44,6 +44,7 @@ fn diagnostics(report: &CheckReport) -> String {
     let items: Vec<String> = report
         .files
         .iter()
+        .filter(|f| !f.library)
         .flat_map(|f| {
             let name = f.path.display().to_string();
             f.diagnostics
@@ -60,7 +61,7 @@ pub fn check(r: &CheckReport) -> String {
     format!(
         "{{\"command\":\"check\",\"ok\":{},\"files\":{},\"errors\":{},\"warnings\":{},\"diagnostics\":{}}}",
         r.ok(),
-        r.files.len(),
+        r.files.iter().filter(|f| !f.library).count(),
         r.count(Severity::Error),
         r.count(Severity::Warning),
         diagnostics(r)
@@ -208,6 +209,29 @@ pub fn coverage(r: &CoverageReport) -> String {
         r.count(Status::Dependent),
         r.count(Status::Blocked),
         units.join(",")
+    )
+}
+
+/// `libraries` report: the bundled compatibility libraries.
+pub fn libraries() -> String {
+    let items: Vec<String> = rootplc_stdlib::compat::libraries()
+        .iter()
+        .map(|l| {
+            let list = |v: &[String]| v.iter().map(|x| json_string(x)).collect::<Vec<_>>().join(",");
+            format!(
+                "{{\"name\":{},\"vendor\":{},\"version\":{},\"description\":{},\"declare_only\":[{}],\"references\":[{}]}}",
+                json_string(&l.name),
+                json_string(&l.vendor),
+                json_string(&l.version),
+                json_string(&l.description),
+                list(&l.declare_only),
+                list(&l.references)
+            )
+        })
+        .collect();
+    format!(
+        "{{\"command\":\"libraries\",\"ok\":true,\"libraries\":[{}]}}",
+        items.join(",")
     )
 }
 

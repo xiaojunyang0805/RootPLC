@@ -32,6 +32,8 @@ pub struct Case {
     pub run: Option<String>,
     /// `assert:` lines.
     pub asserts: Vec<String>,
+    /// `libraries:` compatibility libraries to activate ([stdlib.compat]).
+    pub libraries: Vec<String>,
     /// Full source text.
     pub source: String,
 }
@@ -69,6 +71,7 @@ pub fn parse_case(path: &Path, source: &str) -> Result<Case, String> {
     let header = &body[start + 2..end];
 
     let (mut spec, mut expect, mut run, mut asserts) = (Vec::new(), None, None, Vec::new());
+    let mut libraries = Vec::new();
     for line in header.lines().map(str::trim).filter(|l| !l.is_empty()) {
         let (key, value) = line
             .split_once(':')
@@ -97,6 +100,12 @@ pub fn parse_case(path: &Path, source: &str) -> Result<Case, String> {
             }
             "run" => run = Some(value.to_string()),
             "assert" => asserts.push(value.to_string()),
+            "libraries" => libraries.extend(
+                value
+                    .split([',', ' '])
+                    .filter(|x| !x.is_empty())
+                    .map(str::to_string),
+            ),
             other => return Err(err(&format!("unknown header key '{other}'"))),
         }
     }
@@ -112,8 +121,35 @@ pub fn parse_case(path: &Path, source: &str) -> Result<Case, String> {
         expect: expect.ok_or_else(|| err("missing expect:"))?,
         run,
         asserts,
+        libraries,
         source: source.to_string(),
     })
+}
+
+/// Check `source` together with the named compatibility libraries; the
+/// result's first diagnostics list belongs to `source`.
+fn analyze_case(
+    p: &rootplc_syntax::Parse,
+    source: &str,
+    libraries: &[String],
+) -> rootplc_sema::Analysis {
+    let libs: Vec<rootplc_stdlib::compat::Library> = libraries
+        .iter()
+        .filter_map(|n| rootplc_stdlib::compat::find(n))
+        .collect();
+    let lib_src: Vec<&str> = libs
+        .iter()
+        .flat_map(|l| l.files.iter().map(|(_, s)| *s))
+        .collect();
+    let lib_parse: Vec<rootplc_syntax::Parse> =
+        lib_src.iter().map(|s| rootplc_syntax::parse(s)).collect();
+    let mut input: Vec<(&rootplc_syntax::Parse, &str)> = vec![(p, source)];
+    input.extend(lib_parse.iter().zip(&lib_src).map(|(lp, s)| (lp, *s)));
+    let opts = rootplc_sema::Options {
+        declare_only: libs.iter().flat_map(|l| l.declare_only.clone()).collect(),
+        qualifiers: libs.iter().map(|l| l.name.clone()).collect(),
+    };
+    rootplc_sema::analyze_with(&input, &opts)
 }
 
 fn collect_files(dir: &Path, ext: &str, out: &mut Vec<PathBuf>) -> std::io::Result<()> {
@@ -408,7 +444,15 @@ pub fn run_sema_stage(root: &Path) -> Result<Vec<String>, String> {
         if syntax_error {
             continue;
         }
-        let diags = rootplc_sema::check(&p, &c.source);
+        let diags = if c.libraries.is_empty() {
+            rootplc_sema::check(&p, &c.source)
+        } else {
+            analyze_case(&p, &c.source, &c.libraries)
+                .diagnostics
+                .into_iter()
+                .next()
+                .unwrap_or_default()
+        };
         let got: BTreeSet<String> = diags.iter().map(|d| d.code.to_string()).collect();
         let want: BTreeSet<String> = match &c.expect {
             Expect::Ok => BTreeSet::new(),
@@ -452,7 +496,7 @@ fn qualify_assert(expr: &str) -> String {
 }
 
 /// Compile one source text and run its TEST blocks. Returns problems.
-fn compile_and_test(name: &str, source: &str) -> Vec<String> {
+fn compile_and_test(name: &str, source: &str, libraries: &[String]) -> Vec<String> {
     let p = rootplc_syntax::parse(source);
     let syntax: Vec<String> = p
         .lex_diagnostics
@@ -464,7 +508,7 @@ fn compile_and_test(name: &str, source: &str) -> Vec<String> {
     if !syntax.is_empty() {
         return vec![format!("{name}: does not parse: {}", syntax.join("; "))];
     }
-    let a = rootplc_sema::analyze(&[(&p, source)]);
+    let a = analyze_case(&p, source, libraries);
     if !a.ok() {
         let errs: Vec<String> = a
             .diagnostics
@@ -537,7 +581,7 @@ END_VAR
 ",
             );
         }
-        problems.extend(compile_and_test(&name, &source));
+        problems.extend(compile_and_test(&name, &source, &c.libraries));
     }
     Ok(problems)
 }

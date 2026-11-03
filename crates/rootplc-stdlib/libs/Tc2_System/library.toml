@@ -1,0 +1,16 @@
+# Compatibility library: the interface of Beckhoff's Tc2_System, for TwinCAT
+# code. Clean-room: written only from the public references below. RootPLC is
+# an independent project, not affiliated with or endorsed by Beckhoff
+# Automation; the vendor field names whose interface this mirrors.
+name = "Tc2_System"
+vendor = "Beckhoff Automation GmbH"
+version = "1.0.0"
+description = "TwinCAT Tc2_System: string type T_MaxString, system constants, ADS logging functions"
+declare_only = ["ADSLOGSTR", "ADSLOGDINT", "ADSLOGLREAL"]
+references = [
+  "https://infosys.beckhoff.com/content/1033/tcplclib_tc2_system/31084171.html (global constants)",
+  "https://infosys.beckhoff.com/content/1033/tcplclib_tc2_system/31062795.html (T_MaxString)",
+  "https://infosys.beckhoff.com/content/1033/tcplclib_tc2_system/31033611.html (ADSLOGSTR)",
+  "https://infosys.beckhoff.com/content/1033/tcplclib_tc2_system/31030539.html (ADSLOGDINT)",
+  "https://infosys.beckhoff.com/content/1033/tcplclib_tc2_system/31032075.html (ADSLOGLREAL)",
+]

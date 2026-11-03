@@ -13,7 +13,9 @@ const USAGE: &str = "usage:
   rootplc run   <file.st|dir>... [--program NAME] [--cycles N] [--cycle-ms MS] [--json]
   rootplc explain <code> [--json]
   rootplc examples [words...] [--show ID] [--json]   (verified ST patterns)
-  rootplc coverage <file.st|dir>... [--json]       (portable / dialect / dependent / blocked)
+  rootplc coverage <file.st|dir>... [--json]
+  rootplc libraries [--json]                       (bundled compatibility libraries)
+  check, test, run and coverage take --library NAME[,NAME] (e.g. Tc2_System)       (portable / dialect / dependent / blocked)
   rootplc mcp            (MCP server on stdio, for agent hosts)
   rootplc --version
 
@@ -38,7 +40,7 @@ impl Args {
             match x.as_str() {
                 "--json" => a.json = true,
                 "--program" | "--cycles" | "--cycle-ms" | "--filter" | "--name" | "--show"
-                | "--agent" => {
+                | "--agent" | "--library" => {
                     let v = it.next().unwrap_or_default();
                     a.options.push((x, v));
                 }
@@ -46,6 +48,15 @@ impl Args {
             }
         }
         a
+    }
+
+    /// Every value of a repeatable option such as `--library`.
+    fn all(&self, name: &str) -> Vec<String> {
+        self.options
+            .iter()
+            .filter(|(k, _)| k == name)
+            .map(|(_, v)| v.clone())
+            .collect()
     }
 
     fn opt(&self, name: &str) -> Option<&str> {
@@ -74,8 +85,15 @@ fn io_error(cmd: &str, e: &str, json: bool) -> ExitCode {
     ExitCode::from(2)
 }
 
+/// Read the sources and check them with the `--library` libraries.
+fn load(cmd: &str, paths: &[PathBuf], args: &Args) -> Result<CheckReport, ExitCode> {
+    let sources = rootplc_driver::read_sources(paths).map_err(|e| io_error(cmd, &e, args.json))?;
+    rootplc_driver::check_sources_with(sources, &args.all("--library"))
+        .map_err(|e| io_error(cmd, &e, args.json))
+}
+
 fn print_diagnostics(report: &CheckReport) {
-    for f in &report.files {
+    for f in report.files.iter().filter(|f| !f.library) {
         let name = f.path.display().to_string();
         for d in &f.diagnostics {
             println!("{}", d.render_text(&name, &f.source));
@@ -83,10 +101,11 @@ fn print_diagnostics(report: &CheckReport) {
     }
 }
 
-fn cmd_check(paths: &[PathBuf], json_out: bool) -> ExitCode {
-    let r = match rootplc_driver::check(paths) {
+fn cmd_check(paths: &[PathBuf], args: &Args) -> ExitCode {
+    let json_out = args.json;
+    let r = match load("check", paths, args) {
         Ok(r) => r,
-        Err(e) => return io_error("check", &e, json_out),
+        Err(code) => return code,
     };
     if json_out {
         println!("{}", json::check(&r));
@@ -94,7 +113,7 @@ fn cmd_check(paths: &[PathBuf], json_out: bool) -> ExitCode {
         print_diagnostics(&r);
         eprintln!(
             "checked {} file(s): {} error(s), {} warning(s)",
-            r.files.len(),
+            r.files.iter().filter(|f| !f.library).count(),
             r.count(Severity::Error),
             r.count(Severity::Warning)
         );
@@ -102,10 +121,11 @@ fn cmd_check(paths: &[PathBuf], json_out: bool) -> ExitCode {
     exit(r.ok())
 }
 
-fn cmd_test(paths: &[PathBuf], filter: Option<&str>, json_out: bool) -> ExitCode {
-    let r = match rootplc_driver::test(paths, filter) {
-        Ok(r) => r,
-        Err(e) => return io_error("test", &e, json_out),
+fn cmd_test(paths: &[PathBuf], filter: Option<&str>, args: &Args) -> ExitCode {
+    let json_out = args.json;
+    let r = match load("test", paths, args) {
+        Ok(c) => rootplc_driver::test_report(c, filter),
+        Err(code) => return code,
     };
     if json_out {
         println!("{}", json::test(&r));
@@ -141,7 +161,16 @@ fn cmd_run(paths: &[PathBuf], args: &Args) -> ExitCode {
         .opt("--cycle-ms")
         .and_then(|v| v.parse().ok())
         .unwrap_or(10);
-    let r = match rootplc_driver::run(paths, args.opt("--program"), cycles, cycle_ms * 1_000_000) {
+    let check = match load("run", paths, args) {
+        Ok(c) => c,
+        Err(code) => return code,
+    };
+    let r = match rootplc_driver::run_report(
+        check,
+        args.opt("--program"),
+        cycles,
+        cycle_ms * 1_000_000,
+    ) {
         Ok(r) => r,
         Err(e) => return io_error("run", &e, args.json),
     };
@@ -226,9 +255,12 @@ fn cmd_examples(words: &[String], args: &Args) -> ExitCode {
     exit(!found.is_empty())
 }
 
-fn cmd_coverage(paths: &[PathBuf], json_out: bool) -> ExitCode {
+fn cmd_coverage(paths: &[PathBuf], args: &Args) -> ExitCode {
     use rootplc_driver::coverage::Status;
-    let r = match rootplc_driver::coverage::coverage(paths) {
+    let json_out = args.json;
+    let r = match rootplc_driver::read_sources(paths)
+        .and_then(|s| rootplc_driver::coverage::coverage_sources_with(s, &args.all("--library")))
+    {
         Ok(r) => r,
         Err(e) => return io_error("coverage", &e, json_out),
     };
@@ -265,6 +297,24 @@ fn cmd_coverage(paths: &[PathBuf], json_out: bool) -> ExitCode {
         r.count(Status::Dependent),
         r.count(Status::Blocked)
     );
+    ExitCode::SUCCESS
+}
+
+fn cmd_libraries(json_out: bool) -> ExitCode {
+    if json_out {
+        println!("{}", json::libraries());
+        return ExitCode::SUCCESS;
+    }
+    for l in rootplc_stdlib::compat::libraries() {
+        println!(
+            "{} {} ({})\n    {}",
+            l.name, l.version, l.vendor, l.description
+        );
+        if !l.declare_only.is_empty() {
+            println!("    declared only (not run): {}", l.declare_only.join(", "));
+        }
+    }
+    eprintln!("activate with --library NAME; RootPLC is not affiliated with the vendors named");
     ExitCode::SUCCESS
 }
 
@@ -349,13 +399,14 @@ fn main() -> ExitCode {
         return ExitCode::from(2);
     }
     match cmd {
-        Some(Command::Check) => cmd_check(&paths, args.json),
-        Some(Command::Test) => cmd_test(&paths, args.opt("--filter"), args.json),
+        Some(Command::Check) => cmd_check(&paths, &args),
+        Some(Command::Test) => cmd_test(&paths, args.opt("--filter"), &args),
+        Some(Command::Libraries) => cmd_libraries(args.json),
         Some(Command::Run) => cmd_run(&paths, &args),
         Some(Command::Explain) => cmd_explain(rest.first(), args.json),
         Some(Command::Init) => cmd_init(rest.first(), args.opt("--name"), args.opt("--agent")),
         Some(Command::Examples) => cmd_examples(rest, &args),
-        Some(Command::Coverage) => cmd_coverage(&paths, args.json),
+        Some(Command::Coverage) => cmd_coverage(&paths, &args),
         Some(cmd) => {
             if args.json {
                 println!("{}", json::error(cmd.name(), "not implemented yet"));
