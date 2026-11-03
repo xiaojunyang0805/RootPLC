@@ -299,12 +299,16 @@ def extract(p: dict, repo: Path | None = None) -> Path:
             if refs and (str(pj) in distinct or not split):
                 (folder_of(str(pj)) / "libraries.txt").write_text(chr(10).join(refs) + chr(10), encoding="utf-8")
     seen = Counter()
+    lib_ns, want = p.get("provides"), p.get("provides_folder", "")
     for k, (name, src) in enumerate(units):
         folder = folder_of(groups[k]) if split else dst
         safe = re.sub(r"[^A-Za-z0-9_.-]", "_", name)[:80]
         key = (str(folder), safe)
         seen[key] += 1
         fname = safe + (f"_{seen[key]}" if seen[key] > 1 else "") + ".st"
+        if lib_ns and (not want or folder.name == want or folder.name.startswith(want + "_")):
+            # a library's declarations live in its namespace (TcUnit.Test)
+            src = f"NAMESPACE {lib_ns}" + chr(10) + src + chr(10) + "END_NAMESPACE" + chr(10)
         (folder / fname).write_text(src, encoding="utf-8")
     shutil.rmtree(final, ignore_errors=True)
     dst.rename(final)
@@ -407,10 +411,14 @@ def analyse() -> None:
             # never counted for this project
             lt = folder / "libraries.txt"
             refs = lt.read_text(encoding="utf-8").split() if lt.exists() else []
+            deps = []
             for r in refs:
                 dep = provided.get(r.lower())
                 if dep and dep != folder and not str(folder).startswith(str(dep)):
-                    extra = [str(dep)] + extra
+                    deps.append(str(dep))
+                    # what the provided library references is active too
+                    libs = sorted(set(libs) | set(libraries_for(dep, p["format"], shipped)))
+            extra = deps + (["--library", ",".join(libs)] if libs else [])
             r = subprocess.run([exe, "check", *t, *extra, "--json"], capture_output=True, text=True, encoding="utf-8")
             rep = json.loads(r.stdout) if r.stdout.strip().startswith("{") else {}
             for diag in rep.get("diagnostics", []):
@@ -418,17 +426,24 @@ def analyse() -> None:
                     key = str(Path(diag["file"]).resolve())
                     per_file.setdefault(key, []).append(diag)
         key_of = {f: str(f.resolve()) for f in files}
+        # diagnostics in provided libraries checked alongside are not this project's
+        own = set(key_of.values())
+        per_file = {k: v for k, v in per_file.items() if k in own}
         syntax_ok = sum(1 for f in files if not any(x["code"] in SYNTAX_CODES or x["code"] == "RP0004"
                                                     for x in per_file.get(key_of[f], [])))
         clean = sum(1 for f in files if key_of[f] not in per_file)
         codes = Counter(x["code"] for xs in per_file.values() for x in xs)
         msgs = Counter(re.sub(r"'[^']*'", "'…'", x["message"]) for xs in per_file.values() for x in xs)
+        # which names are missing (cache only, to rank compatibility work)
+        names = Counter(f"{x['code']} {m.group(1)}" for xs in per_file.values() for x in xs
+                        if x["code"] in ("RP0201", "RP0111", "RP0203")
+                        for m in [re.search(r"'([^']*)'", x["message"])] if m)
         all_codes.update(codes)
         all_features.update(feats)
         results.append({"name": p["name"], "url": p["url"], "licence": p["licence"], "redistribute": p["redistribute"],
                         "kind": p.get("kind", ""), "units": len(files), "lines": lines, "syntax_ok": syntax_ok,
                         "clean": clean, "codes": codes.most_common(8), "messages": msgs.most_common(6),
-                        "features": dict(feats)})
+                        "features": dict(feats), "names": names.most_common(60)})
         print(f"{p['name']:30} units {len(files):5}  syntax ok {syntax_ok:5}  clean {clean:5}")
     (CACHE / "analysis.json").write_text(json.dumps(results, indent=1), encoding="utf-8")
     record_history(results)
