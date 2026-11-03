@@ -2,9 +2,11 @@
 //!
 //! Roadmap phase: 1. See `ARCHITECTURE.md`. Implemented: `check` v0 (name
 //! resolution and type checking per spec/02-types.md, spec/03-variables.md,
-//! spec/07-test-blocks.md and spec/08-stdlib.md). The typed IR follows.
+//! spec/07-test-blocks.md and spec/08-stdlib.md) and the typed IR (`ir`).
 
 mod check;
+pub mod ir;
+pub mod literal;
 pub mod types;
 
 pub use types::{Elem, Ty};
@@ -21,6 +23,31 @@ pub fn check(parse: &Parse, source: &str) -> Vec<Diagnostic> {
 /// Check the files of one project together: names declared in one file are
 /// visible in the others. Returns the diagnostics of each file, in order.
 pub fn check_project(files: &[(&Parse, &str)]) -> Vec<Vec<Diagnostic>> {
+    analyze(files).diagnostics
+}
+
+/// Result of [`analyze`].
+#[derive(Debug, Clone)]
+pub struct Analysis {
+    /// Checker diagnostics of each file, in order.
+    pub diagnostics: Vec<Vec<Diagnostic>>,
+    /// The typed IR. Execute it only if no diagnostic is an error.
+    pub program: ir::Program,
+}
+
+impl Analysis {
+    /// True if no diagnostic is an error.
+    pub fn ok(&self) -> bool {
+        !self
+            .diagnostics
+            .iter()
+            .flatten()
+            .any(|d| d.severity == Severity::Error)
+    }
+}
+
+/// Check a project and produce its typed IR.
+pub fn analyze(files: &[(&Parse, &str)]) -> Analysis {
     let mut c = check::Checker::new(
         files
             .iter()
@@ -29,11 +56,14 @@ pub fn check_project(files: &[(&Parse, &str)]) -> Vec<Vec<Diagnostic>> {
     );
     let roots: Vec<&rootplc_syntax::Node> = files.iter().map(|(p, _)| &p.tree).collect();
     c.run(&roots);
-    let mut out = vec![Vec::new(); files.len()];
-    for (f, d) in c.diags {
-        out[f].push(d);
+    let mut diagnostics = vec![Vec::new(); files.len()];
+    for (f, d) in std::mem::take(&mut c.diags) {
+        diagnostics[f].push(d);
     }
-    out
+    Analysis {
+        diagnostics,
+        program: c.into_program(),
+    }
 }
 
 /// Result of [`check_source`].

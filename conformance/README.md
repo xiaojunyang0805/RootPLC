@@ -32,8 +32,7 @@ exactly the case's expected codes of that stage, and nothing else.
 3. Every rule ID in the spec is cited by at least one case.
 4. Every diagnostic code in the registry is expected by at least one case.
 
-Implemented stages: **lex**, **parse** and **sema**. `run`/`assert`
-execution is added when the VM lands.
+Implemented stages: **lex**, **parse**, **sema** and **exec**.
 
 - **lex:** every case. The tokens must reproduce the source byte for byte.
 - **parse:** the syntax tree must reproduce the source byte for byte in every
@@ -43,6 +42,11 @@ execution is added when the VM lands.
   no diagnostics.
 - **sema:** graded only for cases that lex and parse without errors. The
   checker's codes must equal the case's expected `sema`-stage codes.
+- **exec:** every case that compiles without errors is run in the VM. Its
+  TEST blocks must pass. For `run: P cycles=N`, program `P` runs N cycles and
+  then every `assert:` expression must be TRUE; names in an assertion refer to
+  the program's variables ([tests.whitebox]).
+- The TEST blocks of every example project must pass.
 - Every `.st` file in `examples/` and the stdlib must lex, parse and check
   with no diagnostics. Each folder under `examples/` is checked as one
   project, so a test file sees the program it tests.

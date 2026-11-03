@@ -432,6 +432,158 @@ pub fn run_sema_stage(root: &Path) -> Result<Vec<String>, String> {
     Ok(problems)
 }
 
+/// Rewrite an `assert:` expression so that variable names refer to the
+/// instance under test: `a[2] = 3` becomes `conf_uut.a[2] = 3`.
+fn qualify_assert(expr: &str) -> String {
+    let lexed = rootplc_syntax::lex(expr);
+    let mut out = String::new();
+    let mut prev_dot = false;
+    for t in &lexed.tokens {
+        let text = t.text(expr);
+        if t.kind == rootplc_syntax::TokenKind::Ident && !prev_dot {
+            out.push_str("conf_uut.");
+        }
+        out.push_str(text);
+        if !t.kind.is_trivia() {
+            prev_dot = t.kind == rootplc_syntax::TokenKind::Dot;
+        }
+    }
+    out
+}
+
+/// Compile one source text and run its TEST blocks. Returns problems.
+fn compile_and_test(name: &str, source: &str) -> Vec<String> {
+    let p = rootplc_syntax::parse(source);
+    let syntax: Vec<String> = p
+        .lex_diagnostics
+        .iter()
+        .chain(&p.diagnostics)
+        .filter(|d| d.severity == rootplc_diag::Severity::Error)
+        .map(|d| format!("{} {}", d.code, d.message))
+        .collect();
+    if !syntax.is_empty() {
+        return vec![format!("{name}: does not parse: {}", syntax.join("; "))];
+    }
+    let a = rootplc_sema::analyze(&[(&p, source)]);
+    if !a.ok() {
+        let errs: Vec<String> = a
+            .diagnostics
+            .iter()
+            .flatten()
+            .map(|d| format!("{} {}", d.code, d.message))
+            .collect();
+        return vec![format!("{name}: does not check: {}", errs.join("; "))];
+    }
+    rootplc_testing::run_tests(&a.program, None)
+        .into_iter()
+        .filter(|o| !o.passed())
+        .map(|o| {
+            let mut why: Vec<String> = o.failures.iter().map(|f| f.message.clone()).collect();
+            if let Some(f) = &o.fault {
+                why.push(format!("fault {}: {}", f.kind.name(), f.message));
+            }
+            format!("{name}: test {} failed: {}", o.name, why.join("; "))
+        })
+        .collect()
+}
+
+/// Execute the cases: every TEST block of a case that compiles without errors
+/// must pass, and every `run:` / `assert:` pair must hold. `run: P cycles=N`
+/// runs program `P` N times, then each assertion is evaluated against the
+/// program's variables ([tests.whitebox]).
+pub fn run_exec_stage(root: &Path) -> Result<Vec<String>, String> {
+    let mut problems = Vec::new();
+    for c in load_cases(root)? {
+        if matches!(c.expect, Expect::Error(_)) {
+            continue;
+        }
+        let name = c
+            .path
+            .strip_prefix(root)
+            .unwrap_or(&c.path)
+            .display()
+            .to_string();
+        let mut source = c.source.clone();
+        if let Some(run) = &c.run {
+            let mut words = run.split_whitespace();
+            let prog = words.next().unwrap_or("");
+            let cycles: usize = words
+                .find_map(|w| w.strip_prefix("cycles="))
+                .and_then(|n| n.parse().ok())
+                .unwrap_or(1);
+            source.push_str(&format!(
+                "
+TEST conformance_run
+VAR
+    conf_uut : {prog};
+END_VAR
+"
+            ));
+            for _ in 0..cycles {
+                source.push_str(
+                    "conf_uut();
+",
+                );
+            }
+            for a in &c.asserts {
+                source.push_str(&format!(
+                    "ASSERT_TRUE({});
+",
+                    qualify_assert(a)
+                ));
+            }
+            source.push_str(
+                "END_TEST
+",
+            );
+        }
+        problems.extend(compile_and_test(&name, &source));
+    }
+    Ok(problems)
+}
+
+/// The TEST blocks of every example project must pass.
+pub fn test_examples(root: &Path) -> Result<Vec<String>, String> {
+    let mut problems = Vec::new();
+    for entry in fs::read_dir(root.join("examples")).map_err(|e| e.to_string())? {
+        let dir = entry.map_err(|e| e.to_string())?.path();
+        if !dir.is_dir() {
+            continue;
+        }
+        let mut files = Vec::new();
+        collect_files(&dir, "st", &mut files).map_err(|e| e.to_string())?;
+        let sources = files
+            .iter()
+            .map(|f| fs::read_to_string(f).map_err(|e| e.to_string()))
+            .collect::<Result<Vec<_>, _>>()?;
+        let parses: Vec<_> = sources.iter().map(|s| rootplc_syntax::parse(s)).collect();
+        let input: Vec<_> = parses
+            .iter()
+            .zip(&sources)
+            .map(|(p, s)| (p, s.as_str()))
+            .collect();
+        let a = rootplc_sema::analyze(&input);
+        if !a.ok() {
+            continue; // reported by check_examples
+        }
+        for o in rootplc_testing::run_tests(&a.program, None) {
+            if !o.passed() {
+                let mut why: Vec<String> = o.failures.iter().map(|f| f.message.clone()).collect();
+                if let Some(f) = &o.fault {
+                    why.push(format!("fault {}: {}", f.kind.name(), f.message));
+                }
+                problems.push(format!(
+                    "{}: test {} failed: {}",
+                    dir.display(),
+                    o.name,
+                    why.join("; ")
+                ));
+            }
+        }
+    }
+    Ok(problems)
+}
+
 /// Every project under `examples/` (one per folder) and the stdlib must check
 /// without diagnostics. The files of a project are checked together.
 pub fn check_examples(root: &Path) -> Result<Vec<String>, String> {

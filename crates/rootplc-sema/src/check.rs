@@ -1,16 +1,21 @@
-//! The checker: name resolution and type checking over the syntax tree.
+//! The checker: name resolution and type checking over the syntax tree, and
+//! emission of the typed IR (`ir.rs`).
 //!
 //! Passes: (1) register every type and POU name, (2) resolve types and POU
 //! interfaces, (3) find structures that contain themselves, (4) check initial
-//! values and statements. Expressions are typed bottom-up; untyped literals
-//! take their type from the other operand or the assignment target
-//! ([types.literal.untyped]). `Ty::Unknown` absorbs follow-on errors.
+//! values and statements, emitting IR. Expressions are typed bottom-up;
+//! untyped literals take their type from the other operand or the assignment
+//! target ([types.literal.untyped]). `Ty::Unknown` absorbs follow-on errors.
 
 use std::collections::{HashMap, HashSet};
 
 use rootplc_diag::{Code, Diagnostic, Span, codes};
 use rootplc_syntax::{Element, Node, NodeKind as N, Token, TokenKind as T};
 
+use crate::ir::{
+    self, BinOp, CallTarget, CaseArm, Const, ExprKind, ForLoop, Init, PouKind, Section, Stmt, UnOp,
+};
+use crate::literal;
 use crate::types::{DEFAULT_STRING_LEN, Elem, Ty};
 
 const GENERIC_TYPES: &[&str] = &[
@@ -35,22 +40,6 @@ const GENERIC_TYPES: &[&str] = &[
 enum Item<'a> {
     Tok(usize),
     Node(&'a Node),
-}
-
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum PouKind {
-    Program,
-    Function,
-    FunctionBlock,
-    Test,
-}
-
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum Section {
-    Input,
-    Output,
-    InOut,
-    Local,
 }
 
 #[derive(Clone)]
@@ -90,7 +79,7 @@ struct Def<'a> {
     init: Option<&'a Node>,
 }
 
-/// A compile-time constant.
+/// A compile-time constant (for folding and range checks).
 #[derive(Clone, Copy, PartialEq, Debug)]
 enum K {
     Int(i128),
@@ -99,7 +88,7 @@ enum K {
     Str(usize),
 }
 
-/// A typed expression.
+/// A typed expression with its IR.
 #[derive(Clone, Debug)]
 struct V {
     ty: Ty,
@@ -107,6 +96,7 @@ struct V {
     /// A literal, possibly negated: out of range is RP0102, not RP0101.
     leaf: bool,
     span: Span,
+    e: ExprKind,
 }
 
 impl V {
@@ -116,10 +106,34 @@ impl V {
             k: None,
             leaf: false,
             span,
+            e: ExprKind::Invalid,
         }
     }
     fn unknown(span: Span) -> V {
         V::of(Ty::Unknown, span)
+    }
+    fn with(ty: Ty, span: Span, e: ExprKind) -> V {
+        V {
+            ty,
+            k: None,
+            leaf: false,
+            span,
+            e,
+        }
+    }
+    /// The IR of this value; folded constants become `Const`.
+    fn ir(self) -> ir::Expr {
+        let kind = match self.k {
+            Some(K::Int(n)) => ExprKind::Const(Const::Int(n)),
+            Some(K::Real(x)) => ExprKind::Const(Const::Real(x)),
+            Some(K::Bool(b)) => ExprKind::Const(Const::Bool(b)),
+            _ => self.e,
+        };
+        ir::Expr {
+            ty: self.ty,
+            kind,
+            span: self.span,
+        }
     }
 }
 
@@ -157,6 +171,13 @@ struct Arg<'a> {
     expr: &'a Node,
 }
 
+/// IR collected for a definition in pass 4.
+#[derive(Default)]
+struct DefIr {
+    var_inits: Vec<Option<Init>>,
+    body: Vec<Stmt>,
+}
+
 pub(crate) struct Checker<'a> {
     /// Source text and tokens of every file in the project.
     files: Vec<(&'a str, &'a [Token])>,
@@ -165,46 +186,13 @@ pub(crate) struct Checker<'a> {
     defs: Vec<Def<'a>>,
     types: HashMap<String, usize>,
     scope: Option<usize>,
+    irs: HashMap<usize, DefIr>,
     /// Diagnostics with the index of their file.
     pub(crate) diags: Vec<(usize, Diagnostic)>,
 }
 
 fn is_trivia(k: T) -> bool {
     k.is_trivia() || k == T::Pragma
-}
-
-/// Parse an integer literal body: `1_000`, `16#FF`, `-3`.
-fn parse_int(text: &str) -> Option<i128> {
-    let t: String = text.chars().filter(|c| *c != '_').collect();
-    let (neg, t) = match t.strip_prefix('-') {
-        Some(r) => (true, r),
-        None => (false, t.strip_prefix('+').unwrap_or(&t)),
-    };
-    let v = match t.split_once('#') {
-        Some((b, d)) => i128::from_str_radix(d, b.parse::<u32>().ok()?).ok()?,
-        None => t.parse::<i128>().ok()?,
-    };
-    Some(if neg { -v } else { v })
-}
-
-/// Number of characters in a quoted string literal, after `$` escapes.
-fn str_len(quoted: &str, wide: bool) -> usize {
-    let inner = quoted.get(1..quoted.len().saturating_sub(1)).unwrap_or("");
-    let mut n = 0;
-    let mut it = inner.chars().peekable();
-    while let Some(c) = it.next() {
-        if c == '$' {
-            if it.peek().is_some_and(char::is_ascii_hexdigit) {
-                for _ in 0..(if wide { 4 } else { 2 }) {
-                    it.next();
-                }
-            } else {
-                it.next();
-            }
-        }
-        n += 1;
-    }
-    n
 }
 
 fn elem_or_str(name: &str) -> Option<Ty> {
@@ -251,6 +239,7 @@ impl<'a> Checker<'a> {
             defs: Vec::new(),
             types: HashMap::new(),
             scope: None,
+            irs: HashMap::new(),
             diags: Vec::new(),
         };
         // [stdlib.fbs]
@@ -331,7 +320,7 @@ impl<'a> Checker<'a> {
             span,
             init: None,
         });
-        self.types.insert(name.to_ascii_lowercase(), id);
+        self.types.insert(key, id);
         id
     }
 
@@ -347,6 +336,56 @@ impl<'a> Checker<'a> {
         for id in 0..self.defs.len() {
             self.check_def(id);
         }
+    }
+
+    /// The typed IR of the project.
+    pub(crate) fn into_program(mut self) -> ir::Program {
+        let mut defs = Vec::with_capacity(self.defs.len());
+        for (id, d) in self.defs.iter().enumerate() {
+            let mut irs = self.irs.remove(&id).unwrap_or_default();
+            let mut inits = std::mem::take(&mut irs.var_inits).into_iter();
+            let mut var = |v: &Var<'a>| ir::Var {
+                name: v.name.clone(),
+                ty: v.ty.clone(),
+                section: v.section,
+                init: inits.next().flatten(),
+            };
+            let kind = match &d.kind {
+                Kind::Pending | Kind::Resolving => ir::DefKind::Unresolved,
+                Kind::Alias(t) => ir::DefKind::Alias(t.clone()),
+                Kind::Struct(m) => ir::DefKind::Struct(m.iter().map(&mut var).collect()),
+                Kind::Enum(v) => ir::DefKind::Enum(v.clone()),
+                Kind::Subrange { base, lo, hi } => ir::DefKind::Subrange {
+                    base: *base,
+                    lo: *lo,
+                    hi: *hi,
+                },
+                Kind::Pou(p) => {
+                    let mut vars: Vec<ir::Var> = p.vars.iter().map(&mut var).collect();
+                    if let (PouKind::Function, Some(t)) = (p.kind, &p.ret) {
+                        vars.push(ir::Var {
+                            name: d.name.clone(),
+                            ty: t.clone(),
+                            section: Section::Result,
+                            init: None,
+                        });
+                    }
+                    ir::DefKind::Pou(ir::Pou {
+                        kind: p.kind,
+                        vars,
+                        ret: p.ret.clone(),
+                        body: std::mem::take(&mut irs.body),
+                        builtin: d.node.is_none(),
+                    })
+                }
+            };
+            defs.push(ir::Def {
+                name: d.name.clone(),
+                file: d.file,
+                kind,
+            });
+        }
+        ir::Program { defs }
     }
 
     // ---------------------------------------------------------------- tree access
@@ -558,6 +597,9 @@ impl<'a> Checker<'a> {
             }
         }
         let ty = spec.map_or(Ty::Unknown, |s| self.type_spec(s, None));
+        if init.is_none() {
+            init = spec.and_then(|s| self.type_default(s));
+        }
         for t in names {
             out.push(Var {
                 name: self.text(t).to_string(),
@@ -567,6 +609,21 @@ impl<'a> Checker<'a> {
                 init,
             });
         }
+    }
+
+    /// Initial value given in the declaration of a named type in this file,
+    /// such as `TYPE Speed : INT := 10; END_TYPE`, [types.derived.alias].
+    fn type_default(&self, spec: &'a Node) -> Option<&'a Node> {
+        let its = self.items(spec);
+        let [Item::Tok(t)] = its.as_slice() else {
+            return None;
+        };
+        if self.tkind(*t) != T::Ident {
+            return None;
+        }
+        let &id = self.types.get(&self.text(*t).to_ascii_lowercase())?;
+        let d = &self.defs[id];
+        if d.file == self.cur { d.init } else { None }
     }
 
     /// A reference to a named type; aliases resolve to their target.
@@ -614,26 +671,22 @@ impl<'a> Checker<'a> {
                 while k < its.len() {
                     match its[k] {
                         Item::Tok(t) if self.tkind(t) == T::LBracket => {
-                            if let Some(Item::Node(e)) = its.get(k + 1).copied() {
-                                if let Ty::Str { wide, .. } = ty {
-                                    match self.const_int(e) {
-                                        Some(v) if (1..=65_535).contains(&v) => {
-                                            ty = Ty::Str {
-                                                wide,
-                                                len: v as u32,
-                                            };
+                            if let (Some(Item::Node(e)), Ty::Str { wide, .. }) =
+                                (its.get(k + 1).copied(), ty.clone())
+                            {
+                                match self.const_int(e) {
+                                    Some(v) if (1..=65_535).contains(&v) => {
+                                        ty = Ty::Str {
+                                            wide,
+                                            len: v as u32,
                                         }
-                                        Some(v) => {
-                                            let sp = self.span(e);
-                                            self.diag(
-                                                codes::INVALID_BOUNDS,
-                                                format!("string length {v} is outside 1..65535"),
-                                                sp,
-                                                None,
-                                            );
-                                        }
-                                        None => {}
                                     }
+                                    Some(v) => {
+                                        let sp = self.span(e);
+                                        let msg = format!("string length {v} is outside 1..65535");
+                                        self.diag(codes::INVALID_BOUNDS, msg, sp, None);
+                                    }
+                                    None => {}
                                 }
                             }
                             k += 3;
@@ -650,12 +703,10 @@ impl<'a> Checker<'a> {
                                             self.span(l).start as usize,
                                             self.span(h).end as usize,
                                         );
-                                        self.diag(
-                                            codes::INVALID_BOUNDS,
-                                            format!("subrange {a}..{b}: the lower bound exceeds the upper bound"),
-                                            sp,
-                                            None,
+                                        let msg = format!(
+                                            "subrange {a}..{b}: the lower bound exceeds the upper bound"
                                         );
+                                        self.diag(codes::INVALID_BOUNDS, msg, sp, None);
                                     } else {
                                         ty = self
                                             .make_def(decl, Kind::Subrange { base, lo: a, hi: b });
@@ -731,8 +782,7 @@ impl<'a> Checker<'a> {
         let mut values = Vec::new();
         let mut next = 0i128;
         for v in self.child_nodes(e, N::EnumValue) {
-            let its = self.items(v);
-            let Some(Item::Tok(t)) = its.first().copied() else {
+            let Some(Item::Tok(t)) = self.items(v).first().copied() else {
                 continue;
             };
             let explicit = self.first_node(v).and_then(|x| self.const_int(x));
@@ -762,12 +812,10 @@ impl<'a> Checker<'a> {
                         [l, h] => match (self.const_int(l), self.const_int(h)) {
                             (Some(a), Some(b)) if a > b => {
                                 let sp = self.span(n);
-                                self.diag(
-                                    codes::INVALID_BOUNDS,
-                                    format!("array bounds {a}..{b}: the lower bound exceeds the upper bound"),
-                                    sp,
-                                    None,
+                                let msg = format!(
+                                    "array bounds {a}..{b}: the lower bound exceeds the upper bound"
                                 );
+                                self.diag(codes::INVALID_BOUNDS, msg, sp, None);
                                 None
                             }
                             (Some(a), Some(b)) => Some((a, b)),
@@ -793,8 +841,8 @@ impl<'a> Checker<'a> {
         match n.kind {
             N::Literal => match its.first().copied() {
                 Some(Item::Tok(i)) => match self.tkind(i) {
-                    T::Integer => parse_int(self.text(i)),
-                    T::TypedLiteral => parse_int(self.text(i).split_once('#')?.1),
+                    T::Integer => literal::parse_int(self.text(i)),
+                    T::TypedLiteral => literal::parse_int(self.text(i).split_once('#')?.1),
                     _ => None,
                 },
                 _ => None,
@@ -876,8 +924,11 @@ impl<'a> Checker<'a> {
     fn check_def(&mut self, id: usize) {
         let d = self.defs[id].clone();
         self.cur = d.file;
+        let mut out = DefIr::default();
         match &d.kind {
             Kind::Alias(t) => {
+                // The value becomes the default of variables of this type
+                // (see `type_default`); here it is only checked.
                 if let Some(i) = d.init {
                     self.scope = None;
                     self.initializer(t, i);
@@ -886,9 +937,8 @@ impl<'a> Checker<'a> {
             Kind::Struct(members) => {
                 self.scope = None;
                 for v in members {
-                    if let Some(i) = v.init {
-                        self.initializer(&v.ty, i);
-                    }
+                    let init = v.init.and_then(|i| self.initializer(&v.ty, i));
+                    out.var_inits.push(init);
                 }
             }
             Kind::Pou(p) => {
@@ -897,49 +947,46 @@ impl<'a> Checker<'a> {
                 let mut seen = HashSet::new();
                 for v in &p.vars {
                     if !seen.insert(v.name.to_ascii_lowercase()) {
-                        self.diag(
-                            codes::DUPLICATE_NAME,
-                            format!("'{}' is already declared in {}", v.name, d.name),
-                            v.span,
-                            None,
-                        );
+                        let msg = format!("'{}' is already declared in {}", v.name, d.name);
+                        self.diag(codes::DUPLICATE_NAME, msg, v.span, None);
                     }
                 }
                 for v in &p.vars {
-                    if let Some(i) = v.init {
-                        self.initializer(&v.ty, i);
-                    }
+                    let init = v.init.and_then(|i| self.initializer(&v.ty, i));
+                    out.var_inits.push(init);
                 }
                 for s in self.child_nodes(node, N::StmtList) {
-                    self.stmt_list(s);
+                    out.body = self.stmt_list(s);
                 }
                 self.scope = None;
             }
-            _ => {}
+            _ => return,
         }
+        self.irs.insert(id, out);
     }
 
     /// [variables.initializer.check].
-    fn initializer(&mut self, ty: &Ty, n: &'a Node) {
-        let Some(inner) = self.first_node(n) else {
-            return;
-        };
+    fn initializer(&mut self, ty: &Ty, n: &'a Node) -> Option<Init> {
+        let inner = self.first_node(n)?;
         let span = self.span(inner);
         match inner.kind {
             N::ArrayInit => {
                 let elem = match self.strip(ty) {
                     Ty::Array { elem, .. } => *elem,
-                    Ty::Unknown => return,
+                    Ty::Unknown => return None,
                     _ => {
                         let msg =
                             format!("array initializer for a value of type {}", self.ty_name(ty));
                         self.diag(codes::IMPLICIT_CONVERSION, msg, span, None);
-                        return;
+                        return None;
                     }
                 };
-                for c in self.child_nodes(inner, N::Initializer) {
-                    self.initializer(&elem, c);
-                }
+                let items = self
+                    .child_nodes(inner, N::Initializer)
+                    .into_iter()
+                    .filter_map(|c| self.initializer(&elem, c))
+                    .collect();
+                Some(Init::Array(items))
             }
             N::StructInit => {
                 let members = match ty {
@@ -947,7 +994,7 @@ impl<'a> Checker<'a> {
                         Kind::Struct(m) => m.clone(),
                         _ => Vec::new(),
                     },
-                    Ty::Unknown => return,
+                    Ty::Unknown => return None,
                     _ => Vec::new(),
                 };
                 if members.is_empty() {
@@ -956,8 +1003,9 @@ impl<'a> Checker<'a> {
                         self.ty_name(ty)
                     );
                     self.diag(codes::IMPLICIT_CONVERSION, msg, span, None);
-                    return;
+                    return None;
                 }
+                let mut fields = Vec::new();
                 let mut cur = None;
                 for it in self.items(inner) {
                     match it {
@@ -965,8 +1013,15 @@ impl<'a> Checker<'a> {
                         Item::Node(c) if c.kind == N::Initializer => {
                             let Some(t) = cur.take() else { continue };
                             let name = self.text(t);
-                            match members.iter().find(|m| m.name.eq_ignore_ascii_case(name)) {
-                                Some(m) => self.initializer(&m.ty, c),
+                            match members
+                                .iter()
+                                .position(|m| m.name.eq_ignore_ascii_case(name))
+                            {
+                                Some(k) => {
+                                    if let Some(i) = self.initializer(&members[k].ty, c) {
+                                        fields.push((k, i));
+                                    }
+                                }
                                 None => {
                                     let msg = format!(
                                         "structure {} has no member '{name}'",
@@ -980,105 +1035,117 @@ impl<'a> Checker<'a> {
                         _ => {}
                     }
                 }
+                Some(Init::Struct(fields))
             }
             _ => {
                 let v = self.expr(inner);
                 self.coerce(ty, &v);
+                Some(Init::Expr(v.ir()))
             }
         }
     }
 
-    fn stmt_list(&mut self, n: &'a Node) {
+    fn stmt_list(&mut self, n: &'a Node) -> Vec<Stmt> {
+        let mut out = Vec::new();
         for it in self.items(n) {
             if let Item::Node(s) = it {
-                self.stmt(s);
+                if let Some(st) = self.stmt(s) {
+                    out.push(st);
+                }
             }
         }
+        out
     }
 
-    fn stmt(&mut self, n: &'a Node) {
+    fn stmt(&mut self, n: &'a Node) -> Option<Stmt> {
         let its = self.items(n);
         match n.kind {
             N::AssignStmt => {
-                if let (Some(Item::Node(t)), Some(Item::Tok(op)), Some(Item::Node(e))) = (
+                let (Some(Item::Node(t)), Some(Item::Tok(op)), Some(Item::Node(e))) = (
                     its.first().copied(),
                     its.get(1).copied(),
                     its.get(2).copied(),
-                ) {
-                    let target = self.expr(t);
-                    let value = self.expr(e);
-                    if self.tkind(op) == T::Assign {
-                        self.coerce(&target.ty, &value);
-                    }
+                ) else {
+                    return None;
+                };
+                let target = self.expr(t);
+                let value = self.expr(e);
+                if self.tkind(op) == T::Assign {
+                    self.coerce(&target.ty, &value);
                 }
+                Some(Stmt::Assign(target.ir(), value.ir()))
             }
-            N::CallStmt => {
-                if let Some(c) = self.first_node(n) {
-                    self.expr(c);
-                }
-            }
+            N::CallStmt => self.first_node(n).map(|c| Stmt::Eval(self.expr(c).ir())),
             N::IfStmt => {
+                let mut arms = Vec::new();
+                let mut cond: Option<ir::Expr> = None;
                 let mut want_cond = false;
+                let mut else_body = Vec::new();
                 for it in its {
                     match it {
                         Item::Tok(t) if self.is_kw(t, "IF") || self.is_kw(t, "ELSIF") => {
                             want_cond = true
                         }
-                        Item::Node(c) if c.kind == N::StmtList => self.stmt_list(c),
+                        Item::Node(c) if c.kind == N::StmtList => {
+                            let body = self.stmt_list(c);
+                            match cond.take() {
+                                Some(e) => arms.push((e, body)),
+                                None => else_body = body,
+                            }
+                        }
                         Item::Node(c) if want_cond => {
-                            self.condition(c);
+                            cond = Some(self.condition(c));
                             want_cond = false;
                         }
                         _ => {}
                     }
                 }
+                Some(Stmt::If(arms, else_body))
             }
             N::CaseStmt => {
                 let mut sel: Option<V> = None;
+                let mut arms = Vec::new();
+                let mut default = Vec::new();
                 for it in its {
                     let Item::Node(c) = it else { continue };
                     match c.kind {
-                        N::CaseElement => {
-                            for x in self.items(c) {
-                                let Item::Node(e) = x else { continue };
-                                if e.kind == N::StmtList {
-                                    self.stmt_list(e);
-                                } else {
-                                    let v = self.expr(e);
-                                    if let Some(s) = &sel {
-                                        let st = s.ty.clone();
-                                        self.coerce(&st, &v);
-                                    }
-                                }
-                            }
-                        }
-                        N::StmtList => self.stmt_list(c),
+                        N::CaseElement => arms.push(self.case_element(c, sel.as_ref())),
+                        N::StmtList => default = self.stmt_list(c),
                         _ if sel.is_none() => sel = Some(self.expr(c)),
                         _ => {}
                     }
                 }
+                let sel = sel?;
+                Some(Stmt::Case {
+                    sel: sel.ir(),
+                    arms,
+                    default,
+                })
             }
             N::ForStmt => {
-                let mut ctrl = Ty::Unknown;
+                let mut ctrl = V::unknown(self.span(n));
                 if let Some(Item::Tok(t)) = its.get(1).copied() {
                     let name = self.text(t);
                     let span = self.tok_span(t);
                     match self.lookup_var(name) {
-                        Some(ty) => {
+                        Some((ty, slot)) => {
                             let ok = match self.strip(&ty) {
                                 Ty::Elem(e) => e.is_int(),
                                 Ty::Unknown => true,
                                 _ => false,
                             };
-                            if ok {
-                                ctrl = ty;
-                            } else {
+                            if !ok {
                                 let msg = format!(
                                     "FOR control variable '{name}' must be an integer, not {}",
                                     self.ty_name(&ty)
                                 );
                                 self.diag(codes::IMPLICIT_CONVERSION, msg, span, None);
                             }
+                            ctrl = V::with(
+                                if ok { ty } else { Ty::Unknown },
+                                span,
+                                ExprKind::Var(slot),
+                            );
                         }
                         None => {
                             self.diag(
@@ -1090,50 +1157,130 @@ impl<'a> Checker<'a> {
                         }
                     }
                 }
+                let mut exprs = Vec::new();
+                let mut body = Vec::new();
                 for it in its {
                     let Item::Node(c) = it else { continue };
                     if c.kind == N::StmtList {
-                        self.stmt_list(c);
+                        body = self.stmt_list(c);
                     } else {
                         let v = self.expr(c);
-                        self.coerce(&ctrl, &v);
+                        self.coerce(&ctrl.ty, &v);
+                        exprs.push(v.ir());
                     }
                 }
+                let mut ex = exprs.into_iter();
+                let (from, to) = (ex.next()?, ex.next()?);
+                Some(Stmt::For(Box::new(ForLoop {
+                    var: ctrl.ir(),
+                    from,
+                    to,
+                    by: ex.next(),
+                    body,
+                })))
             }
             N::WhileStmt | N::RepeatStmt => {
+                let (mut cond, mut body) = (None, Vec::new());
                 for it in its {
                     let Item::Node(c) = it else { continue };
                     if c.kind == N::StmtList {
-                        self.stmt_list(c);
+                        body = self.stmt_list(c);
                     } else {
-                        self.condition(c);
+                        cond = Some(self.condition(c));
                     }
                 }
+                let cond = cond?;
+                Some(if n.kind == N::WhileStmt {
+                    Stmt::While(cond, body)
+                } else {
+                    Stmt::Repeat(body, cond)
+                })
             }
-            _ => {}
+            N::ExitStmt => Some(Stmt::Exit),
+            N::ContinueStmt => Some(Stmt::Continue),
+            N::ReturnStmt => Some(Stmt::Return),
+            _ => None,
+        }
+    }
+
+    fn case_element(&mut self, c: &'a Node, sel: Option<&V>) -> CaseArm {
+        let its = self.items(c);
+        let mut ranges = Vec::new();
+        let mut body = Vec::new();
+        let mut k = 0;
+        while k < its.len() {
+            match its[k] {
+                Item::Node(e) if e.kind == N::StmtList => body = self.stmt_list(e),
+                Item::Node(e) => {
+                    let lo = self.label(e, sel);
+                    let mut hi = lo;
+                    if let (Some(Item::Tok(t)), Some(Item::Node(e2))) =
+                        (its.get(k + 1).copied(), its.get(k + 2).copied())
+                    {
+                        if self.tkind(t) == T::DotDot {
+                            hi = self.label(e2, sel);
+                            k += 2;
+                        }
+                    }
+                    if let (Some(a), Some(b)) = (lo, hi) {
+                        ranges.push((a, b));
+                    }
+                }
+                Item::Tok(_) => {}
+            }
+            k += 1;
+        }
+        CaseArm {
+            labels: ranges,
+            body,
+        }
+    }
+
+    fn label(&mut self, e: &'a Node, sel: Option<&V>) -> Option<i128> {
+        let v = self.expr(e);
+        if let Some(s) = sel {
+            let st = s.ty.clone();
+            self.coerce(&st, &v);
+        }
+        match v.k {
+            Some(K::Int(n)) => Some(n),
+            _ => None,
         }
     }
 
     /// Conditions are `BOOL`, with no implicit conversion, [statements.if].
-    fn condition(&mut self, c: &'a Node) {
+    fn condition(&mut self, c: &'a Node) -> ir::Expr {
         let v = self.expr(c);
         self.coerce(&Ty::Elem(Elem::Bool), &v);
+        v.ir()
     }
 
     // ---------------------------------------------------------------- names
 
-    fn lookup_var(&self, name: &str) -> Option<Ty> {
+    /// Variable of the current POU: type and frame slot.
+    fn lookup_var(&self, name: &str) -> Option<(Ty, usize)> {
         let id = self.scope?;
         let Kind::Pou(p) = &self.defs[id].kind else {
             return None;
         };
-        if let Some(v) = p.vars.iter().find(|v| v.name.eq_ignore_ascii_case(name)) {
-            return Some(v.ty.clone());
+        if let Some(i) = p
+            .vars
+            .iter()
+            .position(|v| v.name.eq_ignore_ascii_case(name))
+        {
+            return Some((p.vars[i].ty.clone(), i));
         }
         if p.kind == PouKind::Function && self.defs[id].name.eq_ignore_ascii_case(name) {
-            return p.ret.clone();
+            return p.ret.clone().map(|t| (t, p.vars.len()));
         }
         None
+    }
+
+    fn scope_kind(&self) -> Option<PouKind> {
+        match &self.defs[self.scope?].kind {
+            Kind::Pou(p) => Some(p.kind),
+            _ => None,
+        }
     }
 
     /// Bare enumeration value, [types.derived.enum].
@@ -1157,6 +1304,7 @@ impl<'a> Checker<'a> {
                 k: Some(K::Int(*v)),
                 leaf: true,
                 span,
+                e: ExprKind::Invalid,
             }),
             many => {
                 let names: Vec<String> = many
@@ -1164,15 +1312,11 @@ impl<'a> Checker<'a> {
                     .map(|(id, _)| self.defs[*id].name.clone())
                     .collect();
                 let hint = format!("write {}#{name}", names[0]);
-                self.diag(
-                    codes::AMBIGUOUS_ENUM_VALUE,
-                    format!(
-                        "'{name}' is a value of several enumerations ({})",
-                        names.join(", ")
-                    ),
-                    span,
-                    Some(hint),
+                let msg = format!(
+                    "'{name}' is a value of several enumerations ({})",
+                    names.join(", ")
                 );
+                self.diag(codes::AMBIGUOUS_ENUM_VALUE, msg, span, Some(hint));
                 Some(V::unknown(span))
             }
         }
@@ -1274,20 +1418,18 @@ impl<'a> Checker<'a> {
                 };
             }
             Ty::RealLit => {
-                return if matches!(tb, Ty::Elem(e) if e.is_real()) {
-                    true
-                } else {
+                let ok = matches!(tb, Ty::Elem(e) if e.is_real());
+                if !ok {
                     self.mismatch(to, v);
-                    false
-                };
+                }
+                return ok;
             }
             Ty::Null => {
-                return if matches!(tb, Ty::Ref(_)) {
-                    true
-                } else {
+                let ok = matches!(tb, Ty::Ref(_));
+                if !ok {
                     self.mismatch(to, v);
-                    false
-                };
+                }
+                return ok;
             }
             _ => {}
         }
@@ -1360,12 +1502,9 @@ impl<'a> Checker<'a> {
                     self.ty_name(&r.ty)
                 );
                 let span = Span::new(l.span.start as usize, r.span.end as usize);
-                self.diag(
-                    codes::IMPLICIT_CONVERSION,
-                    msg,
-                    span,
-                    Some("convert one operand explicitly, for example with TO_INT(...)".into()),
-                );
+                let hint =
+                    Some("convert one operand explicitly, for example with TO_INT(...)".into());
+                self.diag(codes::IMPLICIT_CONVERSION, msg, span, hint);
                 Ty::Unknown
             }
         }
@@ -1384,17 +1523,18 @@ impl<'a> Checker<'a> {
             N::NameRef => match its.first().copied() {
                 Some(Item::Tok(i)) => {
                     let name = self.text(i);
-                    if let Some(t) = self.lookup_var(name) {
-                        return V::of(t, span);
+                    if let Some((t, slot)) = self.lookup_var(name) {
+                        return V::with(t, span, ExprKind::Var(slot));
                     }
                     if let Some(v) = self.enum_value(name, span) {
                         return v;
                     }
+                    let hint = Some("declare it in a VAR section of this POU".into());
                     self.diag(
                         codes::UNKNOWN_NAME,
                         format!("unknown name '{name}'"),
                         span,
-                        Some("declare it in a VAR section of this POU".into()),
+                        hint,
                     );
                     V::unknown(span)
                 }
@@ -1413,16 +1553,23 @@ impl<'a> Checker<'a> {
             N::MemberExpr => self.member(&its, span),
             N::IndexExpr => self.index(&its, span),
             N::DerefExpr => match self.first_node(n) {
-                Some(b) => match self.expr(b).ty {
-                    Ty::Ref(t) => V::of(*t, span),
-                    _ => V::unknown(span),
-                },
+                Some(b) => {
+                    let base = self.expr(b);
+                    match base.ty.clone() {
+                        Ty::Ref(t) => V::with(*t, span, ExprKind::Deref(Box::new(base.ir()))),
+                        _ => V::unknown(span),
+                    }
+                }
                 None => V::unknown(span),
             },
             N::RefExpr => match self.first_node(n) {
                 Some(x) => {
                     let v = self.expr(x);
-                    V::of(Ty::Ref(Box::new(v.ty)), span)
+                    V::with(
+                        Ty::Ref(Box::new(v.ty.clone())),
+                        span,
+                        ExprKind::Ref(Box::new(v.ir())),
+                    )
                 }
                 None => V::unknown(span),
             },
@@ -1438,90 +1585,107 @@ impl<'a> Checker<'a> {
         let text = self.text(i);
         let span = self.tok_span(i);
         let up = text.to_ascii_uppercase();
-        let lit = |ty, k| V {
+        let lit = |ty, k, e| V {
             ty,
             k,
             leaf: true,
             span,
+            e,
         };
-        let el = |e| V {
+        let int = |e: Elem, v: Option<i128>| V {
             ty: Ty::Elem(e),
             k: None,
             leaf: true,
             span,
+            e: v.map_or(ExprKind::Invalid, |v| ExprKind::Const(Const::Int(v))),
         };
         match self.tkind(i) {
-            T::Integer => match parse_int(text) {
-                Some(v) => lit(Ty::IntLit, Some(K::Int(v))),
+            T::Integer => match literal::parse_int(text) {
+                Some(v) => lit(Ty::IntLit, Some(K::Int(v)), ExprKind::Invalid),
                 None => V::unknown(span),
             },
             T::Real => lit(
                 Ty::RealLit,
-                text.replace('_', "").parse::<f64>().ok().map(K::Real),
+                literal::parse_real(text).map(K::Real),
+                ExprKind::Invalid,
             ),
             T::TypedLiteral => self.typed_literal(text, span),
-            T::Duration => el(if up.starts_with("LT") {
-                Elem::Ltime
-            } else {
-                Elem::Time
-            }),
-            T::Date => el(if up.starts_with("LD") {
-                Elem::Ldate
-            } else {
-                Elem::Date
-            }),
-            T::TimeOfDay => el(if up.starts_with("LT") {
-                Elem::Ltod
-            } else {
-                Elem::Tod
-            }),
-            T::DateAndTime => el(if up.starts_with("LD") {
-                Elem::Ldt
-            } else {
-                Elem::Dt
-            }),
-            T::Char => el(if up.starts_with('W') {
-                Elem::Wchar
-            } else {
-                Elem::Char
-            }),
-            T::String => {
-                let n = str_len(text, false);
-                lit(
-                    Ty::Str {
-                        wide: false,
-                        len: n as u32,
-                    },
-                    Some(K::Str(n)),
-                )
+            T::Duration => {
+                let ns = literal::duration_ns(text);
+                if up.starts_with("LT") {
+                    int(Elem::Ltime, ns)
+                } else {
+                    int(Elem::Time, ns.map(|n| n / 1_000_000))
+                }
             }
-            T::WString => {
-                let n = str_len(text, true);
+            T::Date => {
+                let days = literal::date_value(text).map(i128::from);
+                if up.starts_with("LD") {
+                    int(Elem::Ldate, days.map(|d| d * 86_400 * 1_000_000_000))
+                } else {
+                    int(Elem::Date, days.map(|d| d * 86_400))
+                }
+            }
+            T::TimeOfDay => {
+                let ns = literal::tod_value(text);
+                if up.starts_with("LT") {
+                    int(Elem::Ltod, ns)
+                } else {
+                    int(Elem::Tod, ns.map(|n| n / 1_000_000))
+                }
+            }
+            T::DateAndTime => {
+                let ns = literal::dt_value(text);
+                if up.starts_with("LD") {
+                    int(Elem::Ldt, ns)
+                } else {
+                    int(Elem::Dt, ns.map(|n| n / 1_000_000_000))
+                }
+            }
+            T::Char => {
+                let wide = up.starts_with('W');
+                let q = text.split_once('#').map_or(text, |(_, b)| b);
+                let code = literal::decode_str(q, wide)
+                    .chars()
+                    .next()
+                    .map(|c| i128::from(c as u32));
+                int(if wide { Elem::Wchar } else { Elem::Char }, code)
+            }
+            T::String | T::WString => {
+                let wide = self.tkind(i) == T::WString;
+                let s = literal::decode_str(text, wide);
+                let n = s.chars().count();
                 lit(
                     Ty::Str {
-                        wide: true,
+                        wide,
                         len: n as u32,
                     },
                     Some(K::Str(n)),
+                    ExprKind::Const(Const::Str(s)),
                 )
             }
             T::EnumLiteral => self.enum_literal(text, span),
             T::DirectVariable => {
                 let mut cs = text.trim_start_matches('%').chars().skip(1);
-                match cs.next().map(|c| c.to_ascii_uppercase()) {
-                    Some('X') => el(Elem::Bool),
-                    Some('B') => el(Elem::Byte),
-                    Some('W') => el(Elem::Word),
-                    Some('D') => el(Elem::Dword),
-                    Some('L') => el(Elem::Lword),
-                    Some(c) if c.is_ascii_digit() => el(Elem::Bool),
-                    _ => V::unknown(span),
-                }
+                let e = match cs.next().map(|c| c.to_ascii_uppercase()) {
+                    Some('X') => Elem::Bool,
+                    Some('B') => Elem::Byte,
+                    Some('W') => Elem::Word,
+                    Some('D') => Elem::Dword,
+                    Some('L') => Elem::Lword,
+                    Some(c) if c.is_ascii_digit() => Elem::Bool,
+                    _ => return V::unknown(span),
+                };
+                V::of(Ty::Elem(e), span)
             }
             T::Keyword => match up.as_str() {
-                "TRUE" => lit(Ty::Elem(Elem::Bool), Some(K::Bool(true))),
-                "FALSE" => lit(Ty::Elem(Elem::Bool), Some(K::Bool(false))),
-                "NULL" => lit(Ty::Null, None),
+                "TRUE" => lit(Ty::Elem(Elem::Bool), Some(K::Bool(true)), ExprKind::Invalid),
+                "FALSE" => lit(
+                    Ty::Elem(Elem::Bool),
+                    Some(K::Bool(false)),
+                    ExprKind::Invalid,
+                ),
+                "NULL" => lit(Ty::Null, None, ExprKind::Null),
                 _ => V::unknown(span),
             },
             _ => V::unknown(span),
@@ -1536,7 +1700,8 @@ impl<'a> Checker<'a> {
         let up = p.to_ascii_uppercase();
         if up == "STRING" || up == "WSTRING" {
             let wide = up == "WSTRING";
-            let n = str_len(rest, wide);
+            let s = literal::decode_str(rest, wide);
+            let n = s.chars().count();
             return V {
                 ty: Ty::Str {
                     wide,
@@ -1545,48 +1710,39 @@ impl<'a> Checker<'a> {
                 k: Some(K::Str(n)),
                 leaf: true,
                 span,
+                e: ExprKind::Const(Const::Str(s)),
             };
         }
         let Some(e) = Elem::from_name(&up) else {
             return V::unknown(span);
         };
         let ty = Ty::Elem(e);
+        let mk = |k| V {
+            ty: ty.clone(),
+            k,
+            leaf: true,
+            span,
+            e: ExprKind::Invalid,
+        };
         if e == Elem::Bool {
-            let k = match rest.to_ascii_uppercase().as_str() {
+            return mk(match rest.to_ascii_uppercase().as_str() {
                 "1" | "TRUE" => Some(K::Bool(true)),
                 "0" | "FALSE" => Some(K::Bool(false)),
                 _ => None,
-            };
-            return V {
-                ty,
-                k,
-                leaf: true,
-                span,
-            };
+            });
         }
         if let Some((lo, hi)) = e.int_range() {
-            if let Some(v) = parse_int(rest) {
+            if let Some(v) = literal::parse_int(rest) {
                 if v < lo || v > hi {
                     let msg = format!("literal {v} does not fit {} ({lo}..{hi})", e.name());
                     self.diag(codes::LITERAL_OUT_OF_RANGE, msg, span, None);
                     return V::of(ty, span);
                 }
-                return V {
-                    ty,
-                    k: Some(K::Int(v)),
-                    leaf: true,
-                    span,
-                };
+                return mk(Some(K::Int(v)));
             }
         }
         if e.is_real() {
-            let k = rest.replace('_', "").parse::<f64>().ok().map(K::Real);
-            return V {
-                ty,
-                k,
-                leaf: true,
-                span,
-            };
+            return mk(literal::parse_real(rest).map(K::Real));
         }
         V::of(ty, span)
     }
@@ -1620,6 +1776,7 @@ impl<'a> Checker<'a> {
                 k: Some(K::Int(*v)),
                 leaf: true,
                 span,
+                e: ExprKind::Invalid,
             },
             None => {
                 self.diag(
@@ -1657,11 +1814,13 @@ impl<'a> Checker<'a> {
                 Some(K::Bool(b)) => Some(K::Bool(!b)),
                 _ => None,
             };
+            let ty = v.ty.clone();
             return V {
-                ty: v.ty,
+                ty,
                 k,
                 leaf: false,
                 span,
+                e: ExprKind::Unary(UnOp::Not, Box::new(v.ir())),
             };
         }
         let ok = matches!(st, Ty::IntLit | Ty::RealLit | Ty::Unknown)
@@ -1674,20 +1833,23 @@ impl<'a> Checker<'a> {
             self.diag(codes::IMPLICIT_CONVERSION, msg, span, None);
             return V::unknown(span);
         }
-        let k = if optext == "-" {
-            match v.k {
-                Some(K::Int(x)) => Some(K::Int(-x)),
-                Some(K::Real(x)) => Some(K::Real(-x)),
-                _ => None,
-            }
-        } else {
-            v.k
+        if optext != "-" {
+            let mut v = v;
+            v.span = span;
+            return v;
+        }
+        let k = match v.k {
+            Some(K::Int(x)) => Some(K::Int(-x)),
+            Some(K::Real(x)) => Some(K::Real(-x)),
+            _ => None,
         };
+        let leaf = v.leaf;
         V {
             ty: st,
             k,
-            leaf: v.leaf,
+            leaf,
             span,
+            e: ExprKind::Unary(UnOp::Neg, Box::new(v.ir())),
         }
     }
 
@@ -1703,31 +1865,55 @@ impl<'a> Checker<'a> {
         let r = self.expr(rn);
         let opk = self.tkind(op);
         let opt = self.text(op).to_ascii_uppercase();
-        let cls = match opk {
-            T::Plus | T::Minus | T::Star | T::Slash => Cls::Arith,
-            T::Power => Cls::Pow,
-            T::Eq | T::Neq | T::Lt | T::Gt | T::Le | T::Ge => Cls::Cmp,
-            T::Ampersand => Cls::Logic,
-            _ if opt == "MOD" => Cls::Mod,
-            _ => Cls::Logic,
+        let (cls, bop) = match opk {
+            T::Plus => (Cls::Arith, BinOp::Add),
+            T::Minus => (Cls::Arith, BinOp::Sub),
+            T::Star => (Cls::Arith, BinOp::Mul),
+            T::Slash => (Cls::Arith, BinOp::Div),
+            T::Power => (Cls::Pow, BinOp::Pow),
+            T::Eq => (Cls::Cmp, BinOp::Eq),
+            T::Neq => (Cls::Cmp, BinOp::Ne),
+            T::Lt => (Cls::Cmp, BinOp::Lt),
+            T::Gt => (Cls::Cmp, BinOp::Gt),
+            T::Le => (Cls::Cmp, BinOp::Le),
+            T::Ge => (Cls::Cmp, BinOp::Ge),
+            T::Ampersand => (Cls::Logic, BinOp::And),
+            _ => match opt.as_str() {
+                "MOD" => (Cls::Mod, BinOp::Mod),
+                "AND" => (Cls::Logic, BinOp::And),
+                "AND_THEN" => (Cls::Logic, BinOp::AndThen),
+                "OR" => (Cls::Logic, BinOp::Or),
+                "OR_ELSE" => (Cls::Logic, BinOp::OrElse),
+                _ => (Cls::Logic, BinOp::Xor),
+            },
         };
         // [types.int.division]: constant divisor zero.
         if (opk == T::Slash || cls == Cls::Mod) && r.k == Some(K::Int(0)) {
+            let hint = Some("the divisor is the constant 0".into());
             self.diag(
                 codes::CONSTANT_OVERFLOW,
                 "division by zero in a constant expression".into(),
                 r.span,
-                Some("the divisor is the constant 0".into()),
+                hint,
             );
             return V::of(self.strip(&l.ty), span);
         }
+        let mk = |ty: Ty, opty: Ty, l: V, r: V| {
+            let e = ExprKind::Binary {
+                op: bop,
+                opty,
+                l: Box::new(l.ir()),
+                r: Box::new(r.ir()),
+            };
+            V::with(ty, span, e)
+        };
         // Duration scaled by an integer.
         if matches!(opk, T::Star | T::Slash) {
             let (lt, rt) = (self.strip(&l.ty), self.strip(&r.ty));
             if matches!(lt, Ty::Elem(e) if e.is_duration())
                 && (matches!(rt, Ty::IntLit) || matches!(rt, Ty::Elem(e) if e.is_int()))
             {
-                return V::of(lt, span);
+                return mk(lt.clone(), lt, l, r);
             }
         }
         let what = format!("'{}'", self.text(op));
@@ -1755,7 +1941,7 @@ impl<'a> Checker<'a> {
         let rty = if cls == Cls::Cmp {
             Ty::Elem(Elem::Bool)
         } else {
-            st
+            st.clone()
         };
         let k = match (l.k, r.k) {
             (Some(a), Some(b)) => match fold(cls, opk, &opt, a, b) {
@@ -1785,12 +1971,9 @@ impl<'a> Checker<'a> {
                 }
             }
         }
-        V {
-            ty: rty,
-            k,
-            leaf: false,
-            span,
-        }
+        let mut out = mk(rty, st, l, r);
+        out.k = k;
+        out
     }
 
     fn member(&mut self, its: &[Item<'a>], span: Span) -> V {
@@ -1802,8 +1985,12 @@ impl<'a> Checker<'a> {
         let bt = self.strip(&base.ty);
         if self.tkind(m) == T::Integer {
             // bit access x.3
-            return match bt {
-                Ty::Elem(e) if e.is_bit() || e.is_int() => V::of(Ty::Elem(Elem::Bool), span),
+            return match (bt, literal::parse_int(self.text(m))) {
+                (Ty::Elem(e), Some(n)) if e.is_bit() || e.is_int() => V::with(
+                    Ty::Elem(Elem::Bool),
+                    span,
+                    ExprKind::Bit(Box::new(base.ir()), n as u32),
+                ),
                 _ => V::unknown(span),
             };
         }
@@ -1812,22 +1999,27 @@ impl<'a> Checker<'a> {
             return V::unknown(span);
         };
         let tname = self.defs[id].name.clone();
+        // [tests.whitebox]: TEST blocks may read every variable of an instance.
+        let whitebox = self.scope_kind() == Some(PouKind::Test);
         let found = match &self.defs[id].kind {
             Kind::Struct(ms) => Some(
                 ms.iter()
-                    .find(|v| v.name.eq_ignore_ascii_case(name))
-                    .map(|v| v.ty.clone()),
+                    .position(|v| v.name.eq_ignore_ascii_case(name))
+                    .map(|i| (i, ms[i].ty.clone())),
             ),
             Kind::Pou(p) => Some(
                 p.vars
                     .iter()
-                    .find(|v| v.section != Section::Local && v.name.eq_ignore_ascii_case(name))
-                    .map(|v| v.ty.clone()),
+                    .position(|v| {
+                        (whitebox || v.section != Section::Local)
+                            && v.name.eq_ignore_ascii_case(name)
+                    })
+                    .map(|i| (i, p.vars[i].ty.clone())),
             ),
             _ => None,
         };
         match found {
-            Some(Some(t)) => V::of(t, span),
+            Some(Some((i, t))) => V::with(t, span, ExprKind::Member(Box::new(base.ir()), i)),
             Some(None) => {
                 let what = if matches!(self.defs[id].kind, Kind::Struct(_)) {
                     "member"
@@ -1874,16 +2066,13 @@ impl<'a> Checker<'a> {
                 for (k, v) in idx.iter().enumerate() {
                     if let (Some(Some((lo, hi))), Some(K::Int(x))) = (dims.get(k), v.k) {
                         if x < *lo || x > *hi {
-                            self.diag(
-                                codes::CONSTANT_INDEX_OUT_OF_BOUNDS,
-                                format!("index {x} is outside the bounds {lo}..{hi}"),
-                                v.span,
-                                None,
-                            );
+                            let msg = format!("index {x} is outside the bounds {lo}..{hi}");
+                            self.diag(codes::CONSTANT_INDEX_OUT_OF_BOUNDS, msg, v.span, None);
                         }
                     }
                 }
-                V::of(*elem, span)
+                let e = ExprKind::Index(Box::new(base.ir()), idx.into_iter().map(V::ir).collect());
+                V::with(*elem, span, e)
             }
             _ => V::unknown(span),
         }
@@ -1916,29 +2105,29 @@ impl<'a> Checker<'a> {
         let args = self.args(list);
         if callee.kind != N::NameRef {
             let b = self.expr(callee);
-            return self.bind_call(&b.ty, &args, span);
+            return self.bind_call(b, &args, span);
         }
         let Some(Item::Tok(i)) = self.items(callee).first().copied() else {
             return V::unknown(span);
         };
         let name = self.text(i);
-        if let Some(t) = self.lookup_var(name) {
-            return self.bind_call(&t, &args, span);
+        let cspan = self.tok_span(i);
+        if let Some((t, slot)) = self.lookup_var(name) {
+            return self.bind_call(V::with(t, cspan, ExprKind::Var(slot)), &args, span);
         }
         if let Some(&id) = self.types.get(&name.to_ascii_lowercase()) {
             if matches!(&self.defs[id].kind, Kind::Pou(p) if p.kind == PouKind::Function) {
-                return self.bind_call(&Ty::Named(id), &args, span);
+                return self.bind_call(V::of(Ty::Named(id), cspan), &args, span);
             }
         }
         let up = name.to_ascii_uppercase();
         if let Some(b) = builtin(&up) {
             return self.builtin_call(&up, b, &args, span);
         }
-        let sp = self.tok_span(i);
         self.diag(
             codes::UNKNOWN_NAME,
             format!("unknown function '{name}'"),
-            sp,
+            cspan,
             None,
         );
         for a in &args {
@@ -1947,49 +2136,52 @@ impl<'a> Checker<'a> {
         V::unknown(span)
     }
 
-    /// Call of a function-block or program instance, or of a user function.
-    fn bind_call(&mut self, ty: &Ty, args: &[Arg<'a>], span: Span) -> V {
-        let pou = match self.strip(ty) {
+    /// Call of a function-block or program instance (`callee` is a place),
+    /// or of a user function (`callee` has the function's type, no place).
+    fn bind_call(&mut self, callee: V, args: &[Arg<'a>], span: Span) -> V {
+        let pou = match self.strip(&callee.ty) {
             Ty::Named(id) => match &self.defs[id].kind {
-                Kind::Pou(p) => Some((self.defs[id].name.clone(), p.clone())),
+                Kind::Pou(p) => Some((id, self.defs[id].name.clone(), p.clone())),
                 _ => None,
             },
             _ => None,
         };
-        let Some((pname, p)) = pou else {
+        let Some((id, pname, p)) = pou else {
             for a in args {
                 self.expr(a.expr);
             }
             return V::unknown(span);
         };
-        let inputs: Vec<&Var<'a>> = p
-            .vars
-            .iter()
-            .filter(|v| matches!(v.section, Section::Input | Section::InOut))
+        let input_slots: Vec<usize> = (0..p.vars.len())
+            .filter(|&i| matches!(p.vars[i].section, Section::Input | Section::InOut))
             .collect();
+        let (mut inputs, mut outputs) = (Vec::new(), Vec::new());
         for (pos, a) in args.iter().enumerate() {
             match a.name {
                 Some((t, out)) => {
                     let n = self.text(t);
-                    let want = |v: &&Var<'a>| {
+                    let slot = (0..p.vars.len()).find(|&i| {
+                        let v = &p.vars[i];
                         v.name.eq_ignore_ascii_case(n)
                             && if out {
                                 v.section == Section::Output
                             } else {
                                 matches!(v.section, Section::Input | Section::InOut)
                             }
-                    };
-                    match p.vars.iter().find(want) {
-                        Some(v) if out => {
+                    });
+                    match slot {
+                        Some(s) if out => {
                             let target = self.expr(a.expr);
-                            if !self.compatible(&target.ty, &v.ty) {
-                                let src = V::of(v.ty.clone(), target.span);
+                            if !self.compatible(&target.ty, &p.vars[s].ty) {
+                                let src = V::of(p.vars[s].ty.clone(), target.span);
                                 self.mismatch(&target.ty, &src);
                             }
+                            outputs.push((s, target.ir()));
                         }
-                        Some(v) => {
+                        Some(s) => {
                             let val = self.expr(a.expr);
-                            self.coerce(&v.ty, &val);
+                            self.coerce(&p.vars[s].ty, &val);
+                            inputs.push((s, val.ir()));
                         }
                         None => {
                             let what = if out { "output" } else { "input" };
@@ -2006,42 +2198,55 @@ impl<'a> Checker<'a> {
                 }
                 None => {
                     let val = self.expr(a.expr);
-                    if let Some(v) = inputs.get(pos) {
-                        self.coerce(&v.ty, &val);
+                    if let Some(&s) = input_slots.get(pos) {
+                        self.coerce(&p.vars[s].ty, &val);
+                        inputs.push((s, val.ir()));
                     }
                 }
             }
         }
-        match p.ret {
-            Some(t) if p.kind == PouKind::Function => V::of(t, span),
-            _ => V::unknown(span),
-        }
+        let (target, ty) = if p.kind == PouKind::Function {
+            (
+                CallTarget::Function(id),
+                p.ret.clone().unwrap_or(Ty::Unknown),
+            )
+        } else {
+            (CallTarget::Instance(callee.ir(), id), Ty::Unknown)
+        };
+        let call = ir::Call {
+            target,
+            inputs,
+            outputs,
+            args: Vec::new(),
+        };
+        V::with(ty, span, ExprKind::Call(Box::new(call)))
     }
 
     /// [stdlib.conversions], [stdlib.functions], [tests.assert].
     fn builtin_call(&mut self, up: &str, b: Builtin, args: &[Arg<'a>], span: Span) -> V {
         let vals: Vec<V> = args.iter().map(|a| self.expr(a.expr)).collect();
         let bool_ty = Ty::Elem(Elem::Bool);
-        match b {
+        let (ret, hint): (Ty, Option<Ty>) = match b {
             Builtin::AssertBool => {
                 if let Some(v) = vals.first() {
                     self.coerce(&bool_ty, v);
                 }
-                V::unknown(span)
+                (Ty::Unknown, None)
             }
             Builtin::AssertCmp => {
-                if let [a, c, ..] = vals.as_slice() {
-                    self.unify(a, c, up);
-                }
-                V::unknown(span)
+                let t = match vals.as_slice() {
+                    [a, c, ..] => self.unify(a, c, up),
+                    _ => Ty::Unknown,
+                };
+                (Ty::Unknown, Some(t))
             }
             Builtin::Conv(from, to) => {
                 if let Some(v) = vals.first() {
                     self.coerce(&from, v);
                 }
-                V::of(to, span)
+                (to, Some(from))
             }
-            Builtin::ToConv(to) => V::of(to, span),
+            Builtin::ToConv(to) => (to, None),
             Builtin::Trunc => {
                 if let Some(v) = vals.first() {
                     let st = self.strip(&v.ty);
@@ -2055,12 +2260,21 @@ impl<'a> Checker<'a> {
                         self.diag(codes::IMPLICIT_CONVERSION, msg, v.span, None);
                     }
                 }
-                V::of(Ty::Elem(Elem::Dint), span)
+                (Ty::Elem(Elem::Dint), None)
             }
-            Builtin::SameAsArg => match vals.first() {
-                Some(v) => V::of(self.strip(&v.ty), span),
-                None => V::unknown(span),
-            },
+            Builtin::SameAsArg => {
+                let t = vals.first().map_or(Ty::Unknown, |v| self.strip(&v.ty));
+                let t = if t == Ty::IntLit && !matches!(up, "SHL" | "SHR" | "ROL" | "ROR" | "ABS") {
+                    Ty::Elem(Elem::Lreal)
+                } else if t == Ty::IntLit {
+                    Ty::Elem(Elem::Dint)
+                } else if t == Ty::RealLit {
+                    Ty::Elem(Elem::Lreal)
+                } else {
+                    t
+                };
+                (t.clone(), Some(t))
+            }
             Builtin::Common | Builtin::Sel | Builtin::Mux => {
                 let skip = usize::from(!matches!(b, Builtin::Common));
                 if matches!(b, Builtin::Sel) {
@@ -2078,30 +2292,40 @@ impl<'a> Checker<'a> {
                     if t == Ty::Unknown {
                         return V::unknown(span);
                     }
-                    acc = V {
-                        ty: t,
-                        k: None,
-                        leaf: false,
-                        span: v.span,
-                    };
+                    acc = V::of(t, v.span);
                 }
-                V::of(acc.ty, span)
+                let t = match acc.ty {
+                    Ty::IntLit => Ty::Elem(Elem::Dint),
+                    Ty::RealLit => Ty::Elem(Elem::Lreal),
+                    t => t,
+                };
+                (t.clone(), Some(t))
             }
-            Builtin::StrInt => V::of(Ty::Elem(Elem::Int), span),
+            Builtin::StrInt => (Ty::Elem(Elem::Int), None),
             Builtin::StrFn => {
                 let wide = matches!(
                     vals.first().map(|v| self.strip(&v.ty)),
                     Some(Ty::Str { wide: true, .. })
                 );
-                V::of(
+                (
                     Ty::Str {
                         wide,
                         len: DEFAULT_STRING_LEN,
                     },
-                    span,
+                    None,
                 )
             }
-        }
+        };
+        let call = ir::Call {
+            target: CallTarget::Builtin {
+                name: up.to_string(),
+                ty: hint,
+            },
+            inputs: Vec::new(),
+            outputs: Vec::new(),
+            args: vals.into_iter().map(V::ir).collect(),
+        };
+        V::with(ret, span, ExprKind::Call(Box::new(call)))
     }
 }
 
@@ -2172,21 +2396,5 @@ fn fold(cls: Cls, opk: T, opt: &str, a: K, b: K) -> Option<Fold> {
             }
         }
         _ => None,
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{parse_int, str_len};
-
-    #[test]
-    fn literals() {
-        assert_eq!(parse_int("1_000"), Some(1000));
-        assert_eq!(parse_int("16#FF"), Some(255));
-        assert_eq!(parse_int("-3"), Some(-3));
-        assert_eq!(parse_int("2#1010_0101"), Some(165));
-        assert_eq!(str_len("'it$'s $$5$N'", false), 8);
-        assert_eq!(str_len("'$41'", false), 1);
-        assert_eq!(str_len("\"温度\"", true), 2);
     }
 }

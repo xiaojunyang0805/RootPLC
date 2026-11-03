@@ -93,6 +93,10 @@ pub struct CheckedFile {
 pub struct CheckReport {
     /// Every file, in path order.
     pub files: Vec<CheckedFile>,
+    /// The typed IR, when no file has an error.
+    pub program: Option<rootplc_sema::ir::Program>,
+    /// For each file index used by the IR and the VM, the index in `files`.
+    pub ir_files: Vec<usize>,
 }
 
 impl CheckReport {
@@ -167,9 +171,124 @@ pub fn check(paths: &[std::path::PathBuf]) -> Result<CheckReport, String> {
         .iter()
         .map(|&i| (&parses[i], files[i].source.as_str()))
         .collect();
-    let results = rootplc_sema::check_project(&input);
-    for (&i, diags) in clean.iter().zip(results) {
+    let analysis = rootplc_sema::analyze(&input);
+    for (&i, diags) in clean.iter().zip(analysis.diagnostics) {
         files[i].diagnostics.extend(diags);
     }
-    Ok(CheckReport { files })
+    let mut report = CheckReport {
+        files,
+        program: None,
+        ir_files: clean,
+    };
+    if report.ok() {
+        report.program = Some(analysis.program);
+    }
+    Ok(report)
+}
+
+/// Result of [`test`].
+#[derive(Debug, Clone)]
+pub struct TestReport {
+    /// Compilation result; tests run only when it has no errors.
+    pub check: CheckReport,
+    /// One outcome per TEST block.
+    pub outcomes: Vec<rootplc_testing::TestOutcome>,
+}
+
+impl TestReport {
+    /// Compiled and every test passed.
+    pub fn ok(&self) -> bool {
+        self.check.ok()
+            && self
+                .outcomes
+                .iter()
+                .all(rootplc_testing::TestOutcome::passed)
+    }
+}
+
+/// `rootplc test`: compile, then run every TEST block ([tests.runner]).
+pub fn test(paths: &[std::path::PathBuf], filter: Option<&str>) -> Result<TestReport, String> {
+    let check = check(paths)?;
+    let outcomes = match &check.program {
+        Some(p) => rootplc_testing::run_tests(p, filter),
+        None => Vec::new(),
+    };
+    Ok(TestReport { check, outcomes })
+}
+
+/// Result of [`run`].
+#[derive(Debug, Clone)]
+pub struct RunReport {
+    /// Compilation result.
+    pub check: CheckReport,
+    /// Program that ran.
+    pub program: String,
+    /// Cycles completed.
+    pub cycles: u64,
+    /// Fault that stopped the run.
+    pub fault: Option<rootplc_vm::Fault>,
+    /// Variables after the last cycle: name and IEC literal text.
+    pub variables: Vec<(String, String)>,
+}
+
+/// `rootplc run`: execute a PROGRAM for `cycles` cycles in the VM, advancing
+/// the virtual clock by `cycle_ns` per cycle.
+pub fn run(
+    paths: &[std::path::PathBuf],
+    program: Option<&str>,
+    cycles: u64,
+    cycle_ns: i128,
+) -> Result<RunReport, String> {
+    let check = check(paths)?;
+    let Some(prog) = &check.program else {
+        return Ok(RunReport {
+            check,
+            program: String::new(),
+            cycles: 0,
+            fault: None,
+            variables: Vec::new(),
+        });
+    };
+    let programs: Vec<usize> = (0..prog.defs.len())
+        .filter(|&i| matches!(prog.pou(i), Some(p) if p.kind == rootplc_sema::ir::PouKind::Program))
+        .collect();
+    let def = match program {
+        Some(name) => prog
+            .find(name)
+            .filter(|i| programs.contains(i))
+            .ok_or_else(|| format!("no PROGRAM named '{name}'"))?,
+        None => match programs.as_slice() {
+            [one] => *one,
+            [] => return Err("the project has no PROGRAM".into()),
+            _ => return Err("the project has several programs; choose one with --program".into()),
+        },
+    };
+    let mut vm = rootplc_vm::Vm::new(prog);
+    let root = vm.instantiate(def);
+    let (mut done, mut fault) = (0, None);
+    for _ in 0..cycles {
+        if let Err(f) = vm.cycle(root, def) {
+            fault = Some(f);
+            break;
+        }
+        done += 1;
+        vm.advance(cycle_ns);
+    }
+    let pou = prog.pou(def).ok_or("not a POU")?;
+    let variables = pou
+        .vars
+        .iter()
+        .filter_map(|v| {
+            vm.read_var(root, def, &v.name)
+                .map(|x| (v.name.clone(), vm.display(x, &v.ty)))
+        })
+        .collect();
+    let name = prog.defs[def].name.clone();
+    Ok(RunReport {
+        check,
+        program: name,
+        cycles: done,
+        fault,
+        variables,
+    })
 }
