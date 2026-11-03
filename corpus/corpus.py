@@ -327,9 +327,28 @@ def libraries_for(folder: Path, fmt: str, shipped: dict[str, str]) -> list[str]:
     return sorted(set(libs))
 
 
+def corpus_libraries() -> dict[str, Path]:
+    """Libraries the corpus itself provides (manifest `provides`): lower-case
+    name -> the folder of extracted units that implements it."""
+    out: dict[str, Path] = {}
+    for p in projects():
+        name = p.get("provides")
+        if not name:
+            continue
+        d = CACHE / p["name"] / "extracted"
+        if not d.exists():
+            continue
+        want = p.get("provides_folder", "")
+        subs = sorted(x for x in d.iterdir() if x.is_dir())
+        match = next((x for x in subs if want and (x.name == want or x.name.startswith(want + "_"))), None)
+        out[name.lower()] = match or d
+    return out
+
+
 def analyse() -> None:
     exe = rootplc()
     shipped = shipped_libraries(exe)
+    provided = corpus_libraries()
     results = []
     all_codes, all_features = Counter(), Counter()
     for p in projects():
@@ -364,6 +383,14 @@ def analyse() -> None:
         for t, folder in targets:
             libs = libraries_for(folder, p["format"], shipped)
             extra = ["--library", ",".join(libs)] if libs else []
+            # libraries the corpus provides (e.g. TcUnit): checked alongside,
+            # never counted for this project
+            lt = folder / "libraries.txt"
+            refs = lt.read_text(encoding="utf-8").split() if lt.exists() else []
+            for r in refs:
+                dep = provided.get(r.lower())
+                if dep and dep != folder and not str(folder).startswith(str(dep)):
+                    extra = [str(dep)] + extra
             r = subprocess.run([exe, "check", *t, *extra, "--json"], capture_output=True, text=True, encoding="utf-8")
             rep = json.loads(r.stdout) if r.stdout.strip().startswith("{") else {}
             for diag in rep.get("diagnostics", []):

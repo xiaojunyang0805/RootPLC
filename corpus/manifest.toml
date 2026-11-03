@@ -4,6 +4,9 @@
 # Apache, CC0, Unlicense): only those may ever be copied into a published
 # dataset. Everything else is analysed locally and cited by URL.
 #
+# provides / provides_folder: this project is the library of that name; a
+#   project whose .plcproj references it is checked together with the units
+#   in that folder (which never count for the referencing project).
 # format: "st" (plain files), "twincat" (.TcPOU/.TcDUT/.TcGVL XML),
 #         "brx" (B&R: declarations in .fun/.typ/.var, bodies in .st),
 #         "binary" / "none": nothing to extract (see note)
@@ -15,6 +18,9 @@ licence = "MIT (custom text)"
 redistribute = false
 format = "twincat"
 kind = "test framework"
+# a library other corpus projects reference (.plcproj): analysed with them
+provides = "TcUnit"
+provides_folder = "TcUnit"
 
 [[project]]
 name = "twincat-dynamic-collections"
