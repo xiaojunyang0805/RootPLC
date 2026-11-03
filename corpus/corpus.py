@@ -185,6 +185,12 @@ def twincat_units(path: Path) -> list[tuple[str, str]]:
                     parts.append(end)
             elif kind == "Itf":
                 parts.append("END_INTERFACE")
+            elif kind == "GVL" and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", name):
+                # a TwinCAT global variable list is named, and code reads its
+                # variables as GVL_Name.x; the name lives only in the XML, so it
+                # becomes a namespace around the list (IEC ed.3 [pous.namespace]:
+                # qualified and unqualified access both resolve)
+                parts = [f"NAMESPACE {name}"] + parts + ["END_NAMESPACE"]
             out.append((f"{kind}_{name}", "\n".join(x for x in parts if x) + "\n"))
     return out
 
