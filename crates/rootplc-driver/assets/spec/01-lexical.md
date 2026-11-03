@@ -93,7 +93,10 @@ unary operator. Constant folding makes `-128` valid where a SINT is expected
 
 **[lexical.literal.real]** A real literal is `digits . digits`, optionally
 followed by an exponent `E` or `e`, an optional sign, and digits. Both sides
-of the point are required: `1.`, `.5` and `1E3` are error RP0008.
+of the point are required: `1.` and `.5` are error RP0008. A literal with an
+exponent but no point, such as `1E-6`, is accepted as a real with warning
+RP0017: IEC 61131-3 requires the point, but CODESYS and TwinCAT accept this
+form and real code uses it. The portable spelling is `1.0E-6`.
 
 **[lexical.literal.typed]** A typed literal is an elementary type name, `#`,
 and a literal: `INT#5`, `REAL#1.5`, `BYTE#16#FF`, `BOOL#1`. An unknown type

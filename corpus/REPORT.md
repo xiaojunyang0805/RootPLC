@@ -10,7 +10,7 @@ are not in the corpus count as errors.
 
 | Project | Kind | Licence | Units | Lines | Syntax OK | Clean |
 |---|---|---|---|---|---|---|
-| [aixocat](https://github.com/RWTH-EBC/AixOCAT) | building automation library (OSCAT based) | MIT | 973 | 56,846 | 69% | 41% |
+| [aixocat](https://github.com/RWTH-EBC/AixOCAT) | building automation library (OSCAT based) | MIT | 973 | 56,846 | 69% | 42% |
 | [br-oscat](https://github.com/tkucic/brOscatLib) | standard library (OSCAT, B&R) | MIT | 729 | 45,030 | 83% | 49% |
 | [twincat-dynamic-collections](https://github.com/fisothemes/TwinCat-Dynamic-Collections) | library | MIT | 108 | 9,904 | 14% | 5% |
 | [tcunit](https://github.com/tcunit/TcUnit) | test framework | MIT (custom text) | 97 | 13,613 | 10% | 2% |
@@ -49,16 +49,16 @@ Most frequent error codes:
 |---|---|
 | RP0201 | 16000 |
 | RP0301 | 5943 |
-| RP0008 | 2091 |
-| RP0203 | 1597 |
+| RP0203 | 1587 |
 | RP0004 | 627 |
 | RP0103 | 576 |
-| RP0111 | 450 |
+| RP0111 | 449 |
 | RP0202 | 165 |
 | RP0011 | 34 |
 | RP0204 | 29 |
 | RP0016 | 9 |
 | RP0104 | 8 |
+| RP0009 | 2 |
 
 ## Listed but not analysed
 

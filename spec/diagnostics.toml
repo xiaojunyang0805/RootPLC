@@ -115,6 +115,13 @@ spec = "lexical.pragma"
 stage = "lex"
 
 [[code]]
+id = "RP0017"
+severity = "warning"
+summary = "real literal without a decimal point (not portable); write 1.0E-6"
+spec = "lexical.literal.real"
+stage = "lex"
+
+[[code]]
 id = "RP0016"
 severity = "error"
 summary = "malformed directly represented variable"

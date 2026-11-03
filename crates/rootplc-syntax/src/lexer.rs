@@ -379,9 +379,10 @@ impl<'a> Lexer<'a> {
                 self.eat_while(|c| c.is_ascii_digit() || c == b'_');
                 self.check_underscores(es, self.pos);
                 if kind == TokenKind::Integer {
+                    // [lexical.literal.real]: accepted, but not portable.
                     self.diag(
-                        codes::MALFORMED_LITERAL,
-                        "real literal needs a decimal point",
+                        codes::REAL_WITHOUT_POINT,
+                        "real literal without a decimal point is not portable; write it as 1.0E-6",
                         start,
                         self.pos,
                     );
@@ -851,7 +852,7 @@ mod tests {
     fn numbers() {
         assert_eq!(kinds("1.5E3"), [TokenKind::Real]);
         assert!(codes_of("2#1010_0101 16#ff 8#17 1_000").is_empty());
-        assert_eq!(codes_of("1E3"), [8]);
+        assert_eq!(codes_of("1E3"), [17]); // accepted with a portability warning
         assert_eq!(codes_of("1__0"), [7]);
         assert_eq!(codes_of("3#12"), [8]);
     }

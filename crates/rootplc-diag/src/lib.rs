@@ -184,7 +184,7 @@ pub mod codes {
         UNKNOWN_PRAGMA = 13, Warning;
         UNKNOWN_LITERAL_TYPE = 14, Error;
         UNTERMINATED_PRAGMA = 15, Error;
-        MALFORMED_DIRECT_VARIABLE = 16, Error;
+        MALFORMED_DIRECT_VARIABLE = 16, Error; REAL_WITHOUT_POINT = 17, Warning;
         SYNTAX_ERROR = 201, Error;
         MISSING_END = 202, Error; UNKNOWN_NAME = 203, Error; DUPLICATE_NAME = 204, Error;
         MISSING_SEMICOLON = 301, Error;
