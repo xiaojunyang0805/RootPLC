@@ -5,8 +5,9 @@
 #[test]
 fn every_library_checks_clean() {
     for lib in rootplc_stdlib::compat::libraries() {
-        let report = rootplc_driver::check_sources_with(Vec::new(), &[lib.name.clone()])
-            .expect("library resolves");
+        let report =
+            rootplc_driver::check_sources_with(Vec::new(), std::slice::from_ref(&lib.name))
+                .expect("library resolves");
         let errors: Vec<String> = report
             .files
             .iter()
