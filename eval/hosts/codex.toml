@@ -1,8 +1,12 @@
-# Codex CLI. NOT VERIFIED: flags taken from its documentation; check with
-# `codex exec --help` once installed, then uncomment.
+# OpenAI Codex CLI, non-interactive (codex exec). Command lines written for
+# codex-cli 0.166.0; set `verified` once a run succeeds. Login: `codex login`.
+# The MCP server is passed with -c so the user's own config is not changed.
 name = "codex"
 ecosystem = "western"
 verified = "no"
-# command_with = ["codex", "exec", "--skip-git-repo-check", "--full-auto",
-#   "-c", "mcp_servers.rootplc.command=\"rootplc\"", "-c", "mcp_servers.rootplc.args=[\"mcp\"]", "{prompt}"]
-# command_without = ["codex", "exec", "--skip-git-repo-check", "--full-auto", "{prompt}"]
+model = ""
+model_flag = ["-m"]
+
+command_with = ["codex", "exec", "--skip-git-repo-check", "--json", "--sandbox", "workspace-write",
+  "-c", "mcp_servers.rootplc.command=\"rootplc\"", "-c", "mcp_servers.rootplc.args=[\"mcp\"]", "{prompt}"]
+command_without = ["codex", "exec", "--skip-git-repo-check", "--json", "--sandbox", "workspace-write", "{prompt}"]

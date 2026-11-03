@@ -84,6 +84,24 @@ def agent_env(mode: str) -> dict:
     return env
 
 
+def resolve_command(args: list[str]) -> list[str]:
+    """On Windows, npm installs CLIs as .cmd shims. Python cannot start them
+    without cmd.exe, and cmd.exe mangles multi-line prompts, so run the
+    shim's JavaScript entry point with node directly."""
+    if os.name != "nt":
+        return args
+    # npm also writes an extensionless sh shim, which shutil.which finds first
+    exe = shutil.which(args[0] + ".cmd") or shutil.which(args[0])
+    if not exe or not exe.lower().endswith(".cmd"):
+        return args
+    import re
+    text = Path(exe).read_text(encoding="utf-8", errors="replace")
+    m = re.search(r'"%dp0%\\([^"]+\.(?:js|mjs|cjs))"', text)
+    if not m:
+        return args
+    return [shutil.which("node") or "node", str(Path(exe).parent / m.group(1))] + args[1:]
+
+
 def run_agent(task: Task, host: dict, mode: str, ws: Path, timeout: int) -> tuple[str, float, int]:
     start = time.monotonic()
     if host.get("builtin"):
@@ -99,7 +117,7 @@ def run_agent(task: Task, host: dict, mode: str, ws: Path, timeout: int) -> tupl
     if host.get("model"):
         args += host.get("model_flag", ["--model"]) + [host["model"]]
     try:
-        p = subprocess.run(args, cwd=ws, env=agent_env(mode), capture_output=True, text=True,
+        p = subprocess.run(resolve_command(args), cwd=ws, env=agent_env(mode), capture_output=True, text=True,
                            encoding="utf-8", errors="replace", timeout=timeout)
         out, code = p.stdout + "\n" + p.stderr, p.returncode
     except subprocess.TimeoutExpired as e:
