@@ -1724,7 +1724,7 @@ impl<'a> Parser<'a> {
             // an elementary type name as a call argument: SIZEOF(INT); TIME()
             // (TwinCAT_BuiltIns) is a call
             Some(TokenKind::TypeName)
-                if self.nth_kind(1) == Some(TokenKind::RParen)
+                if matches!(self.nth_kind(1), Some(TokenKind::RParen | TokenKind::Comma))
                     || (self.nth_kind(1) == Some(TokenKind::LParen)
                         && self.nth_kind(2) == Some(TokenKind::RParen)) =>
             {

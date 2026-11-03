@@ -221,7 +221,13 @@ pub struct Vm<'p> {
     /// caller's variable it was copied from; ADR / REF of the slot names
     /// the caller's variable.
     aliases: Vec<(Loc, Loc)>,
+    /// [stdlib.compat.dynamic]: variables created by __NEW, at roots from
+    /// [`HEAP`] on; `None` once freed by __DELETE.
+    heap: Vec<Option<Value>>,
 }
+
+/// First root index of the heap ([`Vm::heap`]).
+const HEAP: usize = 1 << 40;
 
 fn truthy(v: &Value) -> bool {
     match v {
@@ -360,6 +366,7 @@ impl<'p> Vm<'p> {
             file: 0,
             globals: None,
             aliases: Vec::new(),
+            heap: Vec::new(),
         };
         if let Some(g) = prog.globals {
             vm.globals = Some(vm.instantiate(g));
@@ -532,10 +539,13 @@ impl<'p> Vm<'p> {
     // ---------------------------------------------------------------- storage
 
     fn get(&self, loc: &Loc, span: Span) -> R<&Value> {
-        let mut v = self
-            .roots
-            .get(loc.root)
-            .ok_or_else(|| self.fault(FaultKind::NullRef, span, "dangling reference"))?;
+        let root = if loc.root >= HEAP {
+            self.heap.get(loc.root - HEAP).and_then(Option::as_ref)
+        } else {
+            self.roots.get(loc.root)
+        };
+        let mut v =
+            root.ok_or_else(|| self.fault(FaultKind::NullRef, span, "dangling reference"))?;
         for &i in &loc.path {
             v = match v {
                 Value::Agg(xs) => xs.get(i as usize),
@@ -548,7 +558,15 @@ impl<'p> Vm<'p> {
 
     fn get_mut(&mut self, loc: &Loc, span: Span) -> R<&mut Value> {
         let bad = self.fault(FaultKind::Unsupported, span, "invalid location");
-        let mut v = self.roots.get_mut(loc.root).ok_or_else(|| bad.clone())?;
+        let mut v = if loc.root >= HEAP {
+            let dangling = self.fault(FaultKind::NullRef, span, "dangling reference (__DELETE)");
+            self.heap
+                .get_mut(loc.root - HEAP)
+                .and_then(Option::as_mut)
+                .ok_or(dangling)?
+        } else {
+            self.roots.get_mut(loc.root).ok_or_else(|| bad.clone())?
+        };
         for &i in &loc.path {
             v = match v {
                 Value::Agg(xs) => xs.get_mut(i as usize),
@@ -1291,6 +1309,36 @@ impl<'p> Vm<'p> {
                 .map_err(|k| vm.fault(k, e.span, "result outside the subrange"))
         };
         match name {
+            // [stdlib.compat.dynamic]
+            "__NEW" => {
+                let t = ty.cloned().unwrap_or(Ty::Unknown);
+                let one = self.default_value(&t);
+                let (v, path) = match args.first() {
+                    Some(n) => {
+                        let n = int(n).clamp(0, 1 << 20) as usize;
+                        (Value::Agg(vec![one; n.max(1)]), vec![0])
+                    }
+                    None => (one, Vec::new()),
+                };
+                self.heap.push(Some(v));
+                Ok(Value::Ref(Some(Loc {
+                    root: HEAP + self.heap.len() - 1,
+                    path,
+                })))
+            }
+            "__DELETE" => {
+                if let Value::Ref(Some(pl)) = arg(0) {
+                    if let Ok(Value::Ref(Some(obj))) = self.get(&pl, e.span).cloned() {
+                        if obj.root >= HEAP {
+                            if let Some(slot) = self.heap.get_mut(obj.root - HEAP) {
+                                *slot = None;
+                            }
+                        }
+                    }
+                    *self.get_mut(&pl, e.span)? = Value::Ref(None);
+                }
+                Ok(Value::Int(0))
+            }
             // [stdlib.compat.intrinsics]: time since start, ms (virtual clock)
             "TIME" => Ok(Value::Int(self.now_ns / 1_000_000)),
             "ADVANCE" => {

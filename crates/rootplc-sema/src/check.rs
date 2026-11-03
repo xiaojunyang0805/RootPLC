@@ -3806,6 +3806,69 @@ impl<'a> Checker<'a> {
             }
         }
         let up = name.to_ascii_uppercase();
+        // [stdlib.compat.dynamic]: __NEW(T [, n]) creates a variable (n
+        // elements) and returns a reference to it; __DELETE(p) frees it
+        // and sets p to NULL
+        if up == "__NEW" && self.intrinsics.contains(&up) && (1..=2).contains(&args.len()) {
+            let tnode = args[0].expr;
+            let ty = match (tnode.kind, self.items(tnode).first().copied()) {
+                (N::NameRef, Some(Item::Tok(i))) => {
+                    let name = self.text(i);
+                    elem_or_str(name).unwrap_or_else(|| self.type_name(i))
+                }
+                _ => {
+                    self.diag(
+                        codes::UNKNOWN_TYPE,
+                        "__NEW expects a type name".into(),
+                        span,
+                        None,
+                    );
+                    Ty::Unknown
+                }
+            };
+            let mut call_args = Vec::new();
+            if let Some(a) = args.get(1) {
+                let n = self.expr(a.expr);
+                self.coerce(&Ty::Elem(Elem::Udint), &n);
+                call_args.push(n.ir());
+            }
+            let call = ir::Call {
+                target: CallTarget::Builtin {
+                    name: "__NEW".into(),
+                    ty: Some(ty.clone()),
+                },
+                inputs: Vec::new(),
+                outputs: Vec::new(),
+                args: call_args,
+            };
+            return V::with(Ty::Ref(Box::new(ty)), span, ExprKind::Call(Box::new(call)));
+        }
+        if up == "__DELETE" && self.intrinsics.contains(&up) && args.len() == 1 {
+            let p = self.expr(args[0].expr);
+            let pty = self.strip(&p.ty);
+            if !matches!(pty, Ty::Ref(_) | Ty::Unknown) {
+                let msg = format!(
+                    "__DELETE expects a reference, found {}",
+                    self.ty_name(&p.ty)
+                );
+                self.diag(codes::IMPLICIT_CONVERSION, msg, span, None);
+            }
+            let addr = ir::Expr {
+                ty: Ty::Ref(Box::new(p.ty.clone())),
+                kind: ExprKind::Ref(Box::new(p.ir())),
+                span,
+            };
+            let call = ir::Call {
+                target: CallTarget::Builtin {
+                    name: "__DELETE".into(),
+                    ty: None,
+                },
+                inputs: Vec::new(),
+                outputs: Vec::new(),
+                args: vec![addr],
+            };
+            return V::with(Ty::Unknown, span, ExprKind::Call(Box::new(call)));
+        }
         // [stdlib.compat.intrinsics]: __POUNAME() is the name of the POU it
         // is written in; TIME() the time since the PLC started (VM clock)
         if args.is_empty() && self.intrinsics.contains(&up) && up == "__POUNAME" {

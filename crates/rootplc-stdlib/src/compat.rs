@@ -229,7 +229,15 @@ mod tests {
         assert!(resolve(&["Tc9_Nope".into()]).is_err());
         assert_eq!(
             find("TwinCAT_BuiltIns").expect("builtins").intrinsics,
-            ["SIZEOF", "XSIZEOF", "PVOID", "__POUNAME", "TIME"]
+            [
+                "SIZEOF",
+                "XSIZEOF",
+                "PVOID",
+                "__POUNAME",
+                "TIME",
+                "__NEW",
+                "__DELETE"
+            ]
         );
     }
 }

@@ -97,6 +97,13 @@ as typed references.
 a STRING constant with the name of the POU it is written in, and `TIME()`,
 the time since the PLC started (the virtual clock of the VM).
 
+**[stdlib.compat.dynamic]** `TwinCAT_BuiltIns` enables `__NEW(T)`, which
+creates a variable of type `T` (initial values) and returns a reference to
+it, `__NEW(T, n)`, which creates `n` elements and returns a reference to the
+first, and `__DELETE(p)`, which frees the variable `p` refers to and sets
+`p` to NULL; using a reference to a freed variable is the fault `NULL_REF`.
+Indexing such a reference as a pointer (`p[i]`) is not supported.
+
 **[stdlib.compat.sizeof]** A library may enable compiler operators;
 `TwinCAT_BuiltIns` enables `SIZEOF(x)` and `XSIZEOF(x)`: the size in bytes
 of a variable or type, a constant, with TwinCAT's 64-bit layout and default
