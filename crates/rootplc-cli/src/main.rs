@@ -205,7 +205,11 @@ fn cmd_init(dir: Option<&String>, name: Option<&str>) -> ExitCode {
 
 fn main() -> ExitCode {
     let args = Args::parse();
-    if args.positional.iter().any(|a| a == "--version" || a == "-V") {
+    if args
+        .positional
+        .iter()
+        .any(|a| a == "--version" || a == "-V")
+    {
         println!("rootplc {}", env!("CARGO_PKG_VERSION"));
         return ExitCode::SUCCESS;
     }
