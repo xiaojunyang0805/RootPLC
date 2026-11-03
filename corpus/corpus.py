@@ -350,7 +350,9 @@ def analyse() -> None:
         subdirs = sorted(x for x in d.iterdir() if x.is_dir())
         targets = [([str(x)], x) for x in subdirs]
         top = [str(f) for f in files if f.parent == d]
-        if top:
+        if top and not subdirs:
+            targets.append(([str(d)], d))  # one project: pass the folder (short command line)
+        elif top:
             targets.append((top, d))
         per_file: dict[str, list] = {}
         for t, folder in targets:
