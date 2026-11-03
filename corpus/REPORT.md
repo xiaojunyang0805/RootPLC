@@ -243,21 +243,16 @@ are not in the corpus count as errors.
 
 ## What blocks the rest
 
-Units using each construct (dialect features beyond RootPLC v0):
+Units using each construct RootPLC does not support yet:
 
 | Construct | Units |
 |---|---|
-| pragmas {..} | 4980 (35%) |
-| EXTENDS / IMPLEMENTS | 3710 (26%) |
-| METHOD | 3584 (25%) |
-| THIS^ / SUPER^ | 1937 (14%) |
 | PROPERTY | 1409 (10%) |
-| ADR / SIZEOF | 1374 (10%) |
-| REFERENCE TO | 1099 (8%) |
-| POINTER TO | 809 (6%) |
-| INTERFACE | 647 (5%) |
-| VAR_GLOBAL | 529 (4%) |
+| vendor pragmas {..} | 1341 (9%) |
+| SIZEOF | 957 (7%) |
+| __ system calls | 577 (4%) |
 | VAR_INST / VAR_STAT | 370 (3%) |
+| __SYSTEM types | 322 (2%) |
 | UNION | 192 (1%) |
 | ACTION | 134 (1%) |
 
