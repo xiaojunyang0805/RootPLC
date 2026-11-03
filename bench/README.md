@@ -5,7 +5,7 @@ programs. Tasks run headless with `rootplc`, so anyone can reproduce the
 scores without a vendor IDE or licence.
 
 **Sizes:**
-- v0 (now): 20 tasks in `tasks/`, every reference solution passing, hidden tests
+- v0 (now): 21 tasks in `tasks/`, every reference solution passing, hidden tests
   validated by mutation testing (`python eval/harness/validate_bench.py`).
 - v0 target for G1: about 100 tasks.
 - v1: more tasks, adding simulation and formal properties.

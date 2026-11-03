@@ -1,7 +1,8 @@
 """Real-world PLC code corpus: fetch, extract and analyse with rootplc.
 
     python corpus/corpus.py fetch      # shallow-clone every project into corpus/.cache
-    python corpus/corpus.py analyse    # extract ST, run rootplc check, write the report
+    python corpus/corpus.py analyse    # extract ST, run rootplc check, write the report + dashboard
+    python corpus/corpus.py dashboard  # rebuild corpus/dashboard.html from the last analysis
 
 Writes corpus/REPORT.md and corpus/.cache/analysis.json. Code is never
 copied into the repository (see manifest.toml).
@@ -197,6 +198,7 @@ def analyse() -> None:
                         "features": dict(feats)})
         print(f"{p['name']:30} units {len(files):5}  syntax ok {syntax_ok:5}  clean {clean:5}")
     (CACHE / "analysis.json").write_text(json.dumps(results, indent=1), encoding="utf-8")
+    record_history(results)
     write_report(results, all_codes, all_features)
 
 
@@ -245,11 +247,49 @@ def write_report(results, all_codes, all_features) -> None:
     print(f"wrote {HERE / 'REPORT.md'}")
 
 
+def record_history(results) -> None:
+    """Append this run's totals to corpus/history.json (public metrics only)."""
+    from datetime import datetime
+    U = sum(r["units"] for r in results) or 1
+    row = {"date": datetime.now().strftime("%Y-%m-%d %H:%M"), "units": U,
+           "parse": round(100 * sum(r["syntax_ok"] for r in results) / U),
+           "clean": round(100 * sum(r["clean"] for r in results) / U)}
+    path = HERE / "history.json"
+    hist = json.loads(path.read_text(encoding="utf-8")) if path.exists() else []
+    if not hist or (hist[-1]["units"], hist[-1]["parse"], hist[-1]["clean"]) != (row["units"], row["parse"], row["clean"]):
+        hist.append(row)
+    path.write_text(json.dumps(hist, indent=1), encoding="utf-8")
+
+
+def dashboard() -> None:
+    """Write corpus/dashboard.html (self-contained) from the last analysis."""
+    results = json.loads((CACHE / "analysis.json").read_text(encoding="utf-8"))
+    feats = Counter()
+    for r in results:
+        feats.update(r["features"])
+    version = subprocess.run([rootplc(), "--version"], capture_output=True, text=True).stdout.strip().replace("rootplc ", "")
+    hist_path = HERE / "history.json"
+    data = {
+        "date": date.today().strftime("%d %b %Y"),
+        "listed": len(projects()),
+        "rootplc": version,
+        "projects": [{k: r[k] for k in ("name", "licence", "units", "lines", "syntax_ok", "clean")} for r in results],
+        "features": feats.most_common(),
+        "history": json.loads(hist_path.read_text(encoding="utf-8")) if hist_path.exists() else [],
+    }
+    page = (HERE / "dashboard_template.html").read_text(encoding="utf-8").replace("__DATA__", json.dumps(data).replace("</", "<\\/"))
+    (HERE / "dashboard.html").write_text(page, encoding="utf-8")
+    print(f"wrote {HERE / 'dashboard.html'}")
+
+
 if __name__ == "__main__":
     cmd = sys.argv[1] if len(sys.argv) > 1 else ""
     if cmd == "fetch":
         fetch()
     elif cmd in ("analyse", "analyze"):
         analyse()
+        dashboard()
+    elif cmd == "dashboard":
+        dashboard()
     else:
         print(__doc__)

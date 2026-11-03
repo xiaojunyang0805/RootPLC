@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Real-World PLC Coverage</title>
+<style>
+:root{color-scheme:light;--surface-0:#f4f6f9;--surface-1:#fcfcfb;--text-primary:#0b0b0b;--text-secondary:#52514e;--text-muted:#77756f;--grid:#e6e5e0;--line:#dcdad3;
+  --clean:#104281;--parse:#2a78d6;--blocked:#6da7ec;--bar:#2a78d6;--accent:#0e7490}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){color-scheme:dark;--surface-0:#111110;--surface-1:#1a1a19;--text-primary:#f0efec;--text-secondary:#c3c2b7;--text-muted:#9a9890;--grid:#2c2c2a;--line:#33332f;
+  --clean:#86b6ef;--parse:#2a78d6;--blocked:#184f95;--bar:#3987e5;--accent:#22d3ee}}
+:root[data-theme="dark"]{color-scheme:dark;--surface-0:#111110;--surface-1:#1a1a19;--text-primary:#f0efec;--text-secondary:#c3c2b7;--text-muted:#9a9890;--grid:#2c2c2a;--line:#33332f;
+  --clean:#86b6ef;--parse:#2a78d6;--blocked:#184f95;--bar:#3987e5;--accent:#22d3ee}
+*{box-sizing:border-box}
+body{margin:0;background:var(--surface-0);color:var(--text-primary);font:14px/1.45 "Segoe UI",system-ui,-apple-system,"Microsoft YaHei",sans-serif}
+.wrap{max-width:1180px;margin:0 auto;padding:22px 20px 32px}
+@media (max-width:640px){.wrap{padding:16px}}
+h1{font-size:24px;margin:0 0 4px}
+.sub{color:var(--text-secondary);margin:0 0 18px}
+.tiles{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;margin-bottom:16px}
+@media (max-width:900px){.tiles{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.tile{background:var(--surface-1);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.tile b{display:block;font-size:30px;font-weight:700;letter-spacing:-.5px}
+.tile span{color:var(--text-secondary);font-size:13px}
+.tile small{display:block;color:var(--text-muted);font-size:12px;margin-top:2px}
+.card{background:var(--surface-1);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:16px}
+.card h2{font-size:16px;margin:0 0 2px}
+.card p.note{color:var(--text-secondary);margin:0 0 12px;font-size:13px}
+.legend{display:flex;gap:16px;flex-wrap:wrap;font-size:13px;color:var(--text-secondary);margin-bottom:8px}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+svg{display:block;width:100%;height:auto;overflow:visible}
+svg text{fill:var(--text-secondary);font-size:12.5px}
+svg text.strong{fill:var(--text-primary)}
+.tip{position:fixed;pointer-events:none;background:var(--surface-1);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:12.5px;box-shadow:0 6px 18px rgba(0,0,0,.18);display:none;max-width:280px;z-index:9}
+.tip b{color:var(--text-primary)}
+details{margin-top:8px}summary{cursor:pointer;color:var(--accent);font-size:13px}
+table{border-collapse:collapse;width:100%;font-size:13px;margin-top:8px}
+th,td{text-align:right;padding:5px 8px;border-bottom:1px solid var(--grid)}th:first-child,td:first-child{text-align:left}
+th{color:var(--text-secondary);font-weight:600}
+.grid2{display:grid;grid-template-columns:1.3fr 1fr;gap:16px}
+@media (max-width:900px){.grid2{grid-template-columns:1fr}}
+footer{color:var(--text-muted);font-size:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Real-world PLC code: what rootplc handles today</h1>
+  <p class="sub" id="sub"></p>
+  <div class="tiles" id="tiles"></div>
+  <div class="grid2">
+    <div class="card">
+      <h2>Coverage by project</h2>
+      <p class="note">Share of each project's program units that rootplc type-checks clean, only parses, or cannot parse yet. Units are checked per project, so calls into libraries outside the corpus count as errors.</p>
+      <div class="legend"><span><i style="background:var(--clean)"></i>type-checks clean</span><span><i style="background:var(--parse)"></i>parses only</span><span><i style="background:var(--blocked)"></i>blocked</span></div>
+      <svg id="cov" role="img" aria-label="Coverage by project, stacked bars"></svg>
+      <details><summary>Table view</summary><table id="tbl"></table></details>
+    </div>
+    <div class="card">
+      <h2>What blocks the rest</h2>
+      <p class="note">Units that use each construct beyond RootPLC v0. Next engineering (R3): IEC Ed3 object orientation and CODESYS/TwinCAT pointers.</p>
+      <svg id="blk" role="img" aria-label="Blocking constructs, ranked bars"></svg>
+      <h2 style="margin-top:16px">Trend</h2>
+      <p class="note" id="trendnote"></p>
+      <svg id="trend" role="img" aria-label="Parse and clean rate over time"></svg>
+    </div>
+  </div>
+  <footer id="foot"></footer>
+</div>
+<div class="tip" id="tip"></div>
+<script>
+const DATA = __DATA__;
+const $ = id => document.getElementById(id);
+const NS = "http://www.w3.org/2000/svg";
+const fmt = n => n.toLocaleString("en-GB");
+const pct = (a, b) => b ? Math.round(100 * a / b) : 0;
+function el(tag, attrs, parent, text) { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (text != null) e.textContent = text; parent.appendChild(e); return e; }
+const tip = $("tip");
+function hover(node, html) {
+  node.addEventListener("mousemove", ev => { tip.innerHTML = html; tip.style.display = "block"; tip.style.left = Math.min(ev.clientX + 14, innerWidth - 300) + "px"; tip.style.top = (ev.clientY + 14) + "px"; });
+  node.addEventListener("mouseleave", () => { tip.style.display = "none"; });
+}
+const P = DATA.projects.filter(p => p.units > 0).sort((a, b) => b.units - a.units);
+const U = P.reduce((s, p) => s + p.units, 0), L = P.reduce((s, p) => s + p.lines, 0);
+const S = P.reduce((s, p) => s + p.syntax_ok, 0), C = P.reduce((s, p) => s + p.clean, 0);
+$("sub").textContent = `${P.length} public PLC projects (TwinCAT, CODESYS, B&R, plain ST), analysed ${DATA.date}. Code stays in the source repositories; only licence-permissive projects may be redistributed.`;
+const tiles = [[P.length, "projects", `${DATA.listed} listed with licences`], [fmt(U), "program units", "POUs, types, global lists"], [Math.round(L / 1000) + "k", "lines of ST", "real code, not generated"], [pct(S, U) + "%", "parse today", "lexer + parser accept"], [pct(C, U) + "%", "type-check clean", "no errors at all"]];
+$("tiles").innerHTML = tiles.map(([v, l, s]) => `<div class="tile"><b>${v}</b><span>${l}</span><small>${s}</small></div>`).join("");
+
+// coverage: 100% stacked bars
+(function () {
+  const svg = $("cov"), rowH = 24, gap = 10, labelW = 190, valW = 64, W = 720, barW = W - labelW - valW;
+  const H = P.length * (rowH + gap);
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  P.forEach((p, i) => {
+    const y = i * (rowH + gap);
+    el("text", { x: 0, y: y + rowH / 2 + 4, class: "strong" }, svg, p.name);
+    const segs = [["clean", p.clean, "type-checks clean"], ["parse", p.syntax_ok - p.clean, "parses only"], ["blocked", p.units - p.syntax_ok, "blocked"]];
+    let x = labelW;
+    segs.forEach(([k, n, label], j) => {
+      if (n <= 0) return;
+      const w = barW * n / p.units;
+      const isLast = segs.slice(j + 1).every(s => s[1] <= 0);
+      const r = el("rect", { x: x, y: y, width: Math.max(w - 2, 1), height: rowH, rx: isLast ? 4 : 0, fill: `var(--${k})` }, svg);
+      hover(r, `<b>${p.name}</b><br>${label}: ${fmt(n)} of ${fmt(p.units)} units (${pct(n, p.units)}%)<br><small>${p.licence}</small>`);
+      x += w;
+    });
+    el("text", { x: W, y: y + rowH / 2 + 4, "text-anchor": "end" }, svg, `${fmt(p.units)} units`);
+  });
+  $("tbl").innerHTML = `<tr><th>Project</th><th>Units</th><th>Lines</th><th>Parse</th><th>Clean</th><th>Licence</th></tr>` +
+    P.map(p => `<tr><td>${p.name}</td><td>${fmt(p.units)}</td><td>${fmt(p.lines)}</td><td>${pct(p.syntax_ok, p.units)}%</td><td>${pct(p.clean, p.units)}%</td><td style="text-align:left">${p.licence}</td></tr>`).join("");
+})();
+
+// blockers: ranked bars
+(function () {
+  const svg = $("blk"), F = DATA.features.filter(f => f[1] > 0).slice(0, 10), rowH = 18, gap = 9, labelW = 150, W = 460, barW = W - labelW - 70;
+  const max = Math.max(...F.map(f => f[1]));
+  svg.setAttribute("viewBox", `0 0 ${W} ${F.length * (rowH + gap)}`);
+  F.forEach(([name, n], i) => {
+    const y = i * (rowH + gap);
+    el("text", { x: 0, y: y + 13, class: "strong" }, svg, name);
+    const r = el("rect", { x: labelW, y: y, width: Math.max(barW * n / max, 3), height: rowH, rx: 4, fill: "var(--bar)" }, svg);
+    hover(r, `<b>${name}</b><br>used in ${fmt(n)} units (${pct(n, U)}% of all units)`);
+    el("text", { x: labelW + barW * n / max + 8, y: y + 13 }, svg, `${fmt(n)} (${pct(n, U)}%)`);
+  });
+})();
+
+// trend: parse and clean rate per analysis run
+(function () {
+  const H = DATA.history, svg = $("trend"), W = 460, h = 120, padL = 34, padB = 22;
+  if (H.length < 2) { $("trendnote").textContent = `Baseline set on ${DATA.date}: ${pct(S, U)}% parse, ${pct(C, U)}% clean. The line appears from the next analysis run; each extractor or dialect feature should move it up.`; svg.remove(); return; }
+  $("trendnote").textContent = "Parse and clean rate at each analysis run.";
+  svg.setAttribute("viewBox", `0 0 ${W} ${h}`);
+  for (const v of [0, 50, 100]) { const y = h - padB - (h - padB - 8) * v / 100; el("line", { x1: padL, x2: W, y1: y, y2: y, stroke: "var(--grid)" }, svg); el("text", { x: padL - 6, y: y + 4, "text-anchor": "end" }, svg, v + "%"); }
+  const xs = i => padL + 8 + (W - padL - 16) * i / (H.length - 1);
+  const ys = v => h - padB - (h - padB - 8) * v / 100;
+  [["parse", "var(--parse)"], ["clean", "var(--clean)"]].forEach(([k, col]) => {
+    el("polyline", { points: H.map((r, i) => `${xs(i)},${ys(r[k])}`).join(" "), fill: "none", stroke: col, "stroke-width": 2 }, svg);
+    H.forEach((r, i) => { const c = el("circle", { cx: xs(i), cy: ys(r[k]), r: 4, fill: col, stroke: "var(--surface-1)", "stroke-width": 2 }, svg); hover(c, `<b>${r.date}</b><br>${k}: ${r[k]}% · ${fmt(r.units)} units`); });
+    const last = H[H.length - 1]; el("text", { x: xs(H.length - 1) - 6, y: ys(last[k]) - 8, "text-anchor": "end" }, svg, `${k} ${last[k]}%`);
+  });
+})();
+$("foot").textContent = `Generated by corpus/corpus.py from ${P.length} projects · rootplc ${DATA.rootplc} · public data only (no confidential strategy).`;
+</script>
+</body>
+</html>
