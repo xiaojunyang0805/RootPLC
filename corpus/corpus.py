@@ -275,7 +275,7 @@ def extract(p: dict, repo: Path | None = None) -> Path:
         by_dir = any(len(d) > 1 for d in seen_in.values())
         for f, t in zip(st_files, texts):
             units.append((f.stem, t))
-            groups.append(str(f.parent.relative_to(repo)) if by_dir else "")
+            groups.append(str(f.parent.relative_to(long_path(repo))) if by_dir else "")
     distinct = sorted(set(groups))
     split = len(distinct) > 1
 
