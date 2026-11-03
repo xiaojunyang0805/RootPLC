@@ -67,8 +67,8 @@ written from (clean-room; RootPLC is not affiliated with the vendors).
 Bundled: `Tc2_System` (also `ST_LibVersion`, `F_CmpLibVersion`, the AMS
 address types and the task index; RootPLC runs one task, index 1) and
 `Tc2_Utilities` (TwinCAT; case conversion, trimming, `TIMESTRUCT`, the
-`T_Arg` argument helpers `F_INT`, `F_STRING`, ...; `FB_FormatString` is
-declared only; `Tc2_Utilities`
+`T_Arg` argument helpers `F_INT`, `F_STRING`, ... and `FB_FormatString`,
+which formats them like fprintf after the manual's format specification; `Tc2_Utilities`
 requires `Tc2_System`, which requires `TwinCAT_BuiltIns`; activating a
 library activates what it requires) and
 `TwinCAT_BuiltIns` (names every TwinCAT project has: `BIT`, the 64-bit

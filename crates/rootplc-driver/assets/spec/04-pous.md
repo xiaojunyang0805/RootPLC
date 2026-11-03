@@ -170,7 +170,9 @@ interface property without GET or SET requires a GET part.
 variable: changes made by the called function or function block are visible
 in that variable after the call. RootPLC copies the value in before the call
 and back after it. The argument must be a variable, an element or a member
-(RP0114); a constant or an expression is an error.
+(RP0114); a constant or an expression is an error. While the call runs,
+`REF` or `ADR` of the parameter (or of an element or member of it) is the
+address of the caller's variable, so it stays valid after the call.
 
 **[pous.test]** A TEST block is a POU that only the test runner executes
 (semantics: spec/07-test-blocks.md):

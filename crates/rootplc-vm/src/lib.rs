@@ -217,6 +217,10 @@ pub struct Vm<'p> {
     file: usize,
     /// Root holding the global variables, [config.global-list].
     globals: Option<usize>,
+    /// [pous.call.in-out]: while a call runs, each VAR_IN_OUT slot and the
+    /// caller's variable it was copied from; ADR / REF of the slot names
+    /// the caller's variable.
+    aliases: Vec<(Loc, Loc)>,
 }
 
 fn truthy(v: &Value) -> bool {
@@ -355,6 +359,7 @@ impl<'p> Vm<'p> {
             steps: 0,
             file: 0,
             globals: None,
+            aliases: Vec::new(),
         };
         if let Some(g) = prog.globals {
             vm.globals = Some(vm.instantiate(g));
@@ -878,7 +883,10 @@ impl<'p> Vm<'p> {
                 let v = int(&self.eval(b, cx)?);
                 Ok(Value::Bool((v >> n) & 1 == 1))
             }
-            ExprKind::Ref(x) => Ok(Value::Ref(Some(self.place(x, cx)?))),
+            ExprKind::Ref(x) => {
+                let l = self.place(x, cx)?;
+                Ok(Value::Ref(Some(self.unalias(l))))
+            }
             ExprKind::Unary(op, x) => {
                 let v = self.eval(x, cx)?;
                 let el = self.elem(&e.ty);
@@ -1015,6 +1023,60 @@ impl<'p> Vm<'p> {
 
     /// [pous.call.in-out]: copy each VAR_IN_OUT parameter back to the
     /// caller's variable after the call (copy-in, copy-out).
+    /// The caller's variables behind the VAR_IN_OUT slots of a call, to
+    /// register while it runs ([`Vm::aliases`]). Open-array parameters carry
+    /// a bounds header and are not aliased.
+    fn in_out_aliases(
+        &mut self,
+        c: &Call,
+        pou: &rootplc_sema::ir::Pou,
+        frame: &Loc,
+        cx: &Ctx,
+    ) -> R<Vec<(Loc, Loc)>> {
+        let mut out = Vec::new();
+        for (slot, ex) in &c.inputs {
+            if pou.vars[*slot].section != Section::InOut
+                || is_open(&pou.vars[*slot].ty)
+                || !matches!(
+                    ex.kind,
+                    ExprKind::Var(_)
+                        | ExprKind::Global(_)
+                        | ExprKind::Member(..)
+                        | ExprKind::Index(..)
+                        | ExprKind::Deref(_)
+                )
+            {
+                continue;
+            }
+            let target = self.place(ex, cx)?;
+            out.push((frame.child(*slot), self.unalias(target)));
+        }
+        Ok(out)
+    }
+
+    /// `l`, or the caller's variable when `l` lies in a VAR_IN_OUT slot of a
+    /// running call.
+    fn unalias(&self, mut l: Loc) -> Loc {
+        loop {
+            let hit = self
+                .aliases
+                .iter()
+                .rev()
+                .find(|(slot, _)| slot.root == l.root && l.path.starts_with(&slot.path));
+            match hit {
+                Some((slot, target)) => {
+                    let mut path = target.path.clone();
+                    path.extend_from_slice(&l.path[slot.path.len()..]);
+                    l = Loc {
+                        root: target.root,
+                        path,
+                    };
+                }
+                None => return l,
+            }
+        }
+    }
+
     fn write_back_in_out(
         &mut self,
         c: &Call,
@@ -1057,6 +1119,9 @@ impl<'p> Vm<'p> {
                     let v = open_wrap(&pou.vars[*slot].ty, &self.strip(&ex.ty), v);
                     self.store(&loc.child(*slot), v, &pou.vars[*slot].ty, ex.span)?;
                 }
+                let mark = self.aliases.len();
+                let al = self.in_out_aliases(c, pou, &loc, cx)?;
+                self.aliases.extend(al);
                 if pou.builtin {
                     self.native_fb(&prog.defs[*id].name, &loc, e.span)?;
                 } else {
@@ -1069,6 +1134,7 @@ impl<'p> Vm<'p> {
                     self.exec_block(&pou.body, &inner)?;
                     self.file = saved;
                 }
+                self.aliases.truncate(mark);
                 self.write_back_in_out(c, pou, &loc, e.span, cx)?;
                 for (slot, target) in &c.outputs {
                     let v = self.get(&loc.child(*slot), e.span)?.clone();
@@ -1174,6 +1240,9 @@ impl<'p> Vm<'p> {
             let v = open_wrap(&pou.vars[slot].ty, &aty, v);
             self.store(&floc.child(slot), v, &pou.vars[slot].ty, span)?;
         }
+        let mark = self.aliases.len();
+        let al = self.in_out_aliases(c, pou, &floc, cx)?;
+        self.aliases.extend(al);
         let saved = self.file;
         self.file = prog.defs[id].file;
         self.exec_block(
@@ -1184,6 +1253,7 @@ impl<'p> Vm<'p> {
             },
         )?;
         self.file = saved;
+        self.aliases.truncate(mark);
         self.write_back_in_out(c, pou, &floc, e.span, cx)?;
         let result = if pou.ret.is_some() {
             self.get(&floc.child(pou.vars.len() - 1), e.span)?.clone()

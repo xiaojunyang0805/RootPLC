@@ -627,7 +627,9 @@ Rule `pous.call.in-out` in `spec/04-pous.md`:
 variable: changes made by the called function or function block are visible
 in that variable after the call. RootPLC copies the value in before the call
 and back after it. The argument must be a variable, an element or a member
-(RP0114); a constant or an expression is an error.
+(RP0114); a constant or an expression is an error. While the call runs,
+`REF` or `ADR` of the parameter (or of an element or member of it) is the
+address of the caller's variable, so it stays valid after the call.
 
 ## RP0113
 
