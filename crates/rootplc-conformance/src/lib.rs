@@ -148,6 +148,7 @@ fn analyze_case(
     let opts = rootplc_sema::Options {
         declare_only: libs.iter().flat_map(|l| l.declare_only.clone()).collect(),
         qualifiers: libs.iter().map(|l| l.name.clone()).collect(),
+        intrinsics: libs.iter().flat_map(|l| l.intrinsics.clone()).collect(),
     };
     rootplc_sema::analyze_with(&input, &opts)
 }

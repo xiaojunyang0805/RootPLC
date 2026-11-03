@@ -248,6 +248,7 @@ fn check_files(
     let opts = rootplc_sema::Options {
         declare_only: libs.iter().flat_map(|l| l.declare_only.clone()).collect(),
         qualifiers: libs.iter().map(|l| l.name.clone()).collect(),
+        intrinsics: libs.iter().flat_map(|l| l.intrinsics.clone()).collect(),
     };
     let parses: Vec<_> = files
         .iter()

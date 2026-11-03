@@ -27,6 +27,8 @@ pub struct Library {
     pub declare_only: Vec<String>,
     /// Public sources the declarations were written from.
     pub references: Vec<String>,
+    /// Compiler operators the library enables, e.g. `SIZEOF`.
+    pub intrinsics: Vec<String>,
     /// ST files: (name, source).
     pub files: Vec<(&'static str, &'static str)>,
 }
@@ -109,6 +111,7 @@ fn parse(text: &str, files: &[(&'static str, &'static str)]) -> Library {
         description: one("description"),
         declare_only: many("declare_only"),
         references: many("references"),
+        intrinsics: many("intrinsics"),
         files: files.to_vec(),
     }
 }
@@ -154,5 +157,9 @@ mod tests {
         assert_eq!(tc.declare_only, ["ADSLOGSTR", "ADSLOGDINT", "ADSLOGLREAL"]);
         assert_eq!(tc.references.len(), 5);
         assert!(find("nope").is_none());
+        assert_eq!(
+            find("TwinCAT_BuiltIns").expect("builtins").intrinsics,
+            ["SIZEOF", "XSIZEOF"]
+        );
     }
 }

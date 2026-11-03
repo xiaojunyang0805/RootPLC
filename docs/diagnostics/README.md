@@ -42,6 +42,7 @@ Codes RP00xx are lexical, RP01xx types, RP02xx names and structure, RP03xx synta
 | [RP0118](#rp0118) | warning | REFERENCE TO declares an alias (not portable) |
 | [RP0119](#rp0119) | warning | FB_init arguments in a declaration are accepted but not run |
 | [RP0120](#rp0120) | warning | call of a library function that RootPLC declares but does not implement |
+| [RP0121](#rp0121) | error | SIZEOF of a value whose size is not known (function-block instance, open array) |
 | [RP0115](#rp0115) | warning | enumeration base type after the values (not portable); write UINT (...) |
 | [RP0114](#rp0114) | error | a VAR_IN_OUT argument must be a variable |
 | [RP0113](#rp0113) | warning | FUNCTION without a result type (not portable); call it as a statement |
@@ -528,6 +529,27 @@ not reproduce faithfully (for example one that writes to the vendor's event
 log) is declared only. A call is warning RP0120; executing it stops with the
 fault `UNSUPPORTED`, so a run never continues with behaviour RootPLC cannot
 guarantee.
+
+## RP0121
+
+error: SIZEOF of a value whose size is not known (function-block instance, open array)
+
+Rule `stdlib.compat.sizeof` in `spec/08-stdlib.md`:
+
+**[stdlib.compat.sizeof]** A library may enable compiler operators;
+`TwinCAT_BuiltIns` enables `SIZEOF(x)` and `XSIZEOF(x)`: the size in bytes
+of a variable or type, a constant, with TwinCAT's 64-bit layout and default
+8-byte packing. Elementary types take 1, 2, 4 or 8 bytes; `STRING[n]` takes
+n + 1 bytes, `WSTRING[n]` 2(n + 1); an array the size of its elements times
+their number; references, pointers and interface references 8; an
+enumeration the size of its base type (`INT` unless declared). A structure
+places each member at an address divisible by its alignment (its size, at
+most 8) and is padded to its largest alignment. `SIZEOF`'s result type is
+USINT below 256 bytes, UINT below 65536, UDINT below 2^32 and ULINT above;
+`XSIZEOF` returns ULINT. The size of a function-block instance (vendor
+hidden data) or an open array is not known and is error RP0121. `BIT`
+members count one byte each (TwinCAT packs them into shared bytes; this is
+not modelled yet).
 
 ## RP0115
 

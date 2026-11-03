@@ -255,6 +255,13 @@ spec = "stdlib.compat.declare-only"
 stage = "sema"
 
 [[code]]
+id = "RP0121"
+severity = "error"
+summary = "SIZEOF of a value whose size is not known (function-block instance, open array)"
+spec = "stdlib.compat.sizeof"
+stage = "sema"
+
+[[code]]
 id = "RP0115"
 severity = "warning"
 summary = "enumeration base type after the values (not portable); write UINT (...)"

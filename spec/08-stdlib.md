@@ -60,6 +60,21 @@ written from (clean-room; RootPLC is not affiliated with the vendors).
 Bundled: `Tc2_System` (TwinCAT) and `TwinCAT_BuiltIns` (names every TwinCAT
 project has, such as `BIT` and `__SYSTEM.IQueryInterface`).
 
+**[stdlib.compat.sizeof]** A library may enable compiler operators;
+`TwinCAT_BuiltIns` enables `SIZEOF(x)` and `XSIZEOF(x)`: the size in bytes
+of a variable or type, a constant, with TwinCAT's 64-bit layout and default
+8-byte packing. Elementary types take 1, 2, 4 or 8 bytes; `STRING[n]` takes
+n + 1 bytes, `WSTRING[n]` 2(n + 1); an array the size of its elements times
+their number; references, pointers and interface references 8; an
+enumeration the size of its base type (`INT` unless declared). A structure
+places each member at an address divisible by its alignment (its size, at
+most 8) and is padded to its largest alignment. `SIZEOF`'s result type is
+USINT below 256 bytes, UINT below 65536, UDINT below 2^32 and ULINT above;
+`XSIZEOF` returns ULINT. The size of a function-block instance (vendor
+hidden data) or an open array is not known and is error RP0121. `BIT`
+members count one byte each (TwinCAT packs them into shared bytes; this is
+not modelled yet).
+
 **[stdlib.compat.declare-only]** A library function RootPLC can declare but
 not reproduce faithfully (for example one that writes to the vendor's event
 log) is declared only. A call is warning RP0120; executing it stops with the

@@ -1611,6 +1611,13 @@ impl<'a> Parser<'a> {
                 self.b.finish();
                 true
             }
+            // an elementary type name as a call argument: SIZEOF(INT)
+            Some(TokenKind::TypeName) if self.nth_kind(1) == Some(TokenKind::RParen) => {
+                self.b.start(N::NameRef);
+                self.bump();
+                self.b.finish();
+                true
+            }
             // [pous.oop.this]: THIS and SUPER, dereferenced with ^; TEST(...) is a call
             Some(TokenKind::Keyword) if self.at_any_kw(&["THIS", "SUPER", "TEST"]) => {
                 self.b.start(N::NameRef);

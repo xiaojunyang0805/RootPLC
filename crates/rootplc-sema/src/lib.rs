@@ -56,6 +56,9 @@ pub struct Options {
     /// Names that may qualify a declaration in expressions, `Tc2_System.PI`:
     /// the active compatibility libraries ([stdlib.compat]).
     pub qualifiers: Vec<String>,
+    /// Compiler operators enabled by active libraries, e.g. `SIZEOF`
+    /// ([stdlib.compat.sizeof]).
+    pub intrinsics: Vec<String>,
 }
 
 /// Check a project and produce its typed IR.

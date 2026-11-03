@@ -208,6 +208,7 @@ pub mod codes {
         REFERENCE_TYPE = 118, Warning;
         INIT_ARGUMENTS_IGNORED = 119, Warning;
         DECLARE_ONLY_CALL = 120, Warning;
+        SIZEOF_UNKNOWN = 121, Error;
     }
 
     /// Severity of a code, if the code exists.

@@ -229,6 +229,10 @@ pub(crate) struct Checker<'a> {
     /// Names that qualify a declaration in expressions: active libraries and
     /// declared namespaces (lower case).
     qualifiers: HashSet<String>,
+    /// Operators enabled by active libraries (upper case), e.g. SIZEOF.
+    intrinsics: HashSet<String>,
+    /// Base type of enumerations declared with one (`INT (a, b)`).
+    enum_base: HashMap<usize, Elem>,
     /// Property accessor definition -> (its PROPERTY node, is the getter).
     prop_info: HashMap<usize, (&'a Node, bool)>,
     /// Diagnostics with the index of their file.
@@ -298,6 +302,8 @@ impl<'a> Checker<'a> {
             last_block: None,
             declare_only: HashSet::new(),
             qualifiers: HashSet::new(),
+            intrinsics: HashSet::new(),
+            enum_base: HashMap::new(),
             prop_info: HashMap::new(),
             diags: Vec::new(),
         };
@@ -349,6 +355,11 @@ impl<'a> Checker<'a> {
             .qualifiers
             .iter()
             .map(|n| n.to_ascii_lowercase())
+            .collect();
+        self.intrinsics = o
+            .intrinsics
+            .iter()
+            .map(|n| n.to_ascii_uppercase())
             .collect();
     }
 
@@ -1058,6 +1069,119 @@ impl<'a> Checker<'a> {
         }
     }
 
+    /// [stdlib.compat.sizeof]: size in bytes of a variable or type, with
+    /// TwinCAT's 64-bit layout (8-byte packing). SIZEOF's result type grows
+    /// with the size (USINT, UINT, UDINT, ULINT); XSIZEOF's is ULINT.
+    fn sizeof(&mut self, up: &str, arg: &'a Node, span: Span) -> V {
+        let ty = match (arg.kind, self.items(arg).first().copied()) {
+            (N::NameRef, Some(Item::Tok(i))) => {
+                let name = self.text(i);
+                if let Some((t, _)) = self.lookup_var(name) {
+                    t
+                } else if let Some((t, _, _)) = self.lookup_owner_var(name) {
+                    t
+                } else if let Some((t, _)) = self.lookup_global(name) {
+                    t
+                } else if let Some(t) = elem_or_str(name) {
+                    t
+                } else {
+                    self.type_name(i)
+                }
+            }
+            _ => self.expr(arg).ty,
+        };
+        let Some((size, _)) = self.layout(&ty, 0) else {
+            if ty != Ty::Unknown {
+                let msg = format!(
+                    "the size of {} is not known: function-block instances hold vendor-specific hidden data, and open arrays have no fixed size",
+                    self.ty_name(&ty)
+                );
+                self.diag(codes::SIZEOF_UNKNOWN, msg, span, None);
+            }
+            return V::unknown(span);
+        };
+        let rty = if up == "XSIZEOF" {
+            Elem::Ulint
+        } else if size < 256 {
+            Elem::Usint
+        } else if size < 65_536 {
+            Elem::Uint
+        } else if size < 4_294_967_296 {
+            Elem::Udint
+        } else {
+            Elem::Ulint
+        };
+        let v = size as i128;
+        V {
+            ty: Ty::Elem(rty),
+            k: Some(K::Int(v)),
+            leaf: false,
+            span,
+            e: ExprKind::Const(Const::Int(v)),
+        }
+    }
+
+    /// Size and alignment in bytes with TwinCAT's default 8-byte packing:
+    /// each member at an address divisible by its alignment (its size, at
+    /// most 8); a structure's size is padded to its largest alignment.
+    fn layout(&self, ty: &Ty, depth: usize) -> Option<(u128, u128)> {
+        if depth > 32 {
+            return None;
+        }
+        let elem = |e: Elem| -> u128 {
+            use Elem::*;
+            match e {
+                Bool | Sint | Usint | Byte | Char => 1,
+                Int | Uint | Word | Wchar => 2,
+                Dint | Udint | Dword | Real | Time | Date | Tod | Dt => 4,
+                Lint | Ulint | Lword | Lreal | Ltime | Ldate | Ltod | Ldt => 8,
+            }
+        };
+        let round = |n: u128, a: u128| n.div_ceil(a.max(1)) * a.max(1);
+        match ty {
+            Ty::Elem(e) => {
+                let s = elem(*e);
+                Some((s, s))
+            }
+            Ty::Str { wide: false, len } => Some((u128::from(*len) + 1, 1)),
+            Ty::Str { wide: true, len } => Some((2 * (u128::from(*len) + 1), 2)),
+            Ty::Array { dims, elem: e } => {
+                let (es, ea) = self.layout(e, depth + 1)?;
+                let mut count: u128 = 1;
+                for d in dims {
+                    let (lo, hi) = (*d)?;
+                    count *= u128::try_from(hi - lo + 1).ok()?;
+                }
+                Some((es * count, ea))
+            }
+            Ty::Ref(_) => Some((8, 8)),
+            Ty::Named(id) => match &self.defs[*id].kind {
+                Kind::Struct(members) => {
+                    let (mut off, mut max_a) = (0u128, 1u128);
+                    for m in members {
+                        let (s, a) = self.layout(&m.ty, depth + 1)?;
+                        let a = a.min(8);
+                        off = round(off, a) + s;
+                        max_a = max_a.max(a);
+                    }
+                    Some((round(off, max_a), max_a))
+                }
+                Kind::Enum(_) => {
+                    let s = elem(self.enum_base.get(id).copied().unwrap_or(Elem::Int));
+                    Some((s, s))
+                }
+                Kind::Subrange { base, .. } => {
+                    let s = elem(*base);
+                    Some((s, s))
+                }
+                Kind::Alias(t) => self.layout(t, depth + 1),
+                Kind::Pou(p) if p.kind == PouKind::Interface => Some((8, 8)),
+                _ => None,
+            },
+            _ => None,
+        }
+    }
+
     /// `SUPER^` as the base of a call: the base method runs without dispatch.
     fn is_super(&self, n: &'a Node) -> bool {
         n.kind == N::DerefExpr && self.first_node(n).is_some_and(|x| {
@@ -1721,7 +1845,14 @@ impl<'a> Checker<'a> {
                             k += 5;
                         }
                         Item::Node(e) if e.kind == N::EnumType => {
+                            let base = match ty {
+                                Ty::Elem(b) => Some(b),
+                                _ => None,
+                            };
                             ty = self.enum_type(e, decl);
+                            if let (Some(b), Ty::Named(id)) = (base, &ty) {
+                                self.enum_base.insert(*id, b);
+                            }
                             k += 1;
                         }
                         _ => k += 1,
@@ -1818,7 +1949,16 @@ impl<'a> Checker<'a> {
             values.push((self.text(t).to_string(), val));
             next = val + 1;
         }
-        self.make_def(decl, Kind::Enum(values))
+        let id_ty = self.make_def(decl, Kind::Enum(values));
+        // [types.derived.enum]: the vendor spelling with the base type after the values
+        let trailing = self.items(e).into_iter().find_map(|i| match i {
+            Item::Tok(t) if self.tkind(t) == T::TypeName => Elem::from_name(self.text(t)),
+            _ => None,
+        });
+        if let (Some(b), Ty::Named(id)) = (trailing, &id_ty) {
+            self.enum_base.insert(*id, b);
+        }
+        id_ty
     }
 
     fn array_type(&mut self, e: &'a Node) -> Ty {
@@ -3353,6 +3493,13 @@ impl<'a> Checker<'a> {
             }
         }
         let up = name.to_ascii_uppercase();
+        if (up == "SIZEOF" || up == "XSIZEOF")
+            && self.intrinsics.contains(&up)
+            && args.len() == 1
+            && args[0].name.is_none()
+        {
+            return self.sizeof(&up, args[0].expr, span);
+        }
         if up == "__ISVALIDREF" && args.len() == 1 && args[0].name.is_none() {
             // [types.reference.alias]: the reference is set (not NULL)
             self.raw_alias = true;
