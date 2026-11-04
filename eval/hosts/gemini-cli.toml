@@ -2,14 +2,17 @@
 # set `verified` once a run succeeds. Auth: GEMINI_API_KEY (AI Studio); the free
 # Google-login tier no longer serves Gemini CLI (IneligibleTierError, 2026-11-03;
 # Google moved unpaid and Google One users to Antigravity CLI on 2026-06-18).
-# An unpaid API key serves Flash models only, 250 requests per day, so a full
-# baseline takes several days on it; a paid key has no such limit.
+# Free AI Studio key (tested 4 Nov 2026): 20 requests per day per Flash model
+# (generate_content_free_tier_requests), Pro models none, and Gemini CLI also
+# calls its default model internally whatever -m says. One agent run needs
+# 10-30 requests, so the free tier only proves the auth; baseline runs need a
+# paid key (billing enabled in AI Studio).
 # Mode with: the rootplc MCP server from the workspace settings; mode without:
 # no MCP server and no rootplc on PATH.
 name = "gemini-cli"
 ecosystem = "western"
 verified = "no"
-model = ""
+model = ""   # empty: Gemini CLI's default (gemini-3.8-flash on 4 Nov 2026)
 
 command_with = ["gemini", "-p", "{prompt}", "--approval-mode", "yolo", "--skip-trust", "--output-format", "stream-json",
   "--allowed-mcp-server-names", "rootplc"]
