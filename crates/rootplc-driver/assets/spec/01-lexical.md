@@ -80,7 +80,9 @@ Elementary type names (spec/02-types.md) are also reserved.
 (a located variable, a configuration, SFC, which RootPLC does not parse, a
 method modifier), and CODESYS and TwinCAT code uses them as ordinary names. RootPLC reads them as names
 everywhere else; declaring one as a name is warning RP0124 instead of
-RP0004.
+RP0004. A member or enumeration value may also be called `NULL` or `REF`
+(warning RP0124); it is then written after a `.` (`E_State.NULL`, `x.Ref`),
+where any keyword is read as a member name.
 
 ## 4. Numeric literals
 

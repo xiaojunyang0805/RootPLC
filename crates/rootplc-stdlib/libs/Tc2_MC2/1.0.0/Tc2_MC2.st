@@ -702,3 +702,78 @@ VAR_OUTPUT
     Status             : ST_AxisStatus;
 END_VAR
 END_FUNCTION_BLOCK
+
+(* Gearing options: ST_GearOutOptions is "currently not implemented" and the
+   slave type of ST_GearInOptions "not used"; its enumeration is not
+   published, so RootPLC declares it as a DINT. *)
+TYPE
+    ST_GearInOptions : STRUCT
+        SlaveType : DINT;
+    END_STRUCT;
+    ST_GearOutOptions : STRUCT
+    END_STRUCT;
+END_TYPE
+
+FUNCTION_BLOCK MC_Jog
+VAR_INPUT
+    JogForward   : BOOL;
+    JogBackwards : BOOL;
+    Mode         : E_JogMode;
+    Position     : LREAL;
+    Velocity     : LREAL;
+    Acceleration : LREAL;
+    Deceleration : LREAL;
+    Jerk         : LREAL;
+END_VAR
+VAR_IN_OUT
+    Axis : AXIS_REF;
+END_VAR
+VAR_OUTPUT
+    Done           : BOOL;
+    Busy           : BOOL;
+    CommandAborted : BOOL;
+    Error          : BOOL;
+    ErrorID        : UDINT;
+END_VAR
+END_FUNCTION_BLOCK
+
+FUNCTION_BLOCK MC_GearIn
+VAR_INPUT
+    Execute          : BOOL;
+    RatioNumerator   : LREAL;
+    RatioDenominator : UINT;
+    Acceleration     : LREAL;
+    Deceleration     : LREAL;
+    Jerk             : LREAL;
+    BufferMode       : MC_BufferMode;
+    Options          : ST_GearInOptions;
+END_VAR
+VAR_IN_OUT
+    Master : AXIS_REF;
+    Slave  : AXIS_REF;
+END_VAR
+VAR_OUTPUT
+    InGear         : BOOL;
+    Busy           : BOOL;
+    Active         : BOOL;
+    CommandAborted : BOOL;
+    Error          : BOOL;
+    ErrorID        : UDINT;
+END_VAR
+END_FUNCTION_BLOCK
+
+FUNCTION_BLOCK MC_GearOut
+VAR_INPUT
+    Execute : BOOL;
+    Options : ST_GearOutOptions;
+END_VAR
+VAR_IN_OUT
+    Slave : AXIS_REF;
+END_VAR
+VAR_OUTPUT
+    Done    : BOOL;
+    Busy    : BOOL;
+    Error   : BOOL;
+    ErrorID : UDINT;
+END_VAR
+END_FUNCTION_BLOCK

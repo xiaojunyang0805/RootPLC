@@ -142,6 +142,9 @@ pub struct Pou {
     /// Methods callable on an instance, inherited ones included, with
     /// overrides applied: (name, method definition), [pous.oop.override].
     pub methods: Vec<(String, usize)>,
+    /// Interfaces an instance implements, through its bases and through
+    /// interfaces extending others ([pous.oop.interface]); sorted.
+    pub interfaces: Vec<usize>,
 }
 
 /// Initial value.

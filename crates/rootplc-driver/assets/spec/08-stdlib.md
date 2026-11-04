@@ -118,6 +118,13 @@ reference of the argument's type; reading it byte by byte (pointer
 arithmetic) is not supported. Without the library, generic types in user
 declarations stay RP0104.
 
+**[stdlib.compat.query]** `TwinCAT_BuiltIns` enables `__QUERYINTERFACE(src,
+itf)`: `src` is an interface reference or a function-block instance; if the
+object it refers to implements the interface of the variable `itf`, `itf`
+refers to it and the result is TRUE, else `itf` is NULL and the result
+FALSE. `__QUERYPOINTER(src, p)` sets the reference `p` to the object
+(TRUE) or NULL (FALSE).
+
 **[stdlib.compat.sizeof]** A library may enable compiler operators;
 `TwinCAT_BuiltIns` enables `SIZEOF(x)` and `XSIZEOF(x)`: the size in bytes
 of a variable or type, a constant, with TwinCAT's 64-bit layout and default

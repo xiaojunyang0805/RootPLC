@@ -4,7 +4,7 @@
 name = "Tc2_Utilities"
 vendor = "Beckhoff Automation GmbH"
 version = "1.0.0"
-description = "TwinCAT Tc2_Utilities (part): *_TO_HEXSTR, F_ToLCase/F_ToUCase, F_LTrim/F_RTrim, TIMESTRUCT, T_Arg and the F_ argument helpers, FB_FormatString, E_SBCSType, time conversions (DT/SYSTEMTIME/FILETIME), LREAL_TO_FMTSTR, LEN2/WLEN2, STRNCPY; clock and time-zone blocks declared"
+description = "TwinCAT Tc2_Utilities (part): *_TO_HEXSTR, F_ToLCase/F_ToUCase, F_LTrim/F_RTrim, TIMESTRUCT, T_Arg and the F_ argument helpers, FB_FormatString, E_SBCSType, time conversions (DT/SYSTEMTIME/FILETIME), LREAL_TO_FMTSTR, LEN2/WLEN2, STRNCPY, byte order (HOST_TO_BE16/32, BE16/32_TO_HOST), LrealIsNaN, LrealIsFinite, IsFinite; clock and time-zone blocks declared"
 requires = ["Tc2_System"]
 declare_only = ["FB_LocalSystemTime", "NT_GetTime", "FB_GetTimeZoneInformation", "FB_MemRingBuffer"]
 references = [

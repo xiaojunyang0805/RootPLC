@@ -255,7 +255,9 @@ mod tests {
                 "TIME",
                 "__NEW",
                 "__DELETE",
-                "ANY"
+                "ANY",
+                "__QUERYINTERFACE",
+                "__QUERYPOINTER"
             ]
         );
     }

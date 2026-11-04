@@ -1214,3 +1214,70 @@ VAR_OUTPUT
     cbReturn : UDINT;
 END_VAR
 END_FUNCTION_BLOCK
+
+(* Byte order: host (little endian) to network (big endian) and back. *)
+FUNCTION HOST_TO_BE16 : WORD
+VAR_INPUT
+    in : WORD;
+END_VAR
+HOST_TO_BE16 := ROL(in, 8);
+END_FUNCTION
+
+FUNCTION BE16_TO_HOST : WORD
+VAR_INPUT
+    in : WORD;
+END_VAR
+BE16_TO_HOST := ROL(in, 8);
+END_FUNCTION
+
+FUNCTION HOST_TO_BE32 : DWORD
+VAR_INPUT
+    in : DWORD;
+END_VAR
+HOST_TO_BE32 := SHL(in AND 16#FF, 24) OR SHL(in AND 16#FF00, 8)
+    OR (SHR(in, 8) AND 16#FF00) OR SHR(in, 24);
+END_FUNCTION
+
+FUNCTION BE32_TO_HOST : DWORD
+VAR_INPUT
+    in : DWORD;
+END_VAR
+BE32_TO_HOST := HOST_TO_BE32(in);
+END_FUNCTION
+
+(* LREAL tests: NaN, and finite (neither infinite nor NaN). *)
+FUNCTION LrealIsNaN : BOOL
+VAR_INPUT
+    x : REFERENCE TO LREAL;
+END_VAR
+LrealIsNaN := x <> x;
+END_FUNCTION
+
+FUNCTION LrealIsFinite : BOOL
+VAR_INPUT
+    x : REFERENCE TO LREAL;
+END_VAR
+LrealIsFinite := x = x AND ABS(x) <= 1.7976931348623157E308;
+END_FUNCTION
+
+(* IsFinite for a REAL or LREAL argument (T_Arg); FALSE for other types. *)
+FUNCTION IsFinite : BOOL
+VAR_INPUT
+    x : T_Arg;
+END_VAR
+VAR
+    pR : REF_TO REAL;
+    pL : REF_TO LREAL;
+    v : LREAL;
+END_VAR
+IF x.eType = E_ArgType#ARGTYPE_REAL THEN
+    pR := x.pData;
+    v := REAL_TO_LREAL(pR^);
+ELSIF x.eType = E_ArgType#ARGTYPE_LREAL THEN
+    pL := x.pData;
+    v := pL^;
+ELSE
+    RETURN;
+END_IF
+IsFinite := v = v AND ABS(v) <= 1.7976931348623157E308;
+END_FUNCTION

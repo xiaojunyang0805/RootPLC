@@ -1330,6 +1330,40 @@ impl<'p> Vm<'p> {
                 };
                 Ok(Value::Agg(vec![arg(1), r, arg(2)]))
             }
+            // [stdlib.compat.query]
+            "__QUERYINTERFACE" | "__QUERYPOINTER" => {
+                let Value::Ref(Some(dl)) = arg(1) else {
+                    return Ok(Value::Bool(false));
+                };
+                let obj = match arg(0) {
+                    Value::Obj(Some(o)) => Some(o),
+                    _ => None,
+                };
+                let (v, hit) = if name == "__QUERYINTERFACE" {
+                    let itf = match ty {
+                        Some(Ty::Named(t)) => Some(*t),
+                        _ => None,
+                    };
+                    match (obj, itf) {
+                        (Some((loc, d)), Some(t))
+                            if self
+                                .prog
+                                .pou(d)
+                                .is_some_and(|p| p.interfaces.binary_search(&t).is_ok()) =>
+                        {
+                            (Value::Obj(Some((loc, d))), true)
+                        }
+                        _ => (Value::Obj(None), false),
+                    }
+                } else {
+                    match obj {
+                        Some((loc, _)) => (Value::Ref(Some(loc)), true),
+                        None => (Value::Ref(None), false),
+                    }
+                };
+                *self.get_mut(&dl, e.span)? = v;
+                Ok(Value::Bool(hit))
+            }
             // [stdlib.compat.dynamic]
             "__NEW" => {
                 let t = ty.cloned().unwrap_or(Ty::Unknown);

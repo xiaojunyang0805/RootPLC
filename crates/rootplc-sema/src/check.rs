@@ -590,6 +590,22 @@ impl<'a> Checker<'a> {
                 _ => Vec::new(),
             })
             .collect();
+        // [pous.oop.interface]: for __QUERYINTERFACE at run time
+        let all_itfs: Vec<usize> = (0..self.defs.len())
+            .filter(|&i| self.is_itf(&Ty::Named(i)))
+            .collect();
+        let itfs: Vec<Vec<usize>> = (0..self.defs.len())
+            .map(|d| match &self.defs[d].kind {
+                Kind::Pou(p) if matches!(p.kind, PouKind::FunctionBlock | PouKind::Program) => {
+                    all_itfs
+                        .iter()
+                        .copied()
+                        .filter(|&t| self.implements_itf(d, t))
+                        .collect()
+                }
+                _ => Vec::new(),
+            })
+            .collect();
         let mut defs = Vec::with_capacity(self.defs.len());
         for (id, d) in self.defs.iter().enumerate() {
             let mut irs = self.irs.remove(&id).unwrap_or_default();
@@ -632,6 +648,7 @@ impl<'a> Checker<'a> {
                             && self.declare_only.contains(&d.name.to_ascii_lowercase()),
                         base: p.base,
                         methods: tables[id].clone(),
+                        interfaces: itfs[id].clone(),
                     })
                 }
             };
@@ -1949,7 +1966,11 @@ impl<'a> Checker<'a> {
                     }
                 }
                 Item::Tok(t)
-                    if before_colon && (self.tkind(t) == T::Ident || self.is_kw(t, "TEST")) =>
+                    if before_colon
+                        && (self.tkind(t) == T::Ident
+                            || self.is_kw(t, "TEST")
+                            || self.is_kw(t, "NULL")
+                            || self.is_kw(t, "REF")) =>
                 {
                     names.push(t)
                 }
@@ -3996,6 +4017,61 @@ impl<'a> Checker<'a> {
                 args: call_args,
             };
             return V::with(Ty::Ref(Box::new(ty)), span, ExprKind::Call(Box::new(call)));
+        }
+        // [stdlib.compat.query]: __QUERYINTERFACE(src, itf) / __QUERYPOINTER(src, p)
+        if (up == "__QUERYINTERFACE" || up == "__QUERYPOINTER")
+            && self.intrinsics.contains(&up)
+            && args.len() == 2
+        {
+            let src = self.expr(args[0].expr);
+            let st = self.strip(&src.ty);
+            let src_ir = match st {
+                Ty::Named(fb) if matches!(&self.defs[fb].kind, Kind::Pou(p) if matches!(p.kind, PouKind::FunctionBlock | PouKind::Program)) =>
+                {
+                    let span = src.span;
+                    let ty = src.ty.clone();
+                    ir::Expr {
+                        ty,
+                        kind: ExprKind::ToItf(Box::new(src.ir()), fb),
+                        span,
+                    }
+                }
+                _ => src.ir(),
+            };
+            let dst = self.expr(args[1].expr);
+            let dt = self.strip(&dst.ty);
+            let ok = if up == "__QUERYINTERFACE" {
+                self.is_itf(&dt) || dt == Ty::Unknown
+            } else {
+                matches!(dt, Ty::Ref(_) | Ty::Unknown)
+            };
+            if !ok {
+                let msg = format!(
+                    "{up} needs {} as its second argument, found {}",
+                    if up == "__QUERYINTERFACE" {
+                        "an interface variable"
+                    } else {
+                        "a pointer"
+                    },
+                    self.ty_name(&dst.ty)
+                );
+                self.diag(codes::IMPLICIT_CONVERSION, msg, span, None);
+            }
+            let addr = ir::Expr {
+                ty: Ty::Ref(Box::new(dst.ty.clone())),
+                kind: ExprKind::Ref(Box::new(dst.ir())),
+                span,
+            };
+            let call = ir::Call {
+                target: CallTarget::Builtin {
+                    name: up.to_string(),
+                    ty: Some(dt),
+                },
+                inputs: Vec::new(),
+                outputs: Vec::new(),
+                args: vec![src_ir, addr],
+            };
+            return V::with(Ty::Elem(Elem::Bool), span, ExprKind::Call(Box::new(call)));
         }
         if up == "__DELETE" && self.intrinsics.contains(&up) && args.len() == 1 {
             let p = self.expr(args[0].expr);

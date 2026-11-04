@@ -381,6 +381,18 @@ impl<'a> Parser<'a> {
                 self.bump();
                 true
             }
+            // [lexical.keywords.soft]: a member or enumeration value may be
+            // called NULL or REF (used as E.NULL, x.Ref)
+            Some(TokenKind::Keyword) if self.at_kw("NULL") || self.at_kw("REF") => {
+                let i = self.nth_index(0).unwrap_or(self.pos);
+                let msg = format!(
+                    "'{}' is reserved in IEC 61131-3; RootPLC accepts it as a name (use it after '.')",
+                    self.text_at(i)
+                );
+                self.error(codes::SOFT_KEYWORD_NAME, msg, self.toks[i].span);
+                self.bump();
+                true
+            }
             Some(TokenKind::Keyword | TokenKind::TypeName)
                 if !self.at_any_kw(&["END_VAR", "END_STRUCT", "END_TYPE"]) =>
             {
@@ -1124,7 +1136,14 @@ impl<'a> Parser<'a> {
     /// `( … )` after a type name or on its own: a subrange or an enumeration.
     fn subrange_or_enum(&mut self) {
         // Enumeration if the first item is a name followed by `,`, `:=` or `)`.
-        let is_enum = self.nth_kind(1) == Some(TokenKind::Ident)
+        let first_name = self.nth_kind(1) == Some(TokenKind::Ident)
+            || self.nth_index(1).is_some_and(|i| {
+                self.toks[i].kind == TokenKind::Keyword
+                    && ["NULL", "REF"]
+                        .iter()
+                        .any(|w| self.text_at(i).eq_ignore_ascii_case(w))
+            });
+        let is_enum = first_name
             && matches!(
                 self.nth_kind(2),
                 Some(TokenKind::Comma | TokenKind::Assign | TokenKind::RParen)
@@ -1621,8 +1640,12 @@ impl<'a> Parser<'a> {
             if self.at(TokenKind::Dot) {
                 self.b.start_at(cp, N::MemberExpr);
                 self.bump();
-                // a member name is a use, not a declaration: no RP0124
-                if !self.eat(TokenKind::Integer) && !self.eat(TokenKind::Ident) {
+                // a member name is a use, not a declaration: no RP0124; after
+                // '.' even a keyword is a member name (E_State.NULL, x.Ref)
+                if !self.eat(TokenKind::Integer)
+                    && !self.eat(TokenKind::Ident)
+                    && !self.eat(TokenKind::Keyword)
+                {
                     self.name();
                 }
                 self.b.finish();
