@@ -7,19 +7,19 @@ checker with no errors. Units are checked per project, so references to other li
 are not in the corpus count as errors. *Clean* is rootplc's own verdict: no vendor compiler has
 confirmed that the code is valid, so it measures acceptance, not correctness.
 
-**Headline (applications, libraries and samples; 200 projects, 13372 units): syntax OK 96.4% · clean 73.5% · median project clean 75.0%.**
+**Headline (applications, libraries and samples; 200 projects, 13372 units): syntax OK 96.4% · clean 73.6% · median project clean 75.0%.**
 
 | Figure | Projects | Units | Syntax OK | Clean |
 |---|---|---|---|---|
-| Headline (core set) | 200 | 13372 | 96.4% | 73.5% |
-| Holdout part of the core set (never used to choose fixes) | 32 | 901 | 95.2% | 66.0% |
-| Everything analysed, tool inputs included | 226 | 15470 | 94.7% | 71.2% |
+| Headline (core set) | 200 | 13372 | 96.4% | 73.6% |
+| Holdout part of the core set (never used to choose fixes) | 32 | 901 | 95.2% | 66.4% |
+| Everything analysed, tool inputs included | 226 | 15470 | 94.7% | 71.3% |
 
 | Category | Units | Syntax OK | Clean |
 |---|---|---|---|
 | application | 2455 | 95.2% | 81.7% |
-| library | 9594 | 96.6% | 73.3% |
-| sample | 1323 | 97.2% | 59.6% |
+| library | 9594 | 96.6% | 73.5% |
+| sample | 1323 | 97.2% | 59.8% |
 | tool-input | 2098 | 84.0% | 56.5% |
 
 Categories (manifest `category`): *application* (a program for a machine or plant), *library*,
@@ -33,10 +33,10 @@ as empty, duplicated, not Structured Text or too small are listed at the end of 
 | [tcopengroup-tcopen](https://github.com/TcOpenGroup/TcOpen) | library | MIT License | 1223 | 118,477 | 99% | 83% |
 | [johannespettersson80-trust-platform](https://github.com/johannesPettersson80/trust-platform) | tool-input | Apache License 2.0 | 1049 | 149,729 | 78% | 48% |
 | [thorstenbrach-srci](https://github.com/ThorstenBrach/SRCI) | library | MIT License | 988 | 208,658 | 99% | 83% |
-| [aixocat](https://github.com/RWTH-EBC/AixOCAT) | library | MIT | 973 | 57,919 | 99% | 75% |
+| [aixocat](https://github.com/RWTH-EBC/AixOCAT) | library | MIT | 973 | 57,919 | 99% | 76% |
 | [tomookay-toast](https://github.com/tomookay/TOAST) | application | MIT License | 861 | 27,631 | 100% | 96% |
 | [lorenz-software-tc3unittest](https://github.com/Lorenz-Software/Tc3UnitTest) | library | MIT License | 792 | 122,715 | 99% | 96% |
-| [br-oscat](https://github.com/tkucic/brOscatLib) | library | MIT | 729 | 45,030 | 93% | 75% |
+| [br-oscat](https://github.com/tkucic/brOscatLib) | library | MIT | 729 | 45,030 | 93% | 76% |
 | [haud-ba-plc-motion-layer](https://github.com/haud-ba/PLC_MOTION_LAYER) | library | other (see repository) | 709 | 74,821 | 99% | 78% |
 | [trofimich-twincat-openframework](https://github.com/trofimich/TwinCAT.OpenFramework) | library | MIT License | 574 | 45,173 | 88% | 44% |
 | [thorstenbrach-thorbot-software-plc](https://github.com/ThorstenBrach/ThorBot_Software_PLC) | application | MIT License | 550 | 31,685 | 98% | 85% |
@@ -54,7 +54,7 @@ as empty, duplicated, not Structured Text or too small are listed at the end of 
 | [beckhoff-tf6310-samples](https://github.com/Beckhoff/TF6310_Samples) | sample | other (see repository) | 146 | 9,761 | 99% | 27% |
 | [intecre-twincat-utils](https://github.com/Intecre/twincat-utils) | library | MIT License | 133 | 6,230 | 99% | 65% |
 | [pcdshub-lcls-twincat-pmps](https://github.com/pcdshub/lcls-twincat-pmps) | library | other (see repository) | 131 | 9,104 | 98% | 60% |
-| [gracesrm-openplc-sample-programs](https://github.com/gracesrm/OpenPLC_Sample_Programs) | sample (holdout) | GNU General Public License v3.0 | 115 | 42,123 | 90% | 28% |
+| [gracesrm-openplc-sample-programs](https://github.com/gracesrm/OpenPLC_Sample_Programs) | sample (holdout) | GNU General Public License v3.0 | 115 | 42,123 | 90% | 30% |
 | [twincat-dynamic-collections](https://github.com/fisothemes/TwinCat-Dynamic-Collections) | library (holdout) | MIT | 108 | 10,216 | 96% | 67% |
 | [ironplc-ironplc](https://github.com/ironplc/ironplc) | tool-input | MIT License | 107 | 3,114 | 78% | 48% |
 | [mbc-engineering-log4tc](https://github.com/mbc-engineering/log4TC) | library | Apache License 2.0 | 103 | 4,754 | 99% | 58% |
@@ -299,8 +299,8 @@ Most frequent error codes:
 
 | Code | Count |
 |---|---|
-| RP0203 | 18373 |
-| RP0103 | 5153 |
+| RP0203 | 18305 |
+| RP0103 | 5018 |
 | RP0111 | 4632 |
 | RP0201 | 3603 |
 | RP0301 | 1339 |
