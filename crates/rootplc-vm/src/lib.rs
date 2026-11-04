@@ -337,6 +337,9 @@ fn compare(a: &Value, b: &Value) -> Option<std::cmp::Ordering> {
         });
     }
     match (a, b) {
+        // 0 compared with a reference is NULL (CODESYS / TwinCAT, RP0127)
+        (Value::Ref(_), Value::Int(0)) => compare(a, &Value::Ref(None)),
+        (Value::Int(0), Value::Ref(_)) => compare(&Value::Ref(None), b),
         (Value::Str(x), Value::Str(y)) => Some(x.cmp(y)),
         (Value::Bool(x), Value::Bool(y)) => Some(x.cmp(y)),
         (Value::Real(_), _) | (_, Value::Real(_)) => real(a).partial_cmp(&real(b)),
@@ -1527,6 +1530,22 @@ impl<'p> Vm<'p> {
                 let mut v = arg(0);
                 if let Some(from) = ty {
                     v = self.convert(v, from).unwrap_or_else(|_| arg(0));
+                }
+                // to a STRING: the text of the value (INT_TO_STRING(42) = '42',
+                // TIME_TO_STRING gives T#...ms); only a CHAR converts to its
+                // character
+                let from = ty.map(|t| self.strip(t));
+                let to_str = matches!(self.strip(&e.ty), Ty::Str { .. });
+                let chars = matches!(
+                    from,
+                    Some(Ty::Elem(Elem::Char | Elem::Wchar)) | Some(Ty::Str { .. })
+                );
+                if to_str && !chars && !matches!(v, Value::Str(_)) {
+                    let text = match (&v, ty) {
+                        (Value::Int(_), Some(t)) => self.display(&v, t),
+                        _ => to_text(&v),
+                    };
+                    v = Value::Str(text);
                 }
                 // enumerations and BOOL convert by value
                 let _ = exprs;

@@ -2241,10 +2241,13 @@ declarations: `Tc2_System.PI`. `rootplc libraries` lists the bundled
 libraries with their vendor, version and the public references they were
 written from (clean-room; RootPLC is not affiliated with the vendors).
 Bundled: `Tc2_System` (also `ST_LibVersion`, `F_CmpLibVersion`, the AMS
-address types and the task index; RootPLC runs one task, index 1) and
+address types, the task index (RootPLC runs one task, index 1) and
+`F_CreateAmsNetId`; the file, ADS and memory functions are declared only) and
 `Tc2_Utilities` (TwinCAT; case conversion, trimming, `TIMESTRUCT`, the
 `T_Arg` argument helpers `F_INT`, `F_STRING`, ... and `FB_FormatString`,
-which formats them like fprintf after the manual's format specification; `Tc2_Utilities`
+which formats them like fprintf after the manual's format specification;
+the time conversions between `DT`, `TIMESTRUCT` and FILETIME, `LREAL_TO_FMTSTR`,
+`LEN2`, `STRNCPY`; the clock, time-zone and ring-buffer blocks are declared only; `Tc2_Utilities`
 requires `Tc2_System`, which requires `TwinCAT_BuiltIns`; activating a
 library activates what it requires) and
 `TwinCAT_BuiltIns` (names every TwinCAT project has: `BIT`, the 64-bit

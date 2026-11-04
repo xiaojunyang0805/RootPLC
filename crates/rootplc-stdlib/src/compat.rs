@@ -218,10 +218,21 @@ mod tests {
                 "MEMMOVE",
                 "MEMSET",
                 "MEMCMP",
-                "DRAND"
+                "DRAND",
+                "FB_FileOpen",
+                "FB_FileClose",
+                "FB_FileWrite",
+                "FB_FileRead",
+                "FB_FilePuts",
+                "FB_FileGets",
+                "FB_FileDelete",
+                "FB_CreateDir",
+                "ADSREAD",
+                "ADSWRITE",
+                "F_GetSystemTime"
             ]
         );
-        assert_eq!(tc.references.len(), 19);
+        assert_eq!(tc.references.len(), 20);
         assert!(find("nope").is_none());
         let r = resolve(&["Tc2_Utilities".into()]).expect("resolve");
         let names: Vec<&str> = r.iter().map(|l| l.name.as_str()).collect();

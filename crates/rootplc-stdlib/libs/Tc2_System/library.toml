@@ -5,9 +5,9 @@
 name = "Tc2_System"
 vendor = "Beckhoff Automation GmbH"
 version = "1.0.0"
-description = "TwinCAT Tc2_System: T_MaxString, system constants, ADS logging, ST_LibVersion, AMS address types, task index, CPU counter, MEMCPY/MEMMOVE/MEMSET/MEMCMP and DRAND (declared)"
+description = "TwinCAT Tc2_System: T_MaxString, system constants, ADS logging, ST_LibVersion, AMS address types, task index, CPU counter, F_CreateAmsNetId; declared only: MEMCPY/MEMMOVE/MEMSET/MEMCMP, DRAND, file blocks, ADSREAD/ADSWRITE, F_GetSystemTime"
 requires = ["TwinCAT_BuiltIns"]
-declare_only = ["ADSLOGSTR", "ADSLOGDINT", "ADSLOGLREAL", "GETCPUCOUNTER", "MEMCPY", "MEMMOVE", "MEMSET", "MEMCMP", "DRAND"]
+declare_only = ["ADSLOGSTR", "ADSLOGDINT", "ADSLOGLREAL", "GETCPUCOUNTER", "MEMCPY", "MEMMOVE", "MEMSET", "MEMCMP", "DRAND", "FB_FileOpen", "FB_FileClose", "FB_FileWrite", "FB_FileRead", "FB_FilePuts", "FB_FileGets", "FB_FileDelete", "FB_CreateDir", "ADSREAD", "ADSWRITE", "F_GetSystemTime"]
 references = [
   "https://infosys.beckhoff.com/content/1033/tcplclib_tc2_system/31084171.html (global constants)",
   "https://infosys.beckhoff.com/content/1033/tcplclib_tc2_system/31062795.html (T_MaxString)",
@@ -28,4 +28,5 @@ references = [
   "https://infosys.beckhoff.com/content/1033/tcplclib_tc2_system/31042699.html (MEMSET)",
   "https://infosys.beckhoff.com/content/1033/tcplclib_tc2_system/31039627.html (MEMCMP)",
   "https://infosys.beckhoff.com/content/1033/tcplclib_tc2_system/30956427.html (DRAND)",
+  "https://download.beckhoff.com/download/Document/automation/twincat3/TwinCAT_3_PLC_Lib_Tc2_System_EN.pdf (TE1000 Tc2_System manual 1.17.3: file function blocks, FOPEN_MODE constants, E_OpenPath, ADSREAD, ADSWRITE, F_GetSystemTime, F_CreateAmsNetId)",
 ]

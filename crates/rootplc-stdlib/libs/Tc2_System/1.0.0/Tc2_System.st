@@ -205,3 +205,214 @@ VAR_OUTPUT
     Num : LREAL;
 END_VAR
 END_FUNCTION_BLOCK
+
+(* File access (TwinCAT system service) and ADS: declared only. *)
+VAR_GLOBAL CONSTANT
+    FOPEN_MODEREAD : DWORD := 16#0001;
+    FOPEN_MODEWRITE : DWORD := 16#0002;
+    FOPEN_MODEAPPEND : DWORD := 16#0004;
+    FOPEN_MODEPLUS : DWORD := 16#0008;
+    FOPEN_MODEBINARY : DWORD := 16#0010;
+    FOPEN_MODETEXT : DWORD := 16#0020;
+END_VAR
+
+TYPE
+    E_OpenPath : (
+        PATH_GENERIC := 1,
+        PATH_BOOTPRJ,
+        PATH_BOOTDATA,
+        PATH_BOOTPATH,
+        PATH_USERPATH1 := 11,
+        PATH_USERPATH2,
+        PATH_USERPATH3,
+        PATH_USERPATH4,
+        PATH_USERPATH5,
+        PATH_USERPATH6,
+        PATH_USERPATH7,
+        PATH_USERPATH8,
+        PATH_USERPATH9
+    );
+END_TYPE
+
+FUNCTION_BLOCK FB_FileOpen
+VAR_INPUT
+    sNetId : T_AmsNetId;
+    sPathName : T_MaxString;
+    nMode : DWORD;
+    ePath : E_OpenPath := E_OpenPath#PATH_GENERIC;
+    bExecute : BOOL;
+    tTimeout : TIME := DEFAULT_ADS_TIMEOUT;
+END_VAR
+VAR_OUTPUT
+    bBusy : BOOL;
+    bError : BOOL;
+    nErrId : UDINT;
+    hFile : UINT;
+END_VAR
+END_FUNCTION_BLOCK
+
+FUNCTION_BLOCK FB_FileClose
+VAR_INPUT
+    sNetId : T_AmsNetId;
+    hFile : UINT;
+    bExecute : BOOL;
+    tTimeout : TIME := DEFAULT_ADS_TIMEOUT;
+END_VAR
+VAR_OUTPUT
+    bBusy : BOOL;
+    bError : BOOL;
+    nErrId : UDINT;
+END_VAR
+END_FUNCTION_BLOCK
+
+FUNCTION_BLOCK FB_FileWrite
+VAR_INPUT
+    sNetId : T_AmsNetId;
+    hFile : UINT;
+    pWriteBuff : PVOID;
+    cbWriteLen : UDINT;
+    bExecute : BOOL;
+    tTimeout : TIME := DEFAULT_ADS_TIMEOUT;
+END_VAR
+VAR_OUTPUT
+    bBusy : BOOL;
+    bError : BOOL;
+    nErrId : UDINT;
+    cbWrite : UDINT;
+END_VAR
+END_FUNCTION_BLOCK
+
+FUNCTION_BLOCK FB_FileRead
+VAR_INPUT
+    sNetId : T_AmsNetId;
+    hFile : UINT;
+    pReadBuff : PVOID;
+    cbReadLen : UDINT;
+    bExecute : BOOL;
+    tTimeout : TIME := DEFAULT_ADS_TIMEOUT;
+END_VAR
+VAR_OUTPUT
+    bBusy : BOOL;
+    bError : BOOL;
+    nErrId : UDINT;
+    cbRead : UDINT;
+    bEOF : BOOL;
+END_VAR
+END_FUNCTION_BLOCK
+
+FUNCTION_BLOCK FB_FilePuts
+VAR_INPUT
+    sNetId : T_AmsNetId;
+    hFile : UINT;
+    sLine : T_MaxString;
+    bExecute : BOOL;
+    tTimeout : TIME := DEFAULT_ADS_TIMEOUT;
+END_VAR
+VAR_OUTPUT
+    bBusy : BOOL;
+    bError : BOOL;
+    nErrId : UDINT;
+END_VAR
+END_FUNCTION_BLOCK
+
+FUNCTION_BLOCK FB_FileGets
+VAR_INPUT
+    sNetId : T_AmsNetId;
+    hFile : UINT;
+    bExecute : BOOL;
+    tTimeout : TIME := DEFAULT_ADS_TIMEOUT;
+END_VAR
+VAR_OUTPUT
+    bBusy : BOOL;
+    bError : BOOL;
+    nErrId : UDINT;
+    sLine : T_MaxString;
+    bEOF : BOOL;
+END_VAR
+END_FUNCTION_BLOCK
+
+FUNCTION_BLOCK FB_FileDelete
+VAR_INPUT
+    sNetId : T_AmsNetId;
+    sPathName : T_MaxString;
+    ePath : E_OpenPath := E_OpenPath#PATH_GENERIC;
+    bExecute : BOOL;
+    tTimeout : TIME := DEFAULT_ADS_TIMEOUT;
+END_VAR
+VAR_OUTPUT
+    bBusy : BOOL;
+    bError : BOOL;
+    nErrId : UDINT;
+END_VAR
+END_FUNCTION_BLOCK
+
+FUNCTION_BLOCK FB_CreateDir
+VAR_INPUT
+    sNetId : T_AmsNetId;
+    sPathName : T_MaxString;
+    ePath : E_OpenPath := E_OpenPath#PATH_GENERIC;
+    bExecute : BOOL;
+    tTimeout : TIME := DEFAULT_ADS_TIMEOUT;
+END_VAR
+VAR_OUTPUT
+    bBusy : BOOL;
+    bError : BOOL;
+    nErrId : UDINT;
+END_VAR
+END_FUNCTION_BLOCK
+
+FUNCTION_BLOCK ADSREAD
+VAR_INPUT
+    NETID : T_AmsNetId;
+    PORT : T_AmsPort;
+    IDXGRP : UDINT;
+    IDXOFFS : UDINT;
+    LEN : UDINT;
+    DESTADDR : PVOID;
+    READ : BOOL;
+    TMOUT : TIME := DEFAULT_ADS_TIMEOUT;
+END_VAR
+VAR_OUTPUT
+    BUSY : BOOL;
+    ERR : BOOL;
+    ERRID : UDINT;
+END_VAR
+END_FUNCTION_BLOCK
+
+FUNCTION_BLOCK ADSWRITE
+VAR_INPUT
+    NETID : T_AmsNetId;
+    PORT : T_AmsPort;
+    IDXGRP : UDINT;
+    IDXOFFS : UDINT;
+    LEN : UDINT;
+    SRCADDR : PVOID;
+    WRITE : BOOL;
+    TMOUT : TIME := DEFAULT_ADS_TIMEOUT;
+END_VAR
+VAR_OUTPUT
+    BUSY : BOOL;
+    ERR : BOOL;
+    ERRID : UDINT;
+END_VAR
+END_FUNCTION_BLOCK
+
+(* Operating system timestamp, 100 ns units: declared only. *)
+FUNCTION F_GetSystemTime : ULINT
+END_FUNCTION
+
+(* '127.16.17.3.1.1' from the six bytes of an AMS NetID. *)
+FUNCTION F_CreateAmsNetId : T_AmsNetId
+VAR_INPUT
+    nIds : T_AmsNetIdArr;
+END_VAR
+VAR
+    i : INT;
+    s : T_AmsNetId;
+END_VAR
+s := BYTE_TO_STRING(nIds[0]);
+FOR i := 1 TO 5 DO
+    s := CONCAT(CONCAT(s, '.'), BYTE_TO_STRING(nIds[i]));
+END_FOR
+F_CreateAmsNetId := s;
+END_FUNCTION

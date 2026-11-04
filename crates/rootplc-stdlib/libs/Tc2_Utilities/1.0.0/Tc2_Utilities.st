@@ -886,3 +886,331 @@ ELSE
     __ROOTPLC_STARARG := UDINT_TO_INT(v);
 END_IF
 END_FUNCTION
+
+(* Time types and conversions (TIMESTRUCT, FILETIME, DT). FILETIME counts
+   100 ns since 1601-01-01; DT counts seconds since 1970-01-01. *)
+TYPE
+    T_FILETIME : STRUCT
+        dwLowDateTime : DWORD;
+        dwHighDateTime : DWORD;
+    END_STRUCT;
+    T_FILETIME64 : ULINT;
+    E_TimeZoneID : (
+        eTimeZoneID_Invalid := -1,
+        eTimeZoneID_Unknown := 0,
+        eTimeZoneID_Standard := 1,
+        eTimeZoneID_Daylight := 2
+    ) DINT;
+    ST_TimeZoneInformation : STRUCT
+        bias : DINT;
+        standardName : STRING[31];
+        standardDate : TIMESTRUCT;
+        standardBias : DINT;
+        daylightName : STRING[31];
+        daylightDate : TIMESTRUCT;
+        daylightBias : DINT;
+    END_STRUCT;
+END_TYPE
+
+(* Days since 1970-01-01 of a civil date (proleptic Gregorian). *)
+FUNCTION __ROOTPLC_DAYS : LINT
+VAR_INPUT
+    y, m, d : LINT;
+END_VAR
+VAR
+    era, yoe, doy, doe, mm : LINT;
+END_VAR
+IF m <= 2 THEN
+    y := y - 1;
+    mm := m + 9;
+ELSE
+    mm := m - 3;
+END_IF
+era := y / 400;
+yoe := y - era * 400;
+doy := (153 * mm + 2) / 5 + d - 1;
+doe := yoe * 365 + yoe / 4 - yoe / 100 + doy;
+__ROOTPLC_DAYS := era * 146097 + doe - 719468;
+END_FUNCTION
+
+(* The civil date and time of a number of milliseconds since 1970-01-01. *)
+FUNCTION __ROOTPLC_TIMESTRUCT : TIMESTRUCT
+VAR_INPUT
+    ms : LINT;
+END_VAR
+VAR
+    z, sod, era, doe, yoe, y, doy, mp, d, m : LINT;
+END_VAR
+z := ms / 86400000;
+sod := ms - z * 86400000;
+IF sod < 0 THEN
+    sod := sod + 86400000;
+    z := z - 1;
+END_IF
+__ROOTPLC_TIMESTRUCT.wDayOfWeek := LINT_TO_WORD(((z MOD 7) + 11) MOD 7);
+z := z + 719468;
+era := z / 146097;
+doe := z - era * 146097;
+yoe := (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+y := yoe + era * 400;
+doy := doe - (365 * yoe + yoe / 4 - yoe / 100);
+mp := (5 * doy + 2) / 153;
+d := doy - (153 * mp + 2) / 5 + 1;
+IF mp < 10 THEN
+    m := mp + 3;
+ELSE
+    m := mp - 9;
+END_IF
+IF m <= 2 THEN
+    y := y + 1;
+END_IF
+__ROOTPLC_TIMESTRUCT.wYear := LINT_TO_WORD(y);
+__ROOTPLC_TIMESTRUCT.wMonth := LINT_TO_WORD(m);
+__ROOTPLC_TIMESTRUCT.wDay := LINT_TO_WORD(d);
+__ROOTPLC_TIMESTRUCT.wHour := LINT_TO_WORD(sod / 3600000);
+__ROOTPLC_TIMESTRUCT.wMinute := LINT_TO_WORD((sod / 60000) MOD 60);
+__ROOTPLC_TIMESTRUCT.wSecond := LINT_TO_WORD((sod / 1000) MOD 60);
+__ROOTPLC_TIMESTRUCT.wMilliseconds := LINT_TO_WORD(sod MOD 1000);
+END_FUNCTION
+
+(* Milliseconds since 1970-01-01 of a TIMESTRUCT (wDayOfWeek ignored). *)
+FUNCTION __ROOTPLC_MILLIS : LINT
+VAR_INPUT
+    t : TIMESTRUCT;
+END_VAR
+__ROOTPLC_MILLIS := __ROOTPLC_DAYS(WORD_TO_LINT(t.wYear), WORD_TO_LINT(t.wMonth), WORD_TO_LINT(t.wDay)) * 86400000
+    + WORD_TO_LINT(t.wHour) * 3600000 + WORD_TO_LINT(t.wMinute) * 60000
+    + WORD_TO_LINT(t.wSecond) * 1000 + WORD_TO_LINT(t.wMilliseconds);
+END_FUNCTION
+
+FUNCTION DT_TO_SYSTEMTIME : TIMESTRUCT
+VAR_INPUT
+    DTIN : DT;
+END_VAR
+DT_TO_SYSTEMTIME := __ROOTPLC_TIMESTRUCT(DT_TO_LINT(DTIN) * 1000);
+END_FUNCTION
+
+(* Milliseconds are rounded to the nearest second. *)
+FUNCTION SYSTEMTIME_TO_DT : DT
+VAR_INPUT
+    TIMESTR : TIMESTRUCT;
+END_VAR
+SYSTEMTIME_TO_DT := LINT_TO_DT((__ROOTPLC_MILLIS(TIMESTR) + 500) / 1000);
+END_FUNCTION
+
+(* 1601-01-01 is 11644473600 s before 1970-01-01. The conversion fails
+   (all members zero) if the most significant bit is set. *)
+FUNCTION FILETIME64_TO_SYSTEMTIME : TIMESTRUCT
+VAR_INPUT
+    fileTime : T_FILETIME64;
+END_VAR
+IF fileTime >= ULINT#16#8000000000000000 THEN
+    RETURN;
+END_IF
+FILETIME64_TO_SYSTEMTIME := __ROOTPLC_TIMESTRUCT(ULINT_TO_LINT(fileTime / 10000) - 11644473600000);
+END_FUNCTION
+
+FUNCTION SYSTEMTIME_TO_FILETIME64 : T_FILETIME64
+VAR_INPUT
+    systemTime : TIMESTRUCT;
+END_VAR
+SYSTEMTIME_TO_FILETIME64 := LINT_TO_ULINT(__ROOTPLC_MILLIS(systemTime) + 11644473600000) * 10000;
+END_FUNCTION
+
+FUNCTION SYSTEMTIME_TO_FILETIME : T_FILETIME
+VAR_INPUT
+    systemTime : TIMESTRUCT;
+END_VAR
+VAR
+    ft : ULINT;
+END_VAR
+ft := SYSTEMTIME_TO_FILETIME64(systemTime);
+SYSTEMTIME_TO_FILETIME.dwLowDateTime := ULINT_TO_DWORD(ft MOD 4294967296);
+SYSTEMTIME_TO_FILETIME.dwHighDateTime := ULINT_TO_DWORD(ft / 4294967296);
+END_FUNCTION
+
+(* 'YYYY-MM-DD-hh:mm:ss.xxx' *)
+FUNCTION SYSTEMTIME_TO_STRING : STRING[24]
+VAR_INPUT
+    in : TIMESTRUCT;
+END_VAR
+VAR
+    s : STRING[24];
+END_VAR
+s := CONCAT(__ROOTPLC_DIGITS(WORD_TO_ULINT(in.wYear), 10, FALSE, 4), '-');
+s := CONCAT(CONCAT(s, __ROOTPLC_DIGITS(WORD_TO_ULINT(in.wMonth), 10, FALSE, 2)), '-');
+s := CONCAT(CONCAT(s, __ROOTPLC_DIGITS(WORD_TO_ULINT(in.wDay), 10, FALSE, 2)), '-');
+s := CONCAT(CONCAT(s, __ROOTPLC_DIGITS(WORD_TO_ULINT(in.wHour), 10, FALSE, 2)), ':');
+s := CONCAT(CONCAT(s, __ROOTPLC_DIGITS(WORD_TO_ULINT(in.wMinute), 10, FALSE, 2)), ':');
+s := CONCAT(CONCAT(s, __ROOTPLC_DIGITS(WORD_TO_ULINT(in.wSecond), 10, FALSE, 2)), '.');
+SYSTEMTIME_TO_STRING := CONCAT(s, __ROOTPLC_DIGITS(WORD_TO_ULINT(in.wMilliseconds), 10, FALSE, 3));
+END_FUNCTION
+
+(* [-]dddd.dddd with iPrecision decimals, rounded if bRound, else cut. *)
+FUNCTION LREAL_TO_FMTSTR : STRING[510]
+VAR_INPUT
+    in : LREAL;
+    iPrecision : INT;
+    bRound : BOOL;
+END_VAR
+VAR
+    sign : STRING[1];
+    body : T_MaxString;
+    v, scale : LREAL;
+    i : INT;
+END_VAR
+IF in <> in THEN
+    LREAL_TO_FMTSTR := '#QNAN';
+    RETURN;
+END_IF
+IF in < 0.0 THEN
+    sign := '-';
+ELSE
+    sign := '';
+END_IF
+IF ABS(in) > 1.7976931348623157E308 THEN
+    LREAL_TO_FMTSTR := CONCAT(sign, '#INF');
+    RETURN;
+END_IF
+v := ABS(in);
+IF NOT bRound THEN
+    (* cut after iPrecision decimals: round down at that place *)
+    scale := 1.0;
+    FOR i := 1 TO iPrecision DO
+        scale := scale * 10.0;
+    END_FOR
+    IF v * scale < 9.0E18 THEN
+        v := ULINT_TO_LREAL(LREAL_TO_ULINT(v * scale - 0.5)) / scale;
+        IF v < 0.0 THEN
+            v := 0.0;
+        END_IF
+    END_IF
+END_IF
+body := __ROOTPLC_FIXED(v, MAX(iPrecision, 0));
+IF body = '' THEN
+    LREAL_TO_FMTSTR := CONCAT(sign, '#OVF');
+ELSIF v = 0.0 THEN
+    LREAL_TO_FMTSTR := body;
+ELSE
+    LREAL_TO_FMTSTR := CONCAT(sign, body);
+END_IF
+END_FUNCTION
+
+(* String lengths and copies through pointers. *)
+FUNCTION LEN2 : UDINT
+VAR_INPUT
+    pSTRING : POINTER TO STRING;
+END_VAR
+IF pSTRING <> 0 THEN
+    LEN2 := INT_TO_UDINT(LEN(pSTRING^));
+END_IF
+END_FUNCTION
+
+FUNCTION WLEN2 : UDINT
+VAR_INPUT
+    pWSTRING : POINTER TO WSTRING;
+END_VAR
+IF pWSTRING <> 0 THEN
+    WLEN2 := INT_TO_UDINT(LEN(pWSTRING^));
+END_IF
+END_FUNCTION
+
+(* TRUE if the whole string fitted into nDstSize bytes (with the null). *)
+FUNCTION STRNCPY : BOOL
+VAR_INPUT
+    pDst : POINTER TO STRING;
+    pSrc : POINTER TO STRING;
+    nDstSize : UDINT;
+END_VAR
+VAR_OUTPUT
+    nSrcLen : UDINT;
+    nDstLen : UDINT;
+END_VAR
+IF pDst = 0 OR pSrc = 0 OR nDstSize = 0 THEN
+    RETURN;
+END_IF
+nSrcLen := INT_TO_UDINT(LEN(pSrc^));
+nDstLen := MIN(nSrcLen, nDstSize - 1);
+pDst^ := LEFT(pSrc^, UDINT_TO_INT(nDstLen));
+STRNCPY := nDstLen = nSrcLen;
+END_FUNCTION
+
+FUNCTION WSTRING_TO_STRING2 : BOOL
+VAR_INPUT
+    pDstString : POINTER TO STRING;
+    pSrcWString : POINTER TO WSTRING;
+    nDstSize : UDINT;
+END_VAR
+VAR
+    s : T_MaxString;
+END_VAR
+IF pDstString = 0 OR pSrcWString = 0 OR nDstSize = 0 THEN
+    RETURN;
+END_IF
+s := WSTRING_TO_STRING(pSrcWString^);
+pDstString^ := LEFT(s, UDINT_TO_INT(MIN(INT_TO_UDINT(LEN(s)), nDstSize - 1)));
+WSTRING_TO_STRING2 := INT_TO_UDINT(LEN(s)) <= nDstSize - 1;
+END_FUNCTION
+
+(* Blocks that read the operating system (clock, time zone) or manage raw
+   memory: declared only. *)
+FUNCTION_BLOCK FB_LocalSystemTime
+VAR_INPUT
+    sNetID : T_AmsNetId := '';
+    bEnable : BOOL;
+    dwCycle : DWORD := 5;
+    dwOpt : DWORD := 1;
+    tTimeout : TIME := DEFAULT_ADS_TIMEOUT;
+END_VAR
+VAR_OUTPUT
+    bValid : BOOL;
+    systemTime : TIMESTRUCT;
+    tzID : E_TimeZoneID := E_TimeZoneID#eTimeZoneID_Invalid;
+END_VAR
+END_FUNCTION_BLOCK
+
+FUNCTION_BLOCK NT_GetTime
+VAR_INPUT
+    NETID : T_AmsNetId;
+    START : BOOL;
+    TMOUT : TIME := DEFAULT_ADS_TIMEOUT;
+END_VAR
+VAR_OUTPUT
+    BUSY : BOOL;
+    ERR : BOOL;
+    ERRID : UDINT;
+    TIMESTR : TIMESTRUCT;
+END_VAR
+END_FUNCTION_BLOCK
+
+FUNCTION_BLOCK FB_GetTimeZoneInformation
+VAR_INPUT
+    sNetID : T_AmsNetId;
+    bExecute : BOOL;
+    tTimeout : TIME := DEFAULT_ADS_TIMEOUT;
+END_VAR
+VAR_OUTPUT
+    bBusy : BOOL;
+    bError : BOOL;
+    nErrID : UDINT;
+    tzID : E_TimeZoneID;
+    tzInfo : ST_TimeZoneInformation;
+END_VAR
+END_FUNCTION_BLOCK
+
+FUNCTION_BLOCK FB_MemRingBuffer
+VAR_INPUT
+    pWrite : POINTER TO BYTE;
+    cbWrite : UDINT;
+    pRead : POINTER TO BYTE;
+    cbRead : UDINT;
+    pBuffer : POINTER TO BYTE;
+    cbBuffer : UDINT;
+END_VAR
+VAR_OUTPUT
+    bOk : BOOL;
+    nCount : UDINT;
+    cbSize : UDINT;
+    cbReturn : UDINT;
+END_VAR
+END_FUNCTION_BLOCK
