@@ -1599,6 +1599,8 @@ impl<'a> Checker<'a> {
                     // NULL, or the TwinCAT idiom 0, clears the reference
                     Ty::Null => return v.ir(),
                     Ty::IntLit if v.k == Some(K::Int(0)) => {
+                        let msg = "0 used as an interface reference; IEC 61131-3 writes NULL";
+                        self.diag(codes::INTEGER_AS_BOOL_OR_NULL, msg.into(), v.span, None);
                         return ir::Expr {
                             ty: Ty::Null,
                             kind: ExprKind::Null,
@@ -3389,7 +3391,11 @@ impl<'a> Checker<'a> {
                         true
                     }
                     // the TwinCAT idiom 0 for an empty interface reference
-                    Ty::Named(_) if self.is_itf(&tb) && v.k == Some(K::Int(0)) => true,
+                    Ty::Named(_) if self.is_itf(&tb) && v.k == Some(K::Int(0)) => {
+                        let msg = "0 used as an interface reference; IEC 61131-3 writes NULL";
+                        self.diag(codes::INTEGER_AS_BOOL_OR_NULL, msg.into(), v.span, None);
+                        true
+                    }
                     // [types.derived.enum.integer]: a constant stored in an enumeration
                     Ty::Named(i) if self.is_enum(&tb) => {
                         let listed = matches!(&self.defs[*i].kind, Kind::Enum(vals)
@@ -4008,6 +4014,12 @@ impl<'a> Checker<'a> {
                 me.is_itf(&t) || t == Ty::Null || (t == Ty::IntLit && v.k == Some(K::Int(0)))
             };
             if other_ok(&l, self) && other_ok(&r, self) {
+                for v in [&l, &r] {
+                    if self.strip(&v.ty) == Ty::IntLit {
+                        let msg = "0 compared with an interface reference; IEC 61131-3 writes NULL";
+                        self.diag(codes::INTEGER_AS_BOOL_OR_NULL, msg.into(), v.span, None);
+                    }
+                }
                 let opty = if self.is_itf(&self.strip(&l.ty)) {
                     l.ty.clone()
                 } else {

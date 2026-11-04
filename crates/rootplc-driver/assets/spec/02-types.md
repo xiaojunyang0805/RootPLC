@@ -185,7 +185,8 @@ these stay RP0103, except that a constant equal to one of the type's values
 may be assigned. The value is not checked against the enumeration's values.
 
 **[types.derived.struct]** `STRUCT ... END_STRUCT` declares members with
-optional initial values. A structure that contains itself, directly or
+optional initial values; IEC 61131-3 requires at least one member, and an
+empty structure (CODESYS, TwinCAT) is warning RP0134 ([scope.vendor-forms]). A structure that contains itself, directly or
 through other structures or arrays, is error RP0107. (`REF_TO` to itself is
 allowed.) `TYPE B EXTENDS A : STRUCT … END_STRUCT` (CODESYS and TwinCAT, warning
 RP0134 ([scope.vendor-forms])) gives

@@ -1,5 +1,5 @@
-(* spec: [pous.oop.property]
-   expect: ok
+(* spec: [pous.oop.property] [scope.vendor-forms]
+   expect: warning RP0134
    run: PRG_Main cycles=1
    assert: v = 2.5 *)
 FUNCTION_BLOCK FB_Control

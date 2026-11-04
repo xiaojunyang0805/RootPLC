@@ -1,5 +1,5 @@
-(* spec: [pous.oop.property]
-   expect: ok *)
+(* spec: [pous.oop.property] [scope.vendor-forms]
+   expect: warning RP0134 *)
 FUNCTION_BLOCK FB_Valve
 VAR
     pos : INT;

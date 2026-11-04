@@ -152,13 +152,13 @@ Assigning or passing an instance of a block that provides the interface
 stores a reference to it; an instance of another block is RP0103. `NULL` and
 the TwinCAT idiom `0` clear the reference, also as an initial value or a
 parameter default; `=` and `<>` compare references
-with each other, with `NULL` and with `0`. `itf.M(args)` calls the method of
+with each other, with `NULL` and with `0`; the `0` is warning RP0127. `itf.M(args)` calls the method of
 the referenced instance's own block (dynamic dispatch); through a NULL
 reference it is the fault `NULL_REF`. Passing `THIS^` hands out a reference
 to the current instance.
 
 **[pous.oop.property]** A property is a value with access methods (a CODESYS
-and TwinCAT extension):
+and TwinCAT extension, warning RP0134 ([scope.vendor-forms])):
 
 ```
 property = 'PROPERTY' { modifier } name ':' type_spec { var_section }

@@ -1,5 +1,5 @@
-(* spec: [pous.oop.interface]
-   expect: ok *)
+(* spec: [pous.oop.interface] [scope.vendor-forms]
+   expect: warning RP0134 *)
 INTERFACE I_Base
 METHOD Reset
 END_METHOD

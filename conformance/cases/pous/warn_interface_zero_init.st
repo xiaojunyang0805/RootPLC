@@ -1,5 +1,5 @@
-(* spec: [pous.oop.interface-ref]
-   expect: ok
+(* spec: [pous.oop.interface-ref] [scope.vendor-forms]
+   expect: warning RP0127
    run: PRG_Main cycles=1
    assert: a = TRUE
    assert: b = TRUE

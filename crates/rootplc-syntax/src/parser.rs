@@ -883,6 +883,12 @@ impl<'a> Parser<'a> {
     fn property(&mut self) {
         self.b.start(N::Property);
         let open_span = self.span_here();
+        // [pous.oop.property]: not part of IEC 61131-3
+        self.error(
+            codes::VENDOR_SYNTAX,
+            "PROPERTY is a CODESYS / TwinCAT construct; IEC 61131-3 uses methods".into(),
+            open_span,
+        );
         while self.at_modifier() {
             self.bump();
         }
@@ -1286,6 +1292,15 @@ impl<'a> Parser<'a> {
             ("STRUCT", "END_STRUCT")
         };
         self.bump(); // STRUCT or UNION
+        if self.at_word(close) {
+            // [types.derived.struct]: IEC 61131-3 declares at least one member
+            let sp = self.span_here();
+            self.error(
+                codes::VENDOR_SYNTAX,
+                format!("an empty {open} is a CODESYS / TwinCAT form; IEC 61131-3 declares at least one member"),
+                sp,
+            );
+        }
         while !self.at_eof() && !self.at_word(close) && !self.at_any_kw(&["END_TYPE"]) {
             let before = self.pos;
             self.var_decl();

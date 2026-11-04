@@ -26,7 +26,7 @@ VAR
     listener : FB_Listener;
     entry : TcEventEntry;
     src, other : FB_TcSourceInfo;
-    ipSrc : I_TcSourceInfo := 0;
+    ipSrc : I_TcSourceInfo := NULL;
     hr : HRESULT;
     ok, same : BOOL;
     n : UDINT;

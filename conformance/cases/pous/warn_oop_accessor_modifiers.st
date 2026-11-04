@@ -1,5 +1,5 @@
-(* spec: [pous.oop.modifiers]
-   expect: ok
+(* spec: [pous.oop.modifiers] [scope.vendor-forms]
+   expect: warning RP0134
    run: PRG_Main cycles=1
    assert: x = 9 *)
 FUNCTION_BLOCK FB_Store

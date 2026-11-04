@@ -511,7 +511,8 @@ error: structure contains itself
 Rule `types.derived.struct` in `spec/02-types.md`:
 
 **[types.derived.struct]** `STRUCT ... END_STRUCT` declares members with
-optional initial values. A structure that contains itself, directly or
+optional initial values; IEC 61131-3 requires at least one member, and an
+empty structure (CODESYS, TwinCAT) is warning RP0134 ([scope.vendor-forms]). A structure that contains itself, directly or
 through other structures or arrays, is error RP0107. (`REF_TO` to itself is
 allowed.) `TYPE B EXTENDS A : STRUCT … END_STRUCT` (CODESYS and TwinCAT, warning
 RP0134 ([scope.vendor-forms])) gives
