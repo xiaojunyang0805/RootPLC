@@ -175,7 +175,9 @@ interface property without GET or SET requires a GET part.
 **[pous.call.callee]** Only a function, a function block instance, a
 program, a method or an action can be called. Calling anything else, for
 example a variable of an elementary type (`b(1)` with `b : BOOL`), is error
-RP0132.
+RP0132. A variable that cannot be called does not hide a function of the
+same name: `F(x)` calls the function `F` even where a variable `F` is
+visible (OSCAT relies on this).
 
 **[pous.call.in-out]** A `VAR_IN_OUT` parameter refers to the caller's
 variable: changes made by the called function or function block are visible

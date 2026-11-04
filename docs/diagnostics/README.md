@@ -326,7 +326,9 @@ Rule `pous.call.callee` in `spec/04-pous.md`:
 **[pous.call.callee]** Only a function, a function block instance, a
 program, a method or an action can be called. Calling anything else, for
 example a variable of an elementary type (`b(1)` with `b : BOOL`), is error
-RP0132.
+RP0132. A variable that cannot be called does not hide a function of the
+same name: `F(x)` calls the function `F` even where a variable `F` is
+visible (OSCAT relies on this).
 
 ## RP0301
 

@@ -2608,7 +2608,7 @@ impl<'a> Checker<'a> {
 
     /// An array initializer element `n(v)` / `n()`: the count and the value
     /// expression ([variables.initializer]).
-    fn repeated_element(&self, c: &'a Node) -> Option<(usize, Option<&'a Node>)> {
+    fn repeated_element(&mut self, c: &'a Node) -> Option<(usize, Option<&'a Node>)> {
         let e = self.first_node(c)?;
         if e.kind != N::CallExpr {
             return None;
@@ -2619,16 +2619,25 @@ impl<'a> Checker<'a> {
         else {
             return None;
         };
-        if callee.kind != N::Literal {
-            return None;
-        }
-        let Some(Item::Tok(t)) = self.items(callee).first().copied() else {
-            return None;
+        // the count: an integer literal, or a constant expression such as
+        // SIZEOF(buffer) (TwinCAT); never a name, which would be a call
+        let count = match callee.kind {
+            N::Literal => {
+                let Some(Item::Tok(t)) = self.items(callee).first().copied() else {
+                    return None;
+                };
+                if self.tkind(t) != T::Integer {
+                    return None;
+                }
+                literal::parse_int(self.text(t))?
+            }
+            N::NameRef | N::MemberExpr => return None,
+            _ => match self.expr(callee).k {
+                Some(K::Int(n)) => n,
+                _ => return None,
+            },
         };
-        if self.tkind(t) != T::Integer {
-            return None;
-        }
-        let count = usize::try_from(literal::parse_int(self.text(t))?).ok()?;
+        let count = usize::try_from(count).ok()?;
         let args = self.args(list);
         match args.as_slice() {
             [] => Some((count, None)),
@@ -4431,6 +4440,20 @@ impl<'a> Checker<'a> {
     fn call_named(&mut self, i: usize, args: &[Arg<'a>], span: Span) -> V {
         let name = self.text(i);
         let cspan = self.tok_span(i);
+        // a variable that cannot be called does not hide a function of the
+        // same name (OSCAT: DAY_OF_MONTH the function and a member)
+        let function = self.types.get(&name.to_ascii_lowercase()).copied().filter(
+            |&id| matches!(&self.defs[id].kind, Kind::Pou(p) if p.kind == PouKind::Function),
+        );
+        let callable = |me: &Self, t: &Ty| {
+            matches!(me.strip(t), Ty::Named(id) if matches!(me.defs[id].kind, Kind::Pou(_)))
+                || matches!(me.strip(t), Ty::Ref(ref r) if matches!(me.strip(r), Ty::Named(id) if matches!(me.defs[id].kind, Kind::Pou(_))))
+        };
+        if let (Some(id), Some((t, _))) = (function, self.lookup_var(name)) {
+            if !callable(self, &t) {
+                return self.bind_call(V::of(Ty::Named(id), cspan), args, span, None);
+            }
+        }
         // [types.reference.alias]: a REFERENCE TO an instance calls the instance
         if let Some((t, slot)) = self.lookup_var(name) {
             let v = V::with(t, cspan, ExprKind::Var(slot));

@@ -7,10 +7,12 @@
    assert: a[4] = 2
    assert: a[5] = 0
    assert: d[2] = 0
-   assert: d[3] = 9 *)
+   assert: d[3] = 9
+   assert: e[2] = 5 *)
 PROGRAM PRG_Main
 VAR
     a : ARRAY[0..5] OF INT := [1, 3(7), 2];   (* 3(7): three elements of 7 *)
     d : ARRAY[0..3] OF INT := [1, 2(), 9];    (* 2(): two defaults *)
+    e : ARRAY[0..2] OF INT := [(1 + 2)(5)];   (* a constant expression as count *)
 END_VAR
 END_PROGRAM

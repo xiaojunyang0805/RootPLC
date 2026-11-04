@@ -810,7 +810,9 @@ Rule `pous.call.callee` in `spec/04-pous.md`:
 **[pous.call.callee]** Only a function, a function block instance, a
 program, a method or an action can be called. Calling anything else, for
 example a variable of an elementary type (`b(1)` with `b : BOOL`), is error
-RP0132.
+RP0132. A variable that cannot be called does not hide a function of the
+same name: `F(x)` calls the function `F` even where a variable `F` is
+visible (OSCAT relies on this).
 
 ## RP0301
 
@@ -1844,12 +1846,13 @@ initializer  = expression
              | '[' element { ',' element } ']'                            (* array *)
              | '(' name ':=' initializer { ',' name ':=' initializer } ')' (* structure *)
              | '(' ')'                                                    (* defaults *)
-element      = initializer | integer '(' [ expression ] ')'               (* repeated *)
+element      = initializer | count '(' [ expression ] ')'                 (* repeated *)
 ```
 
 In an array initializer `n(v)` stands for `n` elements of value `v`, and
 `n()` for `n` elements with their default: `[1, 3(7), 2]` is
-`[1, 7, 7, 7, 2]`.
+`[1, 7, 7, 7, 2]`. The count may also be a constant expression in
+parentheses or a call such as `SIZEOF(buffer)` (TwinCAT).
 
 A structure initializer may also set the variables of a function-block
 instance, `t : TON := (PT := T#1S);` (CODESYS and TwinCAT), and `()` keeps
@@ -2071,7 +2074,9 @@ interface property without GET or SET requires a GET part.
 **[pous.call.callee]** Only a function, a function block instance, a
 program, a method or an action can be called. Calling anything else, for
 example a variable of an elementary type (`b(1)` with `b : BOOL`), is error
-RP0132.
+RP0132. A variable that cannot be called does not hide a function of the
+same name: `F(x)` calls the function `F` even where a variable `F` is
+visible (OSCAT relies on this).
 
 **[pous.call.in-out]** A `VAR_IN_OUT` parameter refers to the caller's
 variable: changes made by the called function or function block are visible

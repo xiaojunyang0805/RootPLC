@@ -44,12 +44,13 @@ initializer  = expression
              | '[' element { ',' element } ']'                            (* array *)
              | '(' name ':=' initializer { ',' name ':=' initializer } ')' (* structure *)
              | '(' ')'                                                    (* defaults *)
-element      = initializer | integer '(' [ expression ] ')'               (* repeated *)
+element      = initializer | count '(' [ expression ] ')'                 (* repeated *)
 ```
 
 In an array initializer `n(v)` stands for `n` elements of value `v`, and
 `n()` for `n` elements with their default: `[1, 3(7), 2]` is
-`[1, 7, 7, 7, 2]`.
+`[1, 7, 7, 7, 2]`. The count may also be a constant expression in
+parentheses or a call such as `SIZEOF(buffer)` (TwinCAT).
 
 A structure initializer may also set the variables of a function-block
 instance, `t : TON := (PT := T#1S);` (CODESYS and TwinCAT), and `()` keeps
