@@ -3,7 +3,7 @@ VAR uut : PRG_Palletizer; i : INT; END_VAR
 FOR i := 1 TO 5 DO
     uut(box := TRUE);
     uut(box := FALSE);
-END_FOR
+END_FOR;
 uut(box := TRUE);
 ASSERT_TRUE(uut.layer_done);
 ASSERT_EQ(0, uut.boxes_in_layer);
@@ -17,7 +17,7 @@ VAR uut : PRG_Palletizer; i : INT; END_VAR
 FOR i := 1 TO 24 DO
     uut(box := TRUE);
     uut(box := FALSE);
-END_FOR
+END_FOR;
 ASSERT_TRUE(uut.pallet_done);
 ASSERT_EQ(4, uut.layers);
 uut(box := TRUE);

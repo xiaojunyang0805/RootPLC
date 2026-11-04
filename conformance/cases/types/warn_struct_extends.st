@@ -1,5 +1,5 @@
-(* spec: [types.derived.struct]
-   expect: ok
+(* spec: [types.derived.struct] [scope.vendor-forms]
+   expect: warning RP0134
    run: PRG_Main cycles=1
    assert: a = 5
    assert: b = 2 *)

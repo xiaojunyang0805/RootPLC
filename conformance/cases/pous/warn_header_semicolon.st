@@ -1,5 +1,5 @@
-(* spec: [pous.function-block]
-   expect: ok
+(* spec: [pous.function-block] [scope.vendor-forms]
+   expect: warning RP0134
    run: PRG_Main cycles=1
    assert: v = 7 *)
 FUNCTION Seven : INT;

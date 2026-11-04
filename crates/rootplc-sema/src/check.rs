@@ -2633,7 +2633,16 @@ impl<'a> Checker<'a> {
             }
             N::NameRef | N::MemberExpr => return None,
             _ => match self.expr(callee).k {
-                Some(K::Int(n)) => n,
+                Some(K::Int(n)) => {
+                    let span = self.span(callee);
+                    self.diag(
+                        codes::VENDOR_MEANING,
+                        "a constant expression as repetition count is a TwinCAT form; IEC 61131-3 writes an integer literal".into(),
+                        span,
+                        None,
+                    );
+                    n
+                }
                 _ => return None,
             },
         };

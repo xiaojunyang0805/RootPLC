@@ -561,7 +561,23 @@ impl<'a> Lexer<'a> {
         let body_start = self.pos;
         self.eat_while(accept);
         match validate(&self.src[body_start..self.pos]) {
-            Ok(()) => {}
+            Ok(()) => {
+                // [lexical.literal.date]: hh:mm without seconds (CODESYS / TwinCAT)
+                let body = &self.src[body_start..self.pos];
+                let time = match kind {
+                    TokenKind::TimeOfDay => Some(body),
+                    TokenKind::DateAndTime => body.splitn(4, '-').nth(3),
+                    _ => None,
+                };
+                if time.is_some_and(|t| t.matches(':').count() == 1) {
+                    self.diag(
+                        codes::VENDOR_LITERAL,
+                        "time of day without seconds is a CODESYS / TwinCAT form; IEC 61131-3 writes hh:mm:ss",
+                        start,
+                        self.pos,
+                    );
+                }
+            }
             Err(DateError::Malformed) => self.diag(
                 codes::MALFORMED_TIME_LITERAL,
                 "malformed date/time literal",

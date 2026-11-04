@@ -22,7 +22,7 @@ ELSE
         IF minutes >= 60 THEN
             minutes := 0;
             hours := hours + 1;
-        END_IF
-    END_IF
-END_IF
+        END_IF;
+    END_IF;
+END_IF;
 END_FUNCTION_BLOCK

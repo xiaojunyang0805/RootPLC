@@ -16,5 +16,5 @@ CASE s OF
         x := 2;
 ELSE
     x := 3;
-END_CASE
+END_CASE;
 END_PROGRAM

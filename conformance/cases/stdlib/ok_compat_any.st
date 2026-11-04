@@ -17,7 +17,7 @@ IF value.TypeClass = __SYSTEM.TYPE_CLASS.TYPE_INT THEN
     F_Describe := INT_TO_DINT(pI^) * 100 + value.diSize;
 ELSE
     F_Describe := -TO_DINT(value.TypeClass);
-END_IF
+END_IF;
 END_FUNCTION
 
 PROGRAM PRG_Main

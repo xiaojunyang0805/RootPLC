@@ -27,11 +27,11 @@ VAR
 END_VAR
 IF m = IDLE THEN           (* comparison: the other operand decides *)
     m := RUN;              (* assignment: the target decides *)
-END_IF
+END_IF;
 CASE m OF
     IDLE: n := 1;          (* CASE label: the selector decides *)
     RUN: n := 2;
-END_CASE
+END_CASE;
 d := OPEN;
 hit := F_Open(IDLE) = FALSE AND F_Open(d);   (* parameter decides *)
 END_PROGRAM

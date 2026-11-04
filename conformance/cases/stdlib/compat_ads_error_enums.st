@@ -14,7 +14,7 @@ IF n < 0 THEN
     F_Check := Tc2_System.E_HRESULTAdsErr.INVALIDPARM;
 ELSE
     F_Check := E_HRESULTAdsErr.HRESULT_ADS_NOERROR;
-END_IF
+END_IF;
 END_FUNCTION
 
 PROGRAM PRG_Main
@@ -29,10 +29,10 @@ hr := F_Check(-1);
 CASE hr OF
     E_HRESULTAdsErr.HRESULT_ADS_NOERROR: n := 1;
     E_HRESULTAdsErr.INVALIDPARM: n := 2;
-END_CASE
+END_CASE;
 e := E_AdsErr.DEVICE_NOMEMORY;
 IF e <> E_AdsErr.NOERR THEN
     code := e;
-END_IF
+END_IF;
 failed := hr < 0;
 END_PROGRAM

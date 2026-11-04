@@ -1,5 +1,5 @@
-(* spec: [config.external]
-   expect: ok
+(* spec: [config.external] [scope.vendor-forms]
+   expect: warning RP0134
    run: PRG_Main cycles=2
    assert: seen = 4 *)
 VAR_GLOBAL

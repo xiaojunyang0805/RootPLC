@@ -9,6 +9,6 @@ MaxIndex := 1;
 FOR i := 2 TO 8 DO
     IF values[i] > values[MaxIndex] THEN
         MaxIndex := i;
-    END_IF
-END_FOR
+    END_IF;
+END_FOR;
 END_FUNCTION

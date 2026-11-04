@@ -49,7 +49,7 @@ IF send THEN
     hr := fbMsg.Send(0);
     IF fbAlarm.bRaised THEN
         hr := fbAlarm.Clear(0, FALSE);
-    END_IF
+    END_IF;
     hr := listener.Execute();
-END_IF
+END_IF;
 END_PROGRAM

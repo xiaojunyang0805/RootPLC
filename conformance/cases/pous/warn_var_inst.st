@@ -1,5 +1,5 @@
-(* spec: [pous.oop.method]
-   expect: ok
+(* spec: [pous.oop.method] [scope.vendor-forms]
+   expect: warning RP0134
    run: PRG_Main cycles=3
    assert: a = 3
    assert: b = 3 *)

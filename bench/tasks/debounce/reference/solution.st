@@ -12,5 +12,5 @@ END_VAR
 t(IN := raw <> out, PT := delay);
 IF t.Q THEN
     out := raw;
-END_IF
+END_IF;
 END_FUNCTION_BLOCK

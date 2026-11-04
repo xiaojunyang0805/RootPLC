@@ -5,6 +5,14 @@ RootPLC is built by agents from the first line of code. Follow these rules.
 ## Ground truth
 - `spec/` defines the language. When code and spec disagree, the spec wins.
   If the spec is wrong, fix it first in a separate commit.
+- IEC 61131-3 ed.3 is the reference behind the spec ([scope.iec]). Decide
+  from the standard's text, never from what CODESYS, TwinCAT or another
+  compiler happens to accept.
+- Never accept a non-IEC form silently ([scope.vendor-forms]). A vendor
+  construct is accepted only when the spec names it, and always with a
+  portability warning (RP0133 literal, RP0134 syntax, RP0135 meaning, or a
+  more specific code). Code that checks without warnings is IEC Structured
+  Text. Write examples, tests and stdlib sources in IEC form (`END_IF;`).
 - `conformance/` must pass on every change.
 
 ## Before you finish a change

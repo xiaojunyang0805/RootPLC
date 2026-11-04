@@ -9,10 +9,10 @@ IF NOT estop_ok THEN
     fault := TRUE;
 ELSIF reset THEN
     fault := FALSE;
-END_IF
+END_IF;
 IF fault OR NOT guard_closed OR stop THEN
     motor := FALSE;
 ELSIF start THEN
     motor := TRUE;
-END_IF
+END_IF;
 END_PROGRAM

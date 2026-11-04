@@ -13,7 +13,7 @@ IF stop THEN
     st := 0;
 ELSIF start AND st = 0 THEN
     st := 1;
-END_IF
+END_IF;
 CASE st OF
     1:
         t(IN := TRUE, PT := T#5s);
@@ -21,16 +21,16 @@ CASE st OF
             st := 2;
             t(IN := FALSE);
             t(IN := TRUE, PT := T#100ms);
-        END_IF
+        END_IF;
     2:
         t(IN := TRUE, PT := T#100ms);
         IF t.Q THEN
             st := 3;
             t(IN := FALSE);
-        END_IF
+        END_IF;
 ELSE
     t(IN := FALSE);
-END_CASE
+END_CASE;
 main := st > 0;
 star := st = 1;
 delta := st = 3;

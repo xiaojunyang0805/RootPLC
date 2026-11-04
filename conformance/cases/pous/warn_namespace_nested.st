@@ -1,5 +1,5 @@
-(* spec: [pous.namespace]
-   expect: ok
+(* spec: [pous.namespace] [scope.vendor-forms]
+   expect: warning RP0134
    run: PRG_Main cycles=1
    assert: a = 10
    assert: b = 10

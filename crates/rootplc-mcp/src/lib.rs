@@ -498,7 +498,7 @@ mod tests {
             .expect("diags")[0];
         assert_eq!(d.get("code").and_then(Json::as_str), Some("RP0103"));
 
-        let src = r#"{"source":"FUNCTION_BLOCK C VAR_INPUT x : BOOL; END_VAR VAR n : INT; END_VAR IF x THEN n := n + 1; END_IF END_FUNCTION_BLOCK\nTEST t VAR c : C; END_VAR c(x := TRUE); ASSERT_EQ(1, c.n); END_TEST"}"#;
+        let src = r#"{"source":"FUNCTION_BLOCK C VAR_INPUT x : BOOL; END_VAR VAR n : INT; END_VAR IF x THEN n := n + 1; END_IF; END_FUNCTION_BLOCK\nTEST t VAR c : C; END_VAR c(x := TRUE); ASSERT_EQ(1, c.n); END_TEST"}"#;
         let rep = tool("rootplc_test", src);
         assert_eq!(rep.get("ok"), Some(&Json::Bool(true)), "{}", rep.write());
 

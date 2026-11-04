@@ -1,5 +1,5 @@
-(* spec: [variables.initializer]
-   expect: ok
+(* spec: [variables.initializer] [scope.vendor-forms]
+   expect: warning RP0135
    run: PRG_Main cycles=1
    assert: a[0] = 1
    assert: a[1] = 7

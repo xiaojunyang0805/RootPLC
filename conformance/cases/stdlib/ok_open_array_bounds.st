@@ -17,7 +17,7 @@ END_VAR
 FOR i := LOWER_BOUND(a, 1) TO UPPER_BOUND(a, 1) DO
     SumAndClear := SumAndClear + a[i];
     a[i] := 0;
-END_FOR
+END_FOR;
 END_FUNCTION
 
 FUNCTION MaxOf : INT
@@ -30,7 +30,7 @@ END_VAR
 MaxOf := a[LOWER_BOUND(a, 1)];
 FOR i := LOWER_BOUND(a, 1) + 1 TO UPPER_BOUND(a, 1) DO
     MaxOf := MAX(MaxOf, a[i]);
-END_FOR
+END_FOR;
 END_FUNCTION
 
 PROGRAM PRG_Main

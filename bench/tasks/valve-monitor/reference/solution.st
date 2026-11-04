@@ -17,5 +17,5 @@ IF (fb_open AND fb_closed) OR t.Q THEN
     fault := TRUE;
 ELSIF reset THEN
     fault := FALSE;
-END_IF
+END_IF;
 END_FUNCTION_BLOCK

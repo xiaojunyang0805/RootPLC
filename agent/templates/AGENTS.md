@@ -8,6 +8,9 @@ with `rootplc`.
   counters, state machines and interlocks; `--show <id>` prints one.
 - Check: `rootplc check . --json`. Fix every diagnostic; `rootplc explain <code>`
   quotes the rule.
+- Write IEC 61131-3 forms (`END_IF;`, `TOD#12:00:00`). A warning RP0133,
+  RP0134 or RP0135 marks a CODESYS / TwinCAT form; keep one only when the
+  project must stay vendor-specific.
 - Test: `rootplc test . --json`. Every program change needs a passing test.
 - Inspect: `rootplc run . --cycles 10 --json` shows variable values.
 - Existing code: `rootplc coverage <dir> --json` says which files are

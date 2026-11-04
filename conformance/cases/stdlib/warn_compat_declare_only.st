@@ -10,5 +10,5 @@ VAR
 END_VAR
 IF logNow THEN
     res := ADSLOGSTR(ADSLOG_MSGTYPE_HINT, 'Started %s', 'motor');
-END_IF
+END_IF;
 END_PROGRAM

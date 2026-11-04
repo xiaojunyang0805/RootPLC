@@ -23,7 +23,7 @@ ELSIF e.Q AND NOT pallet_done THEN
         layer_done := TRUE;
         IF layers >= 4 THEN
             pallet_done := TRUE;
-        END_IF
-    END_IF
-END_IF
+        END_IF;
+    END_IF;
+END_IF;
 END_PROGRAM

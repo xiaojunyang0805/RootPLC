@@ -9,8 +9,9 @@ Grammar notation: `[x]` optional, `{x}` zero or more, `|` alternative,
 `'…'` a literal token.
 
 **[config.global-list]** Global variables are declared in `VAR_GLOBAL`
-sections outside any POU, as in TwinCAT global variable lists, or inside a
-configuration or resource:
+sections inside a configuration or resource (IEC 61131-3), or outside any
+POU as in CODESYS and TwinCAT global variable lists, with warning RP0134
+([scope.vendor-forms]):
 
 ```
 global_list  = 'VAR_GLOBAL' [ 'CONSTANT' | 'RETAIN' | 'NON_RETAIN' ] { var_decl } 'END_VAR'

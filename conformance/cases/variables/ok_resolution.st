@@ -2,7 +2,7 @@
    expect: ok
    run: PRG_Main cycles=1
    assert: n = 5 *)
-TYPE Pt : STRUCT x : INT; y : INT; END_STRUCT END_TYPE
+TYPE Pt : STRUCT x : INT; y : INT; END_STRUCT; END_TYPE
 TYPE Color : (Red, Green); END_TYPE
 
 FUNCTION Twice : INT

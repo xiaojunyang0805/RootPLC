@@ -1,5 +1,5 @@
-(* spec: [statements.call]
-   expect: ok
+(* spec: [statements.call] [scope.vendor-forms]
+   expect: warning RP0134
    run: PRG_Main cycles=1
    assert: n = 4 *)
 FUNCTION_BLOCK FB_Count

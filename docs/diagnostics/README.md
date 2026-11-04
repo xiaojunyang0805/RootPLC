@@ -27,6 +27,9 @@ Codes RP00xx are lexical, RP01xx types, RP02xx names and structure, RP03xx synta
 | [RP0201](#rp0201) | error | syntax error: unexpected token |
 | [RP0202](#rp0202) | error | block is never closed: missing END keyword |
 | [RP0132](#rp0132) | error | called value is not a function, function block instance, program, method or action |
+| [RP0133](#rp0133) | warning | vendor literal form, not IEC 61131-3 (for example TOD#12:00 without seconds) |
+| [RP0134](#rp0134) | warning | vendor syntax form, not IEC 61131-3 (for example no ';' after END_IF) |
+| [RP0135](#rp0135) | warning | vendor meaning, not IEC 61131-3 (for example a constant expression as a repetition count) |
 | [RP0301](#rp0301) | error | missing ';' at end of statement or declaration |
 | [RP0101](#rp0101) | error | overflow or division by zero in constant expression |
 | [RP0102](#rp0102) | error | literal out of range for its type |
@@ -229,7 +232,7 @@ Rule `lexical.literal.date` in `spec/01-lexical.md`:
 | `DT#`, `DATE_AND_TIME#`, `LDT#`, `LDATE_AND_TIME#` | `yyyy-mm-dd-hh:mm:ss[.f]` | `DT#2026-11-03-14:30:00` |
 
 The seconds may be left out (`TOD#12:00`, CODESYS and TwinCAT); they are
-then 0. A value outside the calendar or clock (month 13, 30 February, hour
+then 0, with warning RP0133 ([scope.vendor-forms]). A value outside the calendar or clock (month 13, 30 February, hour
 24) is error RP0012. A malformed literal is error RP0011.
 
 ## RP0013
@@ -330,16 +333,63 @@ RP0132. A variable that cannot be called does not hide a function of the
 same name: `F(x)` calls the function `F` even where a variable `F` is
 visible (OSCAT relies on this).
 
+## RP0133
+
+warning: vendor literal form, not IEC 61131-3 (for example TOD#12:00 without seconds)
+
+Rule `scope.vendor-forms` in `spec/00-scope.md`:
+
+**[scope.vendor-forms]** A construct that IEC 61131-3 does not define, such as
+a CODESYS or TwinCAT form, is accepted only when this specification names it,
+and then always with a portability warning, never silently: a program that
+checks without warnings is IEC 61131-3 Structured Text. Vendor literal forms
+are warning RP0133, vendor syntax forms RP0134 and vendor meanings RP0135,
+unless a more specific code is named at the rule (for example RP0122 for
+`E.V` or RP0126 for `DWORD + 1`). Vendor library names and operators come
+only from compatibility libraries activated out of band ([stdlib.compat]).
+
+## RP0134
+
+warning: vendor syntax form, not IEC 61131-3 (for example no ';' after END_IF)
+
+Rule `scope.vendor-forms` in `spec/00-scope.md`:
+
+**[scope.vendor-forms]** A construct that IEC 61131-3 does not define, such as
+a CODESYS or TwinCAT form, is accepted only when this specification names it,
+and then always with a portability warning, never silently: a program that
+checks without warnings is IEC 61131-3 Structured Text. Vendor literal forms
+are warning RP0133, vendor syntax forms RP0134 and vendor meanings RP0135,
+unless a more specific code is named at the rule (for example RP0122 for
+`E.V` or RP0126 for `DWORD + 1`). Vendor library names and operators come
+only from compatibility libraries activated out of band ([stdlib.compat]).
+
+## RP0135
+
+warning: vendor meaning, not IEC 61131-3 (for example a constant expression as a repetition count)
+
+Rule `scope.vendor-forms` in `spec/00-scope.md`:
+
+**[scope.vendor-forms]** A construct that IEC 61131-3 does not define, such as
+a CODESYS or TwinCAT form, is accepted only when this specification names it,
+and then always with a portability warning, never silently: a program that
+checks without warnings is IEC 61131-3 Structured Text. Vendor literal forms
+are warning RP0133, vendor syntax forms RP0134 and vendor meanings RP0135,
+unless a more specific code is named at the rule (for example RP0122 for
+`E.V` or RP0126 for `DWORD + 1`). Vendor library names and operators come
+only from compatibility libraries activated out of band ([stdlib.compat]).
+
 ## RP0301
 
 error: missing ';' at end of statement or declaration
 
 Rule `statements.terminator` in `spec/05-statements.md`:
 
-**[statements.terminator]** Every statement except the block statements
-(`IF`, `CASE`, `FOR`, `WHILE`, `REPEAT`) ends with `;`, and so does every
+**[statements.terminator]** Every statement ends with `;`, and so does every
 variable declaration. A missing `;` is error RP0301, reported at the end of
-the statement. A lone `;` is an empty statement.
+the statement. After the block statements (`IF`, `CASE`, `FOR`, `WHILE`,
+`REPEAT`) IEC 61131-3 also requires the `;` (`END_IF;`); CODESYS and TwinCAT
+let it be left out, which is warning RP0134 ([scope.vendor-forms]). A lone `;` is an empty
+statement.
 
 ## RP0101
 
@@ -463,7 +513,8 @@ Rule `types.derived.struct` in `spec/02-types.md`:
 **[types.derived.struct]** `STRUCT ... END_STRUCT` declares members with
 optional initial values. A structure that contains itself, directly or
 through other structures or arrays, is error RP0107. (`REF_TO` to itself is
-allowed.) `TYPE B EXTENDS A : STRUCT … END_STRUCT` (CODESYS and TwinCAT) gives
+allowed.) `TYPE B EXTENDS A : STRUCT … END_STRUCT` (CODESYS and TwinCAT, warning
+RP0134 ([scope.vendor-forms])) gives
 B the members of A first, with A's initial values, then its own; the base
 must be a structure (RP0111).
 

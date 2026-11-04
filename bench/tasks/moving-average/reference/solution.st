@@ -14,10 +14,10 @@ buf[idx] := x;
 idx := (idx + 1) MOD 4;
 IF n < 4 THEN
     n := n + 1;
-END_IF
+END_IF;
 s := 0.0;
 FOR i := 0 TO n - 1 DO
     s := s + buf[i];
-END_FOR
+END_FOR;
 avg := s / INT_TO_REAL(n);
 END_FUNCTION_BLOCK

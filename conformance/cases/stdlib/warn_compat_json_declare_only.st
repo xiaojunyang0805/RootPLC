@@ -21,7 +21,7 @@ IF parse THEN
     jsonProp := fbDom.FindMember(jsonDoc, 'a');
     f := fbDom.GetDouble(jsonProp);
     fbJson.AddLreal(f);
-END_IF
+END_IF;
 fbJson.EndArray();
 n := fbJson.GetDocumentLength() - 1;
 END_PROGRAM

@@ -10,10 +10,12 @@ Grammar notation as in spec/03-variables.md.
 statement_list = { statement }
 ```
 
-**[statements.terminator]** Every statement except the block statements
-(`IF`, `CASE`, `FOR`, `WHILE`, `REPEAT`) ends with `;`, and so does every
+**[statements.terminator]** Every statement ends with `;`, and so does every
 variable declaration. A missing `;` is error RP0301, reported at the end of
-the statement. A lone `;` is an empty statement.
+the statement. After the block statements (`IF`, `CASE`, `FOR`, `WHILE`,
+`REPEAT`) IEC 61131-3 also requires the `;` (`END_IF;`); CODESYS and TwinCAT
+let it be left out, which is warning RP0134 ([scope.vendor-forms]). A lone `;` is an empty
+statement.
 
 **[statements.assignment]**
 ```
@@ -37,7 +39,8 @@ argument     = [ name ( ':=' | '=>' ) ] expression
 ```
 An output binding may leave out the variable, `Done =>`, and an input
 binding its value, `bExecute :=` (CODESYS and TwinCAT): the output is not
-read, the input keeps its value. A comma may follow the last argument. A
+read, the input keeps its value. A comma may follow the last argument. Both
+are warning RP0134 ([scope.vendor-forms]). A
 `REFERENCE TO T` parameter given a variable of type `T` refers to that
 variable.
 
@@ -57,7 +60,8 @@ case_label   = constant [ '..' constant ]                    (* constant: litera
 ```
 for_stmt     = 'FOR' name ':=' expression 'TO' expression [ 'BY' expression ] 'DO' statement_list 'END_FOR'
 ``` The control variable may also be an array element or a structure member of
-integer type (`FOR idx[1] := 0 TO 9 DO`), as TwinCAT accepts.
+integer type (`FOR idx[1] := 0 TO 9 DO`), as TwinCAT accepts, with warning
+RP0134 ([scope.vendor-forms]).
 
 **[statements.while]**
 ```

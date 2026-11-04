@@ -3,7 +3,7 @@ VAR uut : FB_TwoHand; i : INT; END_VAR
 FOR i := 1 TO 30 DO
     uut(left := TRUE, right := FALSE);
     ADVANCE(T#10ms);
-END_FOR
+END_FOR;
 uut(left := TRUE, right := TRUE);
 ASSERT_TRUE(uut.enable);
 END_TEST
@@ -13,7 +13,7 @@ VAR uut : FB_TwoHand; i : INT; END_VAR
 FOR i := 1 TO 70 DO
     uut(left := TRUE, right := FALSE);
     ADVANCE(T#10ms);
-END_FOR
+END_FOR;
 uut(left := TRUE, right := TRUE);
 ASSERT_FALSE(uut.enable);
 END_TEST

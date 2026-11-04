@@ -144,7 +144,7 @@ a := a + 1; b := a > 3 AND t.Q; t(IN := b, PT := T#1s); END_PROGRAM";
         );
         assert_eq!(
             codes(
-                "TYPE S : STRUCT x : INT; END_STRUCT END_TYPE PROGRAM p VAR s : S; END_VAR s.y := 1; END_PROGRAM"
+                "TYPE S : STRUCT x : INT; END_STRUCT; END_TYPE PROGRAM p VAR s : S; END_VAR s.y := 1; END_PROGRAM"
             ),
             [203]
         );
@@ -153,7 +153,7 @@ a := a + 1; b := a > 3 AND t.Q; t(IN := b, PT := T#1s); END_PROGRAM";
     #[test]
     fn condition_must_be_bool() {
         assert_eq!(
-            codes("PROGRAM p VAR i : INT; END_VAR IF i THEN i := 0; END_IF END_PROGRAM"),
+            codes("PROGRAM p VAR i : INT; END_VAR IF i THEN i := 0; END_IF; END_PROGRAM"),
             [103]
         );
     }

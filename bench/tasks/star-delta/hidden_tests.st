@@ -3,16 +3,16 @@ VAR uut : FB_StarDelta; i, both, gap : INT; END_VAR
 uut(start := TRUE);
 FOR i := 1 TO 250 DO
     uut(start := FALSE);
-    IF uut.star AND uut.delta THEN both := both + 1; END_IF
+    IF uut.star AND uut.delta THEN both := both + 1; END_IF;
     ADVANCE(T#10ms);
-END_FOR
+END_FOR;
 ASSERT_TRUE(uut.main AND uut.star AND NOT uut.delta);
 FOR i := 1 TO 400 DO
     uut(start := FALSE);
-    IF uut.star AND uut.delta THEN both := both + 1; END_IF
-    IF uut.main AND NOT uut.star AND NOT uut.delta THEN gap := gap + 1; END_IF
+    IF uut.star AND uut.delta THEN both := both + 1; END_IF;
+    IF uut.main AND NOT uut.star AND NOT uut.delta THEN gap := gap + 1; END_IF;
     ADVANCE(T#10ms);
-END_FOR
+END_FOR;
 uut(start := FALSE);
 ASSERT_TRUE(uut.main AND uut.delta AND NOT uut.star);
 ASSERT_EQ(0, both);
@@ -25,7 +25,7 @@ uut(start := TRUE);
 FOR i := 1 TO 700 DO
     uut(start := FALSE);
     ADVANCE(T#10ms);
-END_FOR
+END_FOR;
 uut(stop := TRUE);
 ASSERT_FALSE(uut.main OR uut.star OR uut.delta);
 uut(start := TRUE, stop := TRUE);
@@ -38,12 +38,12 @@ uut(start := TRUE);
 FOR i := 1 TO 300 DO
     uut(start := FALSE);
     ADVANCE(T#10ms);
-END_FOR
+END_FOR;
 uut(start := TRUE);
 FOR i := 1 TO 300 DO
     uut(start := FALSE);
     ADVANCE(T#10ms);
-END_FOR
+END_FOR;
 uut(start := FALSE);
 ASSERT_TRUE(uut.delta AND NOT uut.star);
 END_TEST

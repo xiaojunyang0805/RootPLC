@@ -7,7 +7,7 @@
    assert: d = 4
    assert: arr[1, 1] = 50
    assert: p.x = 5 *)
-TYPE Point : STRUCT x : INT; END_STRUCT END_TYPE
+TYPE Point : STRUCT x : INT; END_STRUCT; END_TYPE
 
 PROGRAM PRG_Main
 VAR

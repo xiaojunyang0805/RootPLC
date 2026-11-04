@@ -20,13 +20,13 @@ END_PROGRAM
 
 TEST ex_delays_on_and_run_on
 VAR uut : EX_Delays; i : INT; END_VAR
-FOR i := 1 TO 15 DO uut(request := TRUE); ADVANCE(T#100ms); END_FOR
+FOR i := 1 TO 15 DO uut(request := TRUE); ADVANCE(T#100ms); END_FOR;
 ASSERT_FALSE(uut.heater_on);
-FOR i := 1 TO 10 DO uut(request := TRUE); ADVANCE(T#100ms); END_FOR
+FOR i := 1 TO 10 DO uut(request := TRUE); ADVANCE(T#100ms); END_FOR;
 uut(request := TRUE);
 ASSERT_TRUE(uut.heater_on);
-FOR i := 1 TO 30 DO uut(request := FALSE); ADVANCE(T#100ms); END_FOR
+FOR i := 1 TO 30 DO uut(request := FALSE); ADVANCE(T#100ms); END_FOR;
 ASSERT_TRUE(uut.fan_on);
-FOR i := 1 TO 30 DO uut(request := FALSE); ADVANCE(T#100ms); END_FOR
+FOR i := 1 TO 30 DO uut(request := FALSE); ADVANCE(T#100ms); END_FOR;
 ASSERT_FALSE(uut.fan_on);
 END_TEST

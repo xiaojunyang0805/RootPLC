@@ -187,7 +187,8 @@ may be assigned. The value is not checked against the enumeration's values.
 **[types.derived.struct]** `STRUCT ... END_STRUCT` declares members with
 optional initial values. A structure that contains itself, directly or
 through other structures or arrays, is error RP0107. (`REF_TO` to itself is
-allowed.) `TYPE B EXTENDS A : STRUCT … END_STRUCT` (CODESYS and TwinCAT) gives
+allowed.) `TYPE B EXTENDS A : STRUCT … END_STRUCT` (CODESYS and TwinCAT, warning
+RP0134 ([scope.vendor-forms])) gives
 B the members of A first, with A's initial values, then its own; the base
 must be a structure (RP0111).
 
@@ -200,7 +201,8 @@ mixed with or assigned to a bit string of the same size (`UDINT` and
 integer literals `0` and `1` as `BOOL` and `0` as a reference (`NULL`) are
 warning RP0127.
 
-**[types.derived.union]** `UNION ... END_UNION` (CODESYS and TwinCAT) declares
+**[types.derived.union]** `UNION ... END_UNION` (CODESYS and TwinCAT, warning
+RP0134 ([scope.vendor-forms])) declares
 members that share one storage area; it is checked like a structure and its
 size (`SIZEOF`) is that of its largest member, rounded to its alignment. The
 VM does not model shared storage yet: accessing a member while running stops

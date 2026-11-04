@@ -17,7 +17,8 @@ section_kw   = 'VAR' | 'VAR_INPUT' | 'VAR_OUTPUT' | 'VAR_IN_OUT' | 'VAR_TEMP'
 ```
 
 A POU may contain any number of sections, in any order, before its body.
-Access specifiers (IEC 61131-3 ed.3) and TwinCAT `PERSISTENT` are accepted.
+Access specifiers (IEC 61131-3 ed.3) are accepted, and TwinCAT `PERSISTENT`
+with warning RP0134 ([scope.vendor-forms]).
 Variables of a `VAR PUBLIC` section can be read and written from outside the
 block, like inputs; other access checks and persistence follow in a later
 revision.
@@ -49,12 +50,14 @@ element      = initializer | count '(' [ expression ] ')'                 (* rep
 
 In an array initializer `n(v)` stands for `n` elements of value `v`, and
 `n()` for `n` elements with their default: `[1, 3(7), 2]` is
-`[1, 7, 7, 7, 2]`. The count may also be a constant expression in
-parentheses or a call such as `SIZEOF(buffer)` (TwinCAT).
+`[1, 7, 7, 7, 2]`. IEC 61131-3 writes the count as an integer literal; a constant expression in
+parentheses or a call such as `SIZEOF(buffer)` (TwinCAT) is accepted with
+warning RP0135 ([scope.vendor-forms]).
 
 A structure initializer may also set the variables of a function-block
 instance, `t : TON := (PT := T#1S);` (CODESYS and TwinCAT), and `()` keeps
-every default.
+every default (warning RP0134 ([scope.vendor-forms]); IEC 61131-3 leaves out the
+initializer).
 
 **[variables.init-arguments]** A function-block instance may be declared
 with arguments, `fb : FB_Buffer(size := 10);`, which CODESYS and TwinCAT

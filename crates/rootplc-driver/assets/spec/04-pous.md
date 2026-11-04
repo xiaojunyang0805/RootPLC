@@ -58,7 +58,8 @@ member         = method | property
 
 Methods and properties may stand before or after the body (IEC 61131-3 puts
 them before it, TwinCAT exports them after it). A `;` after a declaration header
-(`METHOD M : INT;`) is accepted, as TwinCAT does. A PROGRAM may have members too.
+(`METHOD M : INT;`) is accepted, as TwinCAT does, with warning RP0134
+([scope.vendor-forms]). A PROGRAM may have members too.
 
 ## Object orientation
 
@@ -103,7 +104,8 @@ method = 'METHOD' { modifier } name [ ':' type_spec ] { var_section } statement_
 ```
 
 Its variables are new for every call, like those of a function; the method
-name holds the result. Variables in a `VAR_INST` section (CODESYS, TwinCAT) keep
+name holds the result. Variables in a `VAR_INST` section (CODESYS, TwinCAT; warning RP0134
+([scope.vendor-forms])) keep
 their value between calls: they belong to the instance, visible only in
 that method. Inside the method, the variables of its block
 (inherited ones included) are visible by name after the method's own. A
@@ -198,7 +200,7 @@ error RP0203, as in TwinCAT. TEST blocks read and write every variable
 ([tests.whitebox]).
 
 **[pous.call.in-out-constant]** Parameters declared in a `VAR_IN_OUT CONSTANT`
-section (CODESYS / TwinCAT) are passed like `VAR_IN_OUT` parameters, but the
+section (CODESYS / TwinCAT; warning RP0134 ([scope.vendor-forms])) are passed like `VAR_IN_OUT` parameters, but the
 argument may also be a constant or an expression of any length: RP0114 does
 not apply. The
 called POU is meant only to read such a parameter; RootPLC does not yet reject
@@ -224,11 +226,11 @@ instead.
 ## 3. Types
 
 **[pous.type-block]** Derived types are declared in `TYPE … END_TYPE`. One
-block may declare several types. The `;` after each declaration is optional
-(CODESYS style accepts both):
+block may declare several types, each ended by `;` as in IEC 61131-3; a
+missing `;` (CODESYS) is warning RP0134 ([scope.vendor-forms]):
 ```
 type_block   = 'TYPE' { type_decl } 'END_TYPE'
-type_decl    = name ':' type_spec [ ':=' initializer ] [ ';' ]
+type_decl    = name ':' type_spec [ ':=' initializer ] ';'
 ```
 
 **[pous.type-spec]** Type specifications:

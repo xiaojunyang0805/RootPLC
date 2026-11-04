@@ -5,7 +5,7 @@ TYPE ST_Recipe : STRUCT
     temperature : REAL;
     duration : TIME;
     label : STRING[20];
-END_STRUCT END_TYPE
+END_STRUCT; END_TYPE
 
 FUNCTION_BLOCK EX_Oven
 VAR_INPUT

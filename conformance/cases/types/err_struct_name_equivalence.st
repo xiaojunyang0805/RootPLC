@@ -1,7 +1,7 @@
 (* spec: [types.equivalence] [types.derived.struct]
    expect: error RP0103 *)
-TYPE A : STRUCT v : INT; END_STRUCT END_TYPE
-TYPE B : STRUCT v : INT; END_STRUCT END_TYPE
+TYPE A : STRUCT v : INT; END_STRUCT; END_TYPE
+TYPE B : STRUCT v : INT; END_STRUCT; END_TYPE
 
 PROGRAM PRG_Main
 VAR

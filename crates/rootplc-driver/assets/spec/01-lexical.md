@@ -172,7 +172,7 @@ A literal that breaks any other of these is error RP0011.
 | `DT#`, `DATE_AND_TIME#`, `LDT#`, `LDATE_AND_TIME#` | `yyyy-mm-dd-hh:mm:ss[.f]` | `DT#2026-11-03-14:30:00` |
 
 The seconds may be left out (`TOD#12:00`, CODESYS and TwinCAT); they are
-then 0. A value outside the calendar or clock (month 13, 30 February, hour
+then 0, with warning RP0133 ([scope.vendor-forms]). A value outside the calendar or clock (month 13, 30 February, hour
 24) is error RP0012. A malformed literal is error RP0011.
 
 ## 7. Pragmas

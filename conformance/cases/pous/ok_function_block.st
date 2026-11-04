@@ -13,7 +13,7 @@ ELSIF v > hi THEN
     Clamp := hi;
 ELSE
     Clamp := v;
-END_IF
+END_IF;
 END_FUNCTION
 
 FUNCTION_BLOCK FB_Counter
@@ -25,7 +25,7 @@ VAR_OUTPUT
 END_VAR
 IF pulse THEN
     count := count + 1;
-END_IF
+END_IF;
 END_FUNCTION_BLOCK
 
 PROGRAM PRG_Main

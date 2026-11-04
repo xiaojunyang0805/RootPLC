@@ -1,5 +1,5 @@
-(* spec: [pous.call.in-out-constant]
-   expect: ok
+(* spec: [pous.call.in-out-constant] [scope.vendor-forms]
+   expect: warning RP0134
    run: PRG_Main cycles=1
    assert: a = 3
    assert: b = 4

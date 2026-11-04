@@ -9,5 +9,5 @@ ELSIF raw >= 27648 THEN
     ScaleAnalog := hi;
 ELSE
     ScaleAnalog := lo + (hi - lo) * INT_TO_REAL(raw) / 27648.0;
-END_IF
+END_IF;
 END_FUNCTION

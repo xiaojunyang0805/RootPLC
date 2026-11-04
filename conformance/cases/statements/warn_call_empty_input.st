@@ -1,5 +1,5 @@
-(* spec: [statements.call]
-   expect: warning RP0118
+(* spec: [statements.call] [scope.vendor-forms]
+   expect: warning RP0118 RP0134
    run: PRG_Main cycles=1
    assert: k = 4
    assert: n = 4 *)

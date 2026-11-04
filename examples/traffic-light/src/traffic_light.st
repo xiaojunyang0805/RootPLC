@@ -18,12 +18,12 @@ ELSE
         0: tmr(IN := TRUE, PT := T#10s);
         1: tmr(IN := TRUE, PT := T#3s);
         2: tmr(IN := TRUE, PT := T#12s);
-    END_CASE
+    END_CASE;
     IF tmr.Q THEN
         tmr(IN := FALSE);
         phase := (phase + 1) MOD 3;
-    END_IF
-END_IF
+    END_IF;
+END_IF;
 
 green  := phase = 0;
 yellow := phase = 1;

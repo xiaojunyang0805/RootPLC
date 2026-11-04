@@ -12,7 +12,7 @@ END_VAR
 total := 0.0;
 FOR i := 1 TO 5 DO
     total := total + samples[i];
-END_FOR
+END_FOR;
 EX_Average := total / 5.0;
 END_FUNCTION
 

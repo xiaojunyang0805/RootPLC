@@ -13,12 +13,12 @@ VAR_OUTPUT
 END_VAR
 CASE state OF
     E_Step#Idle:
-        IF go THEN state := E_Step#Running; END_IF
+        IF go THEN state := E_Step#Running; END_IF;
     E_Step#Running:
-        IF finished THEN state := E_Step#Done; END_IF
+        IF finished THEN state := E_Step#Done; END_IF;
     E_Step#Done:
-        IF ack THEN state := E_Step#Idle; END_IF
-END_CASE
+        IF ack THEN state := E_Step#Idle; END_IF;
+END_CASE;
 busy := state = E_Step#Running;
 END_FUNCTION_BLOCK
 

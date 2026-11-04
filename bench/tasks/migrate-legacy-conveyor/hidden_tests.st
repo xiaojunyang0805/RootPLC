@@ -33,13 +33,13 @@ uut(start := TRUE, estop_ok := TRUE, speed_setpoint := 50);
 FOR i := 1 TO 25 DO
     uut(start := FALSE, jam_sensor := TRUE);
     ADVANCE(T#100ms);
-END_FOR
+END_FOR;
 ASSERT_FALSE(uut.jam_alarm);
 ASSERT_TRUE(uut.motor);
 FOR i := 1 TO 10 DO
     uut(jam_sensor := TRUE);
     ADVANCE(T#100ms);
-END_FOR
+END_FOR;
 uut(jam_sensor := FALSE);
 ASSERT_TRUE(uut.jam_alarm);
 ASSERT_FALSE(uut.motor);

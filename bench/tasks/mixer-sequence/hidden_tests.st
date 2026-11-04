@@ -7,15 +7,15 @@ ASSERT_EQ(2, uut.phase);
 ASSERT_TRUE(uut.mixer AND NOT uut.fill_valve);
 FOR i := 1 TO 95 DO
     uut(level_full := TRUE);
-    IF TO_INT(uut.fill_valve) + TO_INT(uut.mixer) + TO_INT(uut.drain_valve) > 1 THEN clash := clash + 1; END_IF
+    IF TO_INT(uut.fill_valve) + TO_INT(uut.mixer) + TO_INT(uut.drain_valve) > 1 THEN clash := clash + 1; END_IF;
     ADVANCE(T#100ms);
-END_FOR
+END_FOR;
 uut(level_full := TRUE);
 ASSERT_EQ(2, uut.phase);
 FOR i := 1 TO 10 DO
     uut(level_full := TRUE);
     ADVANCE(T#100ms);
-END_FOR
+END_FOR;
 uut(level_full := FALSE);
 ASSERT_EQ(3, uut.phase);
 ASSERT_TRUE(uut.drain_valve AND NOT uut.mixer);
@@ -41,7 +41,7 @@ uut(start := FALSE, level_full := TRUE);
 FOR i := 1 TO 110 DO
     uut(level_full := FALSE);
     ADVANCE(T#100ms);
-END_FOR
+END_FOR;
 uut(level_empty := TRUE);
 uut(level_empty := FALSE, start := TRUE);
 ASSERT_EQ(1, uut.phase);
@@ -49,7 +49,7 @@ uut(start := FALSE, level_full := TRUE);
 FOR i := 1 TO 50 DO
     uut(level_full := TRUE);
     ADVANCE(T#100ms);
-END_FOR
+END_FOR;
 uut(level_full := TRUE);
 ASSERT_EQ(2, uut.phase);
 END_TEST

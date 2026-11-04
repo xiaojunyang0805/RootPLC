@@ -14,15 +14,15 @@ END_VAR
 t(IN := enable AND NOT t.Q, PT := T#500ms);
 IF t.Q THEN
     lamp := NOT lamp;
-END_IF
+END_IF;
 IF NOT enable THEN
     lamp := FALSE;
-END_IF
+END_IF;
 END_FUNCTION_BLOCK
 
 TEST ex_toggle_after_half_second
 VAR uut : EX_Toggle; i : INT; END_VAR
-FOR i := 1 TO 6 DO uut(enable := TRUE); ADVANCE(T#100ms); END_FOR
+FOR i := 1 TO 6 DO uut(enable := TRUE); ADVANCE(T#100ms); END_FOR;
 ASSERT_TRUE(uut.lamp);
 uut(enable := FALSE);
 ASSERT_FALSE(uut.lamp);

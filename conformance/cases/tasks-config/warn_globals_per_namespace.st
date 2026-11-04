@@ -1,5 +1,5 @@
-(* spec: [config.global-list]
-   expect: ok
+(* spec: [config.global-list] [scope.vendor-forms]
+   expect: warning RP0134
    run: PRG_Main cycles=1
    assert: a = 1
    assert: b = 2 *)

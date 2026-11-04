@@ -19,7 +19,7 @@ END_PROGRAM
 
 TEST ex_batch_of_five
 VAR uut : EX_Batch; i : INT; END_VAR
-FOR i := 1 TO 5 DO uut(part := TRUE); uut(part := FALSE); END_FOR
+FOR i := 1 TO 5 DO uut(part := TRUE); uut(part := FALSE); END_FOR;
 ASSERT_TRUE(uut.batch_full);
 ASSERT_EQ(5, uut.count);
 uut(reset := TRUE);

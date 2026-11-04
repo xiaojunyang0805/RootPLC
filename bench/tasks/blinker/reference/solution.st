@@ -15,16 +15,16 @@ IF enable THEN
         running := TRUE;
         out := TRUE;
         t(IN := FALSE);
-    END_IF
+    END_IF;
     t(IN := TRUE, PT := period / 2);
     IF t.Q THEN
         out := NOT out;
         t(IN := FALSE);
         t(IN := TRUE, PT := period / 2);
-    END_IF
+    END_IF;
 ELSE
     running := FALSE;
     out := FALSE;
     t(IN := FALSE);
-END_IF
+END_IF;
 END_FUNCTION_BLOCK

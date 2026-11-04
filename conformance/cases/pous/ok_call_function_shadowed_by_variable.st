@@ -12,7 +12,7 @@ END_FUNCTION
 TYPE ST_R :
 STRUCT
     Twice : INT;   (* a member named like the function *)
-END_STRUCT
+END_STRUCT;
 END_TYPE
 
 PROGRAM PRG_Main

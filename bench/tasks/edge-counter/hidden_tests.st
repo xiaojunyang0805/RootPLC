@@ -2,7 +2,7 @@ TEST hidden_holding_counts_once
 VAR uut : FB_PulseCounter; i : INT; END_VAR
 FOR i := 1 TO 10 DO
     uut(pulse := TRUE);
-END_FOR
+END_FOR;
 ASSERT_EQ(1, uut.count);
 END_TEST
 
@@ -27,6 +27,6 @@ VAR uut : FB_PulseCounter; i : INT; END_VAR
 FOR i := 1 TO 250 DO
     uut(pulse := TRUE);
     uut(pulse := FALSE);
-END_FOR
+END_FOR;
 ASSERT_EQ(250, uut.count);
 END_TEST

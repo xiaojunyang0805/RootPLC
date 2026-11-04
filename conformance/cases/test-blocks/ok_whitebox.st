@@ -9,7 +9,7 @@ VAR
 END_VAR
 IF pulse THEN
     hidden := hidden + 1;
-END_IF
+END_IF;
 END_FUNCTION_BLOCK
 
 TEST internal_state_is_visible

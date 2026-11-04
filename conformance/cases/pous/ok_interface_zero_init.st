@@ -21,7 +21,7 @@ VAR_INPUT
 END_VAR
 IF ip <> 0 THEN
     F_Read := ip.Get();
-END_IF
+END_IF;
 END_FUNCTION
 
 PROGRAM PRG_Main

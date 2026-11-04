@@ -11,5 +11,5 @@ IF x > 3 THEN
     y := 2;
 ELSE
     y := 1;
-END_IF
+END_IF;
 END_PROGRAM

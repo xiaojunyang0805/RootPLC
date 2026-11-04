@@ -1,5 +1,5 @@
-(* spec: [pous.function]
-   expect: warning RP0113
+(* spec: [pous.function] [scope.vendor-forms]
+   expect: warning RP0113 RP0134
    run: PRG_Main cycles=1
    assert: n = 2 *)
 VAR_GLOBAL

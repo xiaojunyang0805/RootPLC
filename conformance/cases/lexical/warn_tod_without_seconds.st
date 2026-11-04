@@ -1,5 +1,5 @@
-(* spec: [lexical.literal.date]
-   expect: ok
+(* spec: [lexical.literal.date] [scope.vendor-forms]
+   expect: warning RP0133
    run: PRG_Main cycles=1
    assert: same = TRUE
    assert: dsame = TRUE *)

@@ -220,6 +220,9 @@ pub mod codes {
         BLOCK_LOCAL_READ = 130, Warning;
         POU_CLOSED_BY_EOF = 131, Warning;
         NOT_CALLABLE = 132, Error;
+        VENDOR_LITERAL = 133, Warning;
+        VENDOR_SYNTAX = 134, Warning;
+        VENDOR_MEANING = 135, Warning;
     }
 
     /// Severity of a code, if the code exists.

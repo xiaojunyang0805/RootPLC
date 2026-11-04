@@ -1913,7 +1913,7 @@ x := x + 1; u := u - 1; r := 0.1; d := r; END_PROGRAM",
             FaultKind::Range
         );
         assert_eq!(
-            fault("PROGRAM p VAR b : BOOL := TRUE; END_VAR WHILE b DO ; END_WHILE END_PROGRAM"),
+            fault("PROGRAM p VAR b : BOOL := TRUE; END_VAR WHILE b DO ; END_WHILE; END_PROGRAM"),
             FaultKind::Watchdog
         );
     }
@@ -1933,7 +1933,7 @@ t(IN := TRUE, PT := T#50ms, Q => q, ET => et); END_PROGRAM";
     #[test]
     fn counters_and_edges() {
         let src = "PROGRAM p VAR c : CTU; e : R_TRIG; tick : BOOL; n : INT; rising : INT; END_VAR
-tick := NOT tick; e(CLK := tick); IF e.Q THEN rising := rising + 1; END_IF
+tick := NOT tick; e(CLK := tick); IF e.Q THEN rising := rising + 1; END_IF;
 c(CU := tick, PV := 3); n := c.CV; END_PROGRAM";
         let (_, v) = run(src, 6, 10);
         assert_eq!(var(&v, "rising"), "3");
@@ -1943,7 +1943,7 @@ c(CU := tick, PV := 3); n := c.CV; END_PROGRAM";
     #[test]
     fn functions_strings_and_loops() {
         let src = "FUNCTION Fact : DINT VAR_INPUT n : DINT; END_VAR VAR i : DINT; END_VAR
-Fact := 1; FOR i := 2 TO n DO Fact := Fact * i; END_FOR END_FUNCTION
+Fact := 1; FOR i := 2 TO n DO Fact := Fact * i; END_FOR; END_FUNCTION
 PROGRAM p VAR f : DINT; s : STRING[4]; k : INT; END_VAR
 f := Fact(5); s := CONCAT('ab', 'cdef'); k := FIND('hello', 'll'); END_PROGRAM";
         let (r, v) = run(src, 1, 0);

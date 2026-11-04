@@ -41,7 +41,7 @@ shapes[1] := sq;
 shapes[2] := re;
 FOR i := 1 TO 2 DO
     total := total + shapes[i].Area();
-END_FOR
+END_FOR;
 empty := none = 0;
 set := shapes[1] <> NULL;
 END_PROGRAM

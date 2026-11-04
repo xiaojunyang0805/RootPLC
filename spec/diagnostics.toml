@@ -150,6 +150,27 @@ spec = "pous.call.callee"
 stage = "sema"
 
 [[code]]
+id = "RP0133"
+severity = "warning"
+summary = "vendor literal form, not IEC 61131-3 (for example TOD#12:00 without seconds)"
+spec = "scope.vendor-forms"
+stage = "lex"
+
+[[code]]
+id = "RP0134"
+severity = "warning"
+summary = "vendor syntax form, not IEC 61131-3 (for example no ';' after END_IF)"
+spec = "scope.vendor-forms"
+stage = "parse"
+
+[[code]]
+id = "RP0135"
+severity = "warning"
+summary = "vendor meaning, not IEC 61131-3 (for example a constant expression as a repetition count)"
+spec = "scope.vendor-forms"
+stage = "sema"
+
+[[code]]
 id = "RP0301"
 severity = "error"
 summary = "missing ';' at end of statement or declaration"

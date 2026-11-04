@@ -7,7 +7,7 @@
    assert: ready *)
 TYPE ST_Flags : STRUCT
     running : BIT;
-END_STRUCT END_TYPE
+END_STRUCT; END_TYPE
 
 PROGRAM PRG_Main
 VAR

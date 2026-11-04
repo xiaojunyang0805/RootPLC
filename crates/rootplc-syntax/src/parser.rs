@@ -502,6 +502,13 @@ impl<'a> Parser<'a> {
         } else if self.at_kw("INTERFACE") {
             self.interface();
         } else if self.at_kw("VAR_GLOBAL") {
+            // [config.global-list]: a global variable list of its own
+            let sp = self.span_here();
+            self.error(
+                codes::VENDOR_SYNTAX,
+                "VAR_GLOBAL outside a CONFIGURATION or POU is a CODESYS / TwinCAT global variable list; IEC 61131-3 declares global variables in a CONFIGURATION or RESOURCE".into(),
+                sp,
+            );
             self.b.start(N::GlobalVarList);
             self.var_section();
             self.b.finish();
@@ -615,7 +622,15 @@ impl<'a> Parser<'a> {
             }
         }
         // TwinCAT accepts a ';' after the declaration header
-        self.eat(TokenKind::Semicolon);
+        if self.at(TokenKind::Semicolon) {
+            let sp = self.span_here();
+            self.error(
+                codes::VENDOR_SYNTAX,
+                "';' after the declaration header is a TwinCAT form; IEC 61131-3 has none".into(),
+                sp,
+            );
+            self.bump();
+        }
         while self.at_section() {
             self.var_section();
         }
@@ -962,6 +977,14 @@ impl<'a> Parser<'a> {
             let named = self.name();
             if named {
                 // [types.derived.struct]: TYPE B EXTENDS A : STRUCT … END_STRUCT
+                if self.at_kw("EXTENDS") {
+                    let sp = self.span_here();
+                    self.error(
+                        codes::VENDOR_SYNTAX,
+                        "a structure that EXTENDS another is a CODESYS / TwinCAT form; IEC 61131-3 has no structure inheritance".into(),
+                        sp,
+                    );
+                }
                 self.extends_implements();
             }
             if named && self.expect(TokenKind::Colon, "':'") {
@@ -970,7 +993,15 @@ impl<'a> Parser<'a> {
                     self.initializer();
                 }
             }
-            self.eat(TokenKind::Semicolon);
+            if !self.eat(TokenKind::Semicolon) && named && !self.at_eof() {
+                // [pous.type-block]: the ';' is optional in CODESYS
+                let sp = self.span_prev_end();
+                self.error(
+                    codes::VENDOR_SYNTAX,
+                    "no ';' after this type declaration; IEC 61131-3 ends each with ';'".into(),
+                    sp,
+                );
+            }
             self.b.finish();
             if self.pos == before {
                 self.recover(&[]);
@@ -999,6 +1030,16 @@ impl<'a> Parser<'a> {
     fn var_section(&mut self) {
         self.b.start(N::VarSection);
         let open_span = self.span_here();
+        let section = self
+            .text_at(self.nth_index(0).unwrap_or(self.pos))
+            .to_ascii_uppercase();
+        if section == "VAR_INST" {
+            self.error(
+                codes::VENDOR_SYNTAX,
+                "VAR_INST is a CODESYS / TwinCAT section; IEC 61131-3 has none".into(),
+                open_span,
+            );
+        }
         self.bump();
         // [variables.section]: CONSTANT / RETAIN / NON_RETAIN, ed.3 access
         // specifiers (VAR PUBLIC) and TwinCAT PERSISTENT, in any order
@@ -1006,6 +1047,17 @@ impl<'a> Parser<'a> {
             || self.at_modifier()
             || self.at_word("PERSISTENT")
         {
+            let vendor = if self.at_word("PERSISTENT") {
+                Some("PERSISTENT is a TwinCAT qualifier; IEC 61131-3 has none")
+            } else if section == "VAR_IN_OUT" && self.at_kw("CONSTANT") {
+                Some("VAR_IN_OUT CONSTANT is a CODESYS / TwinCAT section; IEC 61131-3 has none")
+            } else {
+                None
+            };
+            if let Some(msg) = vendor {
+                let sp = self.span_here();
+                self.error(codes::VENDOR_SYNTAX, msg.into(), sp);
+            }
             self.bump();
         }
         while !self.at_eof()
@@ -1224,6 +1276,11 @@ impl<'a> Parser<'a> {
         self.b.start(N::StructType);
         let open_span = self.span_here();
         let (open, close) = if self.at_word("UNION") {
+            self.error(
+                codes::VENDOR_SYNTAX,
+                "UNION is a CODESYS / TwinCAT type; IEC 61131-3 has none".into(),
+                open_span,
+            );
             ("UNION", "END_UNION")
         } else {
             ("STRUCT", "END_STRUCT")
@@ -1277,6 +1334,14 @@ impl<'a> Parser<'a> {
             self.b.start(N::StructInit);
             self.bump();
             // [variables.initializer]: `()` keeps every default
+            if self.at(TokenKind::RParen) {
+                let sp = self.span_prev_end();
+                self.error(
+                    codes::VENDOR_SYNTAX,
+                    "an empty initializer '()' is a CODESYS / TwinCAT form; IEC 61131-3 omits the initializer".into(),
+                    sp,
+                );
+            }
             while !self.at(TokenKind::RParen) {
                 self.name();
                 self.expect(TokenKind::Assign, "':='");
@@ -1320,16 +1385,27 @@ impl<'a> Parser<'a> {
             self.b.start(N::EmptyStmt);
             self.bump();
             self.b.finish();
-        } else if self.at_kw("IF") {
-            self.if_stmt();
-        } else if self.at_kw("CASE") {
-            self.case_stmt();
-        } else if self.at_kw("FOR") {
-            self.for_stmt();
-        } else if self.at_kw("WHILE") {
-            self.while_stmt();
-        } else if self.at_kw("REPEAT") {
-            self.repeat_stmt();
+        } else if self.at_any_kw(&["IF", "CASE", "FOR", "WHILE", "REPEAT"]) {
+            let open = self
+                .text_at(self.nth_index(0).unwrap_or(self.pos))
+                .to_ascii_uppercase();
+            match open.as_str() {
+                "IF" => self.if_stmt(),
+                "CASE" => self.case_stmt(),
+                "FOR" => self.for_stmt(),
+                "WHILE" => self.while_stmt(),
+                _ => self.repeat_stmt(),
+            }
+            // [statements.terminator]: IEC 61131-3 ends every statement with
+            // ';', also IF ... END_IF; the ';' is an empty statement here
+            if !self.at(TokenKind::Semicolon) && !self.at_eof() {
+                let span = self.span_prev_end();
+                self.error(
+                    codes::VENDOR_SYNTAX,
+                    format!("no ';' after this {open} statement; IEC 61131-3 ends every statement with ';'"),
+                    span,
+                );
+            }
         } else if self.at_kw("EXIT") {
             self.simple_kw_stmt(N::ExitStmt);
         } else if self.at_kw("CONTINUE") {
@@ -1519,7 +1595,16 @@ impl<'a> Parser<'a> {
         self.bump();
         // [statements.for]: a variable, or (TwinCAT) an element or member
         if matches!(self.kind(), Some(TokenKind::Ident)) {
+            let element = matches!(self.nth_kind(1), Some(TokenKind::Dot | TokenKind::LBracket));
             self.postfix_expr();
+            if element {
+                let sp = self.span_prev_end();
+                self.error(
+                    codes::VENDOR_SYNTAX,
+                    "an element or member as FOR control variable is a TwinCAT form; IEC 61131-3 uses a variable".into(),
+                    sp,
+                );
+            }
         } else {
             self.name();
         }
@@ -1706,6 +1791,13 @@ impl<'a> Parser<'a> {
                     // output, `bExecute :=` with no value leaves the input as is
                     if !matches!(self.kind(), Some(TokenKind::Comma | TokenKind::RParen)) {
                         self.expr();
+                    } else {
+                        let sp = self.span_prev_end();
+                        self.error(
+                            codes::VENDOR_SYNTAX,
+                            "an argument without a value is a CODESYS / TwinCAT form; IEC 61131-3 names a variable or value".into(),
+                            sp,
+                        );
                     }
                 } else {
                     self.expr();
@@ -1716,6 +1808,13 @@ impl<'a> Parser<'a> {
                 }
                 // a comma before ')' (CODESYS / TwinCAT)
                 if self.at(TokenKind::RParen) {
+                    let sp = self.span_prev_end();
+                    self.error(
+                        codes::VENDOR_SYNTAX,
+                        "a comma before ')' is a CODESYS / TwinCAT form; IEC 61131-3 has none"
+                            .into(),
+                        sp,
+                    );
                     break;
                 }
             }
@@ -1871,12 +1970,12 @@ mod tests {
 
     #[test]
     fn statements_and_types() {
-        let src = "TYPE M : (A, B); R : INT (0..9); S : STRUCT a : INT; END_STRUCT END_TYPE
+        let src = "TYPE M : (A, B); R : INT (0..9); S : STRUCT a : INT; END_STRUCT; END_TYPE
 PROGRAM p VAR i : INT; m : M; END_VAR
-CASE i OF 1, 2: i := 0; 3..5: ; ELSE i := 1; END_CASE
-FOR i := 1 TO 3 DO EXIT; END_FOR
-WHILE i < 3 DO i := i + 1; END_WHILE
-REPEAT i := i - 1; UNTIL i = 0 END_REPEAT
+CASE i OF 1, 2: i := 0; 3..5: ; ELSE i := 1; END_CASE;
+FOR i := 1 TO 3 DO EXIT; END_FOR;
+WHILE i < 3 DO i := i + 1; END_WHILE;
+REPEAT i := i - 1; UNTIL i = 0 END_REPEAT;
 END_PROGRAM";
         let p = parse(src);
         assert!(p.diagnostics.is_empty(), "{:?}", p.diagnostics);

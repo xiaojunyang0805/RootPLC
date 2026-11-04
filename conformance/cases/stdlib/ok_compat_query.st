@@ -45,7 +45,7 @@ ib := a;
 hasExtra := __QUERYINTERFACE(ib, ie);
 IF hasExtra THEN
     v := ie.Extra();
-END_IF
+END_IF;
 ib := b;
 noExtra := __QUERYINTERFACE(ib, ie);
 gotPointer := __QUERYPOINTER(a, p);

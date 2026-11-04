@@ -8,6 +8,10 @@ pub const REGISTRY: &str = include_str!("../assets/spec/diagnostics.toml");
 /// The spec chapters: (path, text).
 pub const SPEC: &[(&str, &str)] = &[
     (
+        "spec/00-scope.md",
+        include_str!("../assets/spec/00-scope.md"),
+    ),
+    (
         "spec/01-lexical.md",
         include_str!("../assets/spec/01-lexical.md"),
     ),

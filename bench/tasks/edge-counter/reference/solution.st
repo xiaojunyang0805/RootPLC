@@ -13,5 +13,5 @@ IF reset THEN
     count := 0;
 ELSIF edge.Q THEN
     count := count + 1;
-END_IF
+END_IF;
 END_FUNCTION_BLOCK

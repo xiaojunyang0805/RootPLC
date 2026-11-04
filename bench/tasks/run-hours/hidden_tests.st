@@ -3,16 +3,16 @@ VAR uut : FB_RunHours; i : INT; END_VAR
 FOR i := 1 TO 9000 DO
     uut(running := TRUE);
     ADVANCE(T#1s);
-END_FOR
+END_FOR;
 uut(running := TRUE);
 FOR i := 1 TO 600 DO
     uut(running := FALSE);
     ADVANCE(T#1s);
-END_FOR
+END_FOR;
 FOR i := 1 TO 1800 DO
     uut(running := TRUE);
     ADVANCE(T#1s);
-END_FOR
+END_FOR;
 uut(running := TRUE);
 uut(running := FALSE);
 ASSERT_TRUE(uut.hours = 3);
@@ -27,7 +27,7 @@ VAR uut : FB_RunHours; i : INT; END_VAR
 FOR i := 1 TO 3600 DO
     uut(running := FALSE);
     ADVANCE(T#1s);
-END_FOR
+END_FOR;
 ASSERT_TRUE(uut.hours = 0);
 ASSERT_EQ(0, uut.minutes);
 END_TEST

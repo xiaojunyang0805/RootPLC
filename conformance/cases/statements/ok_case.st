@@ -14,5 +14,5 @@ CASE n OF
         r := 2;
 ELSE
     r := 0;
-END_CASE
+END_CASE;
 END_PROGRAM

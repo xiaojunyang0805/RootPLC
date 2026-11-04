@@ -13,7 +13,7 @@ IF stop OR trip OR NOT permissive_ok THEN
     run := FALSE;
 ELSIF start THEN
     run := TRUE;
-END_IF
+END_IF;
 END_FUNCTION_BLOCK
 
 TEST ex_trip_wins
