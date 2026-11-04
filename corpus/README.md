@@ -7,6 +7,7 @@ much real code `rootplc` accepts and which constructs block the rest.
 cargo build --release
 python corpus/corpus.py fetch      # shallow clones into corpus/.cache (git-ignored)
 python corpus/corpus.py analyse    # writes REPORT.md
+python corpus/corpus.py run        # run smoke test: execute each application program (adds to REPORT.md)
 ```
 
 The repository holds only `manifest.toml` (URL, licence, format) and the
