@@ -1,5 +1,11 @@
 # Qwen Code, one-shot (positional prompt). Command lines written for Qwen Code
-# 0.26.6; set `verified` once a run succeeds. Login: run `qwen` once and sign in.
+# 0.26.6; set `verified` once a run succeeds. Auth: the Qwen OAuth free tier
+# ended 2026-04-15, so an API key is needed. Alibaba Cloud Model Studio
+# (international): OPENAI_API_KEY = the Model Studio key, OPENAI_BASE_URL =
+# https://dashscope-intl.aliyuncs.com/compatible-mode/v1, OPENAI_MODEL = e.g.
+# qwen3-coder-plus; or OpenRouter (OPENROUTER_API_KEY). Select the auth type
+# once in the user settings (~/.qwen/settings.json, security.auth.selectedType
+# = "openai"), so both modes use it.
 name = "qwen-code"
 ecosystem = "chinese"
 verified = "no"

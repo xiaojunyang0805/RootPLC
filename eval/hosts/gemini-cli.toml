@@ -1,6 +1,9 @@
 # Gemini CLI, headless (-p). Command lines written for Gemini CLI 0.66.0;
 # set `verified` once a run succeeds. Auth: GEMINI_API_KEY (AI Studio); the free
-# Google-login tier no longer serves Gemini CLI (IneligibleTierError, 2026-11-03).
+# Google-login tier no longer serves Gemini CLI (IneligibleTierError, 2026-11-03;
+# Google moved unpaid and Google One users to Antigravity CLI on 2026-06-18).
+# An unpaid API key serves Flash models only, 250 requests per day, so a full
+# baseline takes several days on it; a paid key has no such limit.
 # Mode with: the rootplc MCP server from the workspace settings; mode without:
 # no MCP server and no rootplc on PATH.
 name = "gemini-cli"
