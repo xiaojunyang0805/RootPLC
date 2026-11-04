@@ -222,11 +222,16 @@ impl<'a> Parser<'a> {
         {
             return true;
         }
-        // a method may be called Get or Set; these words only matter in a property
+        // a method may be called Get or Set; these words only matter in a
+        // property, and a property may be called Set (`Set := x` in its GET)
         self.in_property
             && ["GET", "END_GET", "SET", "END_SET"]
                 .iter()
                 .any(|w| self.at_word(w))
+            && !matches!(
+                self.nth_kind(1),
+                Some(TokenKind::Assign | TokenKind::Dot | TokenKind::LBracket | TokenKind::LParen)
+            )
     }
 
     fn at_any_kw(&self, kws: &[&str]) -> bool {

@@ -531,13 +531,21 @@ impl<'a> Lexer<'a> {
         }
         let body_start = self.pos;
         self.eat_while(|c| is_ident_char(c) || c == b'.');
-        if !validate_duration(&self.src[body_start..self.pos]) {
-            self.diag(
+        match validate_duration(&self.src[body_start..self.pos]) {
+            Some(true) => {}
+            // CODESYS / TwinCAT accept T#1h90m (the fields are added)
+            Some(false) => self.diag(
+                codes::DURATION_FIELD_OVERFLOW,
+                "a duration field after the first exceeds its range; IEC 61131-3 allows that only for the first",
+                start,
+                self.pos,
+            ),
+            None => self.diag(
                 codes::MALFORMED_TIME_LITERAL,
                 "malformed duration literal",
                 start,
                 self.pos,
-            );
+            ),
         }
         TokenKind::Duration
     }
@@ -687,7 +695,10 @@ fn digits_value(s: &str) -> Option<u64> {
 }
 
 /// Validate the body of a duration literal (after `T#` and the optional `-`).
-fn validate_duration(s: &str) -> bool {
+/// Some(true) if valid, Some(false) if a field after the first exceeds its
+/// range (vendor form), None if malformed.
+fn validate_duration(s: &str) -> Option<bool> {
+    let mut in_range = true;
     let b = s.as_bytes();
     let (mut i, mut last_unit, mut fields, mut prev_fraction) = (0usize, None::<usize>, 0, false);
     while i < b.len() {
@@ -702,9 +713,7 @@ fn validate_duration(s: &str) -> bool {
             i += 1;
         }
         let int_part: String = s[ns..i].chars().filter(|c| *c != '_').collect();
-        let Some(value) = digits_value(&int_part) else {
-            return false;
-        };
+        let value = digits_value(&int_part)?;
         let mut fraction = false;
         if i < b.len() && b[i] == b'.' {
             i += 1;
@@ -713,7 +722,7 @@ fn validate_duration(s: &str) -> bool {
                 i += 1;
             }
             if i == fs {
-                return false;
+                return None;
             }
             fraction = true;
         }
@@ -722,20 +731,18 @@ fn validate_duration(s: &str) -> bool {
             i += 1;
         }
         let unit = s[us..i].to_ascii_lowercase();
-        let Some(idx) = DURATION_UNITS.iter().position(|(u, _)| *u == unit) else {
-            return false;
-        };
+        let idx = DURATION_UNITS.iter().position(|(u, _)| *u == unit)?;
         if last_unit.is_some_and(|l| idx <= l) || prev_fraction {
-            return false;
+            return None;
         }
         if fields > 0 && DURATION_UNITS[idx].1.is_some_and(|limit| value >= limit) {
-            return false;
+            in_range = false;
         }
         last_unit = Some(idx);
         prev_fraction = fraction;
         fields += 1;
     }
-    fields > 0
+    (fields > 0).then_some(in_range)
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -874,9 +881,10 @@ mod tests {
         ] {
             assert!(codes_of(ok).is_empty(), "{ok}");
         }
-        for bad in ["T#5s1m", "T#1h90m", "T#1.5s20ms", "T#", "T#5x"] {
+        for bad in ["T#5s1m", "T#1.5s20ms", "T#", "T#5x"] {
             assert_eq!(codes_of(bad), [11], "{bad}");
         }
+        assert_eq!(codes_of("T#1h90m"), [128]);
     }
 
     #[test]

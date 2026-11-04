@@ -155,10 +155,11 @@ units are case-insensitive, and `_` may separate fields (`T#1h_30m`).
 
 - Units appear in descending order, each at most once.
 - Only the last field may have a fraction (`T#1.5s`).
-- Only the first field may exceed its natural range (`T#90m` is allowed,
-  `T#1h90m` is not).
+- Only the first field may exceed its natural range (`T#90m`). CODESYS and
+  TwinCAT also accept a later field out of range (`T#1h90m`, the fields are
+  added): warning RP0128.
 
-A literal that breaks any of these is error RP0011.
+A literal that breaks any other of these is error RP0011.
 
 **[lexical.literal.date]** Date and time literals:
 

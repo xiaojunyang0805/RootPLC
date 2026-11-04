@@ -56,6 +56,7 @@ Codes RP00xx are lexical, RP01xx types, RP02xx names and structure, RP03xx synta
 | [RP0125](#rp0125) | warning | chained assignment a := b := v (not portable) |
 | [RP0126](#rp0126) | warning | bit string used as a number, or bitwise operator on integers (not portable) |
 | [RP0127](#rp0127) | warning | integer literal 0 or 1 used as BOOL, or 0 as a reference (not portable) |
+| [RP0128](#rp0128) | warning | duration field after the first out of its range, T#1h90m (not portable) |
 
 ## RP0001
 
@@ -203,10 +204,11 @@ units are case-insensitive, and `_` may separate fields (`T#1h_30m`).
 
 - Units appear in descending order, each at most once.
 - Only the last field may have a fraction (`T#1.5s`).
-- Only the first field may exceed its natural range (`T#90m` is allowed,
-  `T#1h90m` is not).
+- Only the first field may exceed its natural range (`T#90m`). CODESYS and
+  TwinCAT also accept a later field out of range (`T#1h90m`, the fields are
+  added): warning RP0128.
 
-A literal that breaks any of these is error RP0011.
+A literal that breaks any other of these is error RP0011.
 
 ## RP0012
 
@@ -744,3 +746,22 @@ mixed with or assigned to a bit string of the same size (`UDINT` and
 `DWORD`) are warning RP0126; the
 integer literals `0` and `1` as `BOOL` and `0` as a reference (`NULL`) are
 warning RP0127.
+
+## RP0128
+
+warning: duration field after the first out of its range, T#1h90m (not portable)
+
+Rule `lexical.literal.duration` in `spec/01-lexical.md`:
+
+**[lexical.literal.duration]** A duration literal is a prefix `T#`, `TIME#`,
+`LT#` or `LTIME#`, an optional `-`, and one or more fields. Each field is a
+number followed by a unit: `d`, `h`, `m`, `s`, `ms`, `us`, `ns`. Prefixes and
+units are case-insensitive, and `_` may separate fields (`T#1h_30m`).
+
+- Units appear in descending order, each at most once.
+- Only the last field may have a fraction (`T#1.5s`).
+- Only the first field may exceed its natural range (`T#90m`). CODESYS and
+  TwinCAT also accept a later field out of range (`T#1h90m`, the fields are
+  added): warning RP0128.
+
+A literal that breaks any other of these is error RP0011.

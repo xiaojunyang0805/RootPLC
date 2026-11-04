@@ -351,3 +351,10 @@ severity = "warning"
 summary = "integer literal 0 or 1 used as BOOL, or 0 as a reference (not portable)"
 spec = "types.conversion.vendor"
 stage = "sema"
+
+[[code]]
+id = "RP0128"
+severity = "warning"
+summary = "duration field after the first out of its range, T#1h90m (not portable)"
+spec = "lexical.literal.duration"
+stage = "lex"
