@@ -12,7 +12,7 @@ confirmed that the code is valid, so it measures acceptance, not correctness.
 | Figure | Projects | Units | Syntax OK | Clean |
 |---|---|---|---|---|
 | Headline (core set) | 200 | 13372 | 95.7% | 72.4% |
-| Holdout part of the core set (never used to choose fixes) | 17 | 560 | 96.2% | 73.9% |
+| Holdout part of the core set (never used to choose fixes) | 32 | 901 | 94.1% | 65.0% |
 | Everything analysed, tool inputs included | 226 | 15470 | 94.1% | 70.2% |
 
 | Category | Units | Syntax OK | Clean |
@@ -54,7 +54,7 @@ as empty, duplicated, not Structured Text or too small are listed at the end of 
 | [beckhoff-tf6310-samples](https://github.com/Beckhoff/TF6310_Samples) | sample | other (see repository) | 146 | 9,761 | 99% | 27% |
 | [intecre-twincat-utils](https://github.com/Intecre/twincat-utils) | library | MIT License | 133 | 6,230 | 99% | 64% |
 | [pcdshub-lcls-twincat-pmps](https://github.com/pcdshub/lcls-twincat-pmps) | library | other (see repository) | 131 | 9,104 | 98% | 59% |
-| [gracesrm-openplc-sample-programs](https://github.com/gracesrm/OpenPLC_Sample_Programs) | sample | GNU General Public License v3.0 | 115 | 42,123 | 90% | 28% |
+| [gracesrm-openplc-sample-programs](https://github.com/gracesrm/OpenPLC_Sample_Programs) | sample (holdout) | GNU General Public License v3.0 | 115 | 42,123 | 90% | 28% |
 | [twincat-dynamic-collections](https://github.com/fisothemes/TwinCat-Dynamic-Collections) | library (holdout) | MIT | 108 | 10,216 | 96% | 67% |
 | [ironplc-ironplc](https://github.com/ironplc/ironplc) | tool-input | MIT License | 107 | 3,112 | 78% | 48% |
 | [mbc-engineering-log4tc](https://github.com/mbc-engineering/log4TC) | library | Apache License 2.0 | 103 | 4,754 | 99% | 58% |
@@ -69,7 +69,7 @@ as empty, duplicated, not Structured Text or too small are listed at the end of 
 | [beckhoff-tf6100-samples](https://github.com/Beckhoff/TF6100_Samples) | sample | other (see repository) | 68 | 5,124 | 100% | 62% |
 | [rtzz2000-tc3-component](https://github.com/rtzz2000/Tc3_Component) | library | GNU General Public License v3.0 | 67 | 4,617 | 87% | 63% |
 | [krystian-l-lis-stage](https://github.com/Krystian-L-Lis/Stage) | library (holdout) | MIT License | 64 | 4,294 | 89% | 75% |
-| [verkal1999-fischertechnik-i4-0-modules-simulator-twincat](https://github.com/verkal1999/Fischertechnik_I4.0_Modules_Simulator_TwinCAT) | application | MIT License | 63 | 6,285 | 97% | 52% |
+| [verkal1999-fischertechnik-i4-0-modules-simulator-twincat](https://github.com/verkal1999/Fischertechnik_I4.0_Modules_Simulator_TwinCAT) | application (holdout) | MIT License | 63 | 6,285 | 97% | 52% |
 | [siyka-au-mobject-ext](https://github.com/siyka-au/mobject-ext) | library | MIT License | 62 | 4,145 | 97% | 47% |
 | [fisothemes-twincat-dynamic-string-kit](https://github.com/fisothemes/TwinCAT-Dynamic-String-Kit) | library | MIT License | 56 | 2,125 | 100% | 80% |
 | [sionverhoef-twincat-st](https://github.com/SionVerhoef/twincat-st) | tool-input | MIT License | 55 | 1,838 | 96% | 60% |
@@ -98,11 +98,11 @@ as empty, duplicated, not Structured Text or too small are listed at the end of 
 | [beckhoff-tf6701-samples](https://github.com/Beckhoff/TF6701_Samples) | sample | other (see repository) | 32 | 1,896 | 100% | 3% |
 | [fisothemes-labview-twincat-ads](https://github.com/fisothemes/LabVIEW-TwinCAT-ADS) | sample (holdout) | MIT License | 31 | 431 | 90% | 84% |
 | [sarparslan-ev-charging-controller](https://github.com/sarparslan/ev-charging-controller) | application | MIT License | 30 | 2,298 | 97% | 97% |
-| [keiji01-tf3685-beckhoffdynamicweighingsamplebr](https://github.com/Keiji01/TF3685-BeckhoffDynamicWeighingSampleBR) | sample | MIT License | 29 | 2,795 | 100% | 66% |
+| [keiji01-tf3685-beckhoffdynamicweighingsamplebr](https://github.com/Keiji01/TF3685-BeckhoffDynamicWeighingSampleBR) | sample (holdout) | MIT License | 29 | 2,795 | 100% | 66% |
 | [bengeisler-tclog](https://github.com/bengeisler/TcLog) | library | MIT License | 27 | 2,441 | 96% | 70% |
 | [fisothemes-fisothemes-error-library-for-twincat](https://github.com/fisothemes/FisoThemes-Error-Library-for-TwinCAT) | library | MIT License | 27 | 1,362 | 89% | 63% |
 | [niwhuny-factory-io-projek-1](https://github.com/NIWHUNY/Factory_io_projek_1) | application | GNU General Public License v3.0 | 27 | 7,053 | 96% | 4% |
-| [alexmeissen-starburst-dispenser](https://github.com/alexmeissen/starburst-dispenser) | application | Other | 27 | 4,224 | 100% | 59% |
+| [alexmeissen-starburst-dispenser](https://github.com/alexmeissen/starburst-dispenser) | application (holdout) | Other | 27 | 4,224 | 100% | 59% |
 | [mridulnskp-ts2-conveyor-problem](https://github.com/mridulnskp/TS2_Conveyor_Problem) | application | MIT License | 26 | 2,579 | 100% | 92% |
 | [q3son-concurso-plc](https://github.com/Q3son/Concurso_PLC) | application | MIT License | 26 | 1,888 | 46% | 46% |
 | [beckhoff-jp-machinealarmmanagement](https://github.com/Beckhoff-JP/MachineAlarmManagement) | library | MIT License | 26 | 1,542 | 100% | 62% |
@@ -130,8 +130,8 @@ as empty, duplicated, not Structured Text or too small are listed at the end of 
 | [klauer-blark](https://github.com/klauer/blark) | tool-input | GNU General Public License v2.0 | 18 | 214 | 89% | 50% |
 | [cristianmori-morifixplc](https://github.com/CristianMori/MoriFixPlc) | library | Apache License 2.0 | 18 | 1,240 | 100% | 94% |
 | [beckhoff-tc3eventlogger-samples](https://github.com/Beckhoff/Tc3Eventlogger_Samples) | sample | BSD Zero Clause License | 17 | 785 | 100% | 24% |
-| [jreyesa0901-twincat-conveyors](https://github.com/jreyesa0901/twincat-conveyors) | application | GNU General Public License v3.0 | 17 | 771 | 100% | 100% |
-| [albertjanpieffers-factoryio-twincat](https://github.com/AlbertjanPieffers/FactoryIO_TwinCAT) | application | MIT License | 17 | 1,748 | 100% | 82% |
+| [jreyesa0901-twincat-conveyors](https://github.com/jreyesa0901/twincat-conveyors) | application (holdout) | GNU General Public License v3.0 | 17 | 771 | 100% | 100% |
+| [albertjanpieffers-factoryio-twincat](https://github.com/AlbertjanPieffers/FactoryIO_TwinCAT) | application (holdout) | MIT License | 17 | 1,748 | 100% | 82% |
 | [sa1ntsinner-rung](https://github.com/sa1ntsinner/rung) | tool-input | other (see repository) | 16 | 816 | 100% | 94% |
 | [beckhoff-tf6000-ads-dotnet-v5-samples](https://github.com/Beckhoff/TF6000_ADS_DOTNET_V5_Samples) | sample | BSD Zero Clause License | 16 | 411 | 100% | 75% |
 | [technical-software-solutions-twincat-tools](https://github.com/Technical-Software-Solutions/twincat-tools) | library | MIT License | 16 | 1,144 | 94% | 50% |
@@ -139,7 +139,7 @@ as empty, duplicated, not Structured Text or too small are listed at the end of 
 | [beckhoff-tf6760-samples](https://github.com/Beckhoff/TF6760_Samples) | sample | other (see repository) | 16 | 926 | 100% | 0% |
 | [benhar-dev-tc3-oop-serial](https://github.com/benhar-dev/tc3-oop-serial) | sample | MIT License | 16 | 960 | 100% | 56% |
 | [loupeteam-tccommando](https://github.com/loupeteam/TcCommando) | library | MIT License | 16 | 1,152 | 100% | 44% |
-| [erdemsabriveli-ac-digital-twin](https://github.com/ErdemSabriVeli/ac-digital-twin) | application | MIT License | 16 | 2,519 | 38% | 31% |
+| [erdemsabriveli-ac-digital-twin](https://github.com/ErdemSabriVeli/ac-digital-twin) | application (holdout) | MIT License | 16 | 2,519 | 38% | 31% |
 | [fortiphyd-grficsv3](https://github.com/Fortiphyd/GRFICSv3) | application | GNU General Public License v3.0 | 16 | 3,473 | 75% | 38% |
 | [loupeteam-tcabblinkin](https://github.com/loupeteam/TcAbbLinkin) | library | MIT License | 16 | 2,214 | 94% | 75% |
 | [cgainsworks-plc-cip-batch-control](https://github.com/CGainsWorks/plc-cip-batch-control) | application | MIT License | 15 | 2,053 | 100% | 100% |
@@ -147,7 +147,7 @@ as empty, duplicated, not Structured Text or too small are listed at the end of 
 | [loupeteam-tcpiper](https://github.com/loupeteam/TcPiper) | library (holdout) | MIT License | 15 | 1,535 | 93% | 33% |
 | [stefanhenneken-blog-2022-04-iec61131-lsp-sample01](https://github.com/StefanHenneken/Blog-2022-04-IEC61131-LSP-Sample01) | sample | BSD 2-Clause "Simplified" License | 15 | 418 | 100% | 60% |
 | [babe-brams-st-qlearning](https://github.com/BABE-BramS/ST_QLearning) | sample | BSD 2-Clause "Simplified" License | 15 | 484 | 100% | 87% |
-| [mbc-engineering-net-pcs](https://github.com/mbc-engineering/net-pcs) | library | Apache License 2.0 | 15 | 368 | 100% | 80% |
+| [mbc-engineering-net-pcs](https://github.com/mbc-engineering/net-pcs) | library (holdout) | Apache License 2.0 | 15 | 368 | 100% | 80% |
 | [roald87-tcerror](https://github.com/Roald87/TcError) | library | MIT License | 14 | 10,356 | 93% | 93% |
 | [heytalepazguato-tree-sitter-iec61131-3-st](https://github.com/HeytalePazguato/tree-sitter-iec61131-3-st) | tool-input | MIT License | 14 | 730 | 86% | 57% |
 | [fisothemes-twincat-hashing-algorithms](https://github.com/fisothemes/TwinCAT-Hashing-Algorithms) | library | MIT License | 14 | 301 | 100% | 57% |
@@ -167,9 +167,9 @@ as empty, duplicated, not Structured Text or too small are listed at the end of 
 | [ignacbrychta-elevatorsim-plc](https://github.com/IgnacBrychta/ElevatorSIM_PLC) | application | MIT License | 10 | 642 | 80% | 70% |
 | [agenticcontrolio-twincat-validator-mcp](https://github.com/agenticcontrolio/twincat-validator-mcp) | tool-input | MIT License | 10 | 64 | 90% | 90% |
 | [stefanhenneken-blog-2021-05-iec61131-dip-sample02](https://github.com/StefanHenneken/Blog-2021-05-IEC61131-DIP-Sample02) | sample | BSD 2-Clause "Simplified" License | 10 | 316 | 100% | 80% |
-| [jgw3-plc-projects](https://github.com/JGW3/plc-projects) | application | MIT License | 10 | 363 | 50% | 50% |
+| [jgw3-plc-projects](https://github.com/JGW3/plc-projects) | application (holdout) | MIT License | 10 | 363 | 50% | 50% |
 | [lance0901-twincat-training-simulator](https://github.com/Lance0901/TwinCAT-Training-Simulator) | application | MIT License | 10 | 1,010 | 90% | 80% |
-| [luandev27-forja](https://github.com/LuanDev27/forja) | application | MIT License | 10 | 1,082 | 90% | 80% |
+| [luandev27-forja](https://github.com/LuanDev27/forja) | application (holdout) | MIT License | 10 | 1,082 | 90% | 80% |
 | [virajdesai0309-openplc-tutorials](https://github.com/virajdesai0309/OpenPLC_Tutorials) | sample | MIT License | 10 | 339 | 50% | 50% |
 | [stefanhenneken-blog-2016-06-iec61131-namespaces-sample03](https://github.com/StefanHenneken/Blog-2016-06-IEC61131-Namespaces-Sample03) | sample | BSD 2-Clause "Simplified" License | 10 | 72 | 100% | 80% |
 | [tcnexa-tccylinder](https://github.com/TcNexa/TcCylinder) | library | MIT License | 10 | 1,185 | 100% | 40% |
@@ -194,13 +194,13 @@ as empty, duplicated, not Structured Text or too small are listed at the end of 
 | [stefanhenneken-blog-2018-06-iec61131-statepattern-sample03](https://github.com/StefanHenneken/Blog-2018-06-IEC61131-StatePattern-Sample03) | sample | BSD 2-Clause "Simplified" License | 7 | 275 | 100% | 86% |
 | [barteling-twincat-meets-project-euler](https://github.com/Barteling/TwinCAT-Meets-Project-Euler) | sample | MIT License | 7 | 281 | 100% | 100% |
 | [atakangudulluogluhv-elevator-plc-agents](https://github.com/atakangudulluogluhv/elevator-plc-agents) | application | Other | 7 | 253 | 100% | 71% |
-| [bstiffler582-twincat-modularmachine](https://github.com/bstiffler582/TwinCAT-ModularMachine) | application | MIT License | 7 | 1,437 | 100% | 86% |
+| [bstiffler582-twincat-modularmachine](https://github.com/bstiffler582/TwinCAT-ModularMachine) | application (holdout) | MIT License | 7 | 1,437 | 100% | 86% |
 | [stefanbesler-twingrind](https://github.com/stefanbesler/twingrind) | library | GNU General Public License v3.0 | 6 | 280 | 83% | 83% |
 | [nikvoronin-tc3-pcspeaker](https://github.com/nikvoronin/Tc3_PcSpeaker) | library | MIT License | 6 | 190 | 100% | 67% |
 | [stefanhenneken-blog-2023-06-iec61131-lod-sample01](https://github.com/StefanHenneken/Blog-2023-06-IEC61131-LoD-Sample01) | sample | BSD 2-Clause "Simplified" License | 6 | 125 | 100% | 100% |
 | [stefanhenneken-blog-2014-03-iec61131-abstractfactory-sample01](https://github.com/StefanHenneken/Blog-2014-03-IEC61131-AbstractFactory-Sample01) | sample | BSD 2-Clause "Simplified" License | 6 | 126 | 100% | 100% |
 | [stefanhenneken-blog-2018-02-iec61131-observerpattern-sample01](https://github.com/StefanHenneken/Blog-2018-02-IEC61131-ObserverPattern-Sample01) | sample | BSD 2-Clause "Simplified" License | 6 | 161 | 100% | 100% |
-| [0xc00be-rsb-lab](https://github.com/0xC00BE/rsb-lab) | application | MIT License | 6 | 441 | 100% | 17% |
+| [0xc00be-rsb-lab](https://github.com/0xC00BE/rsb-lab) | application (holdout) | MIT License | 6 | 441 | 100% | 17% |
 | [ishansharma97-virtual-manufacturing-cell](https://github.com/IshanSharma97/virtual-manufacturing-cell) | application | MIT License | 6 | 269 | 100% | 50% |
 | [tcnexa-tcdevicebase](https://github.com/TcNexa/TcDeviceBase) | library | MIT License | 6 | 619 | 100% | 50% |
 | [zeugwerk-testbench](https://github.com/Zeugwerk/Testbench) | library | MIT | 5 | 544 | 100% | 100% |
@@ -234,17 +234,17 @@ as empty, duplicated, not Structured Text or too small are listed at the end of 
 | [fortiphyd-grficsv2](https://github.com/Fortiphyd/GRFICSv2) | application | GNU General Public License v3.0 | 3 | 908 | 100% | 33% |
 | [jarmocluyse-ads-go](https://github.com/JarmoCluyse/ads-go) | sample (holdout) | MIT License | 3 | 78 | 100% | 100% |
 | [evanmj-tcjoy](https://github.com/evanmj/TcJoy) | sample | MIT License | 3 | 159 | 67% | 67% |
-| [fortuechip-automation-virtual-industrial-automation-cell](https://github.com/fortuechip-automation/virtual-industrial-automation-cell) | application | MIT License | 3 | 218 | 100% | 100% |
+| [fortuechip-automation-virtual-industrial-automation-cell](https://github.com/fortuechip-automation/virtual-industrial-automation-cell) | application (holdout) | MIT License | 3 | 218 | 100% | 100% |
 | [aydogandagidir-conveyor-sorting-twin](https://github.com/aydogandagidir/conveyor-sorting-twin) | application | MIT License | 3 | 265 | 100% | 100% |
 | [vishnukarthikbalakrishnan-plc-tank-level-pid](https://github.com/vishnukarthikbalakrishnan/PLC_Tank_Level_PID) | application | MIT License | 3 | 211 | 100% | 100% |
 | [kathiravankb06-water-tank-level-control-plc](https://github.com/kathiravankb06/Water-Tank-Level-Control-PLC) | application | Other | 3 | 54 | 0% | 0% |
-| [jozamudi-lcls-plc-rix-sample-delivery-old](https://github.com/jozamudi/lcls-plc-rix-sample-delivery-old) | application | Other | 3 | 98 | 100% | 33% |
+| [jozamudi-lcls-plc-rix-sample-delivery-old](https://github.com/jozamudi/lcls-plc-rix-sample-delivery-old) | application (holdout) | Other | 3 | 98 | 100% | 33% |
 | [jozamudi-lcls-plc-mfx-sample-delivery-old](https://github.com/jozamudi/lcls-plc-mfx-sample-delivery-old) | application | Other | 3 | 196 | 100% | 33% |
 | [ntandolis431-iiot-testbed](https://github.com/Ntandolis431/iiot-testbed) | application | MIT License | 3 | 178 | 100% | 33% |
 | [liamcarper-ot-security-lab](https://github.com/LiamCarPer/OT-Security-Lab) | application | MIT License | 3 | 162 | 100% | 33% |
 | [beckhoff-usa-community-te2000-tchmi-advancedtrafficlight](https://github.com/Beckhoff-USA-Community/TE2000_TcHMI_AdvancedTrafficLight) | sample | BSD Zero Clause License | 3 | 57 | 100% | 100% |
 | [ishansharma97-plc-portability-lab](https://github.com/IshanSharma97/plc-portability-lab) | sample | MIT License | 3 | 276 | 100% | 67% |
-| [yifei-diy-openplc-project](https://github.com/yifei-diy/OpenPLC-Project) | sample | MIT License | 3 | 293 | 33% | 0% |
+| [yifei-diy-openplc-project](https://github.com/yifei-diy/OpenPLC-Project) | sample (holdout) | MIT License | 3 | 293 | 33% | 0% |
 | [fbarresi-beckhoffs7client](https://github.com/fbarresi/BeckhoffS7Client) | library | MIT License | 2 | 33 | 100% | 100% |
 | [stefanhenneken-blog-2017-08-iec61131-unittests-tcunit](https://github.com/StefanHenneken/Blog-2017-08-IEC61131-UnitTests-TcUnit) | sample | BSD 2-Clause "Simplified" License | 2 | 520 | 100% | 50% |
 | [stefanhenneken-blog-2016-03-iec61131-arrays-sample04](https://github.com/StefanHenneken/Blog-2016-03-IEC61131-Arrays-Sample04) | sample | BSD 2-Clause "Simplified" License | 2 | 42 | 100% | 100% |
@@ -257,6 +257,30 @@ as empty, duplicated, not Structured Text or too small are listed at the end of 
 | [michielvanwelsenaere-homeautomation-codesys3](https://github.com/MichielVanwelsenaere/HomeAutomation.CoDeSys3) | application | MIT License | 1 | 15 | 0% | 0% |
 | [beckhoff-ads](https://github.com/Beckhoff/ADS) | sample | MIT License | 1 | 16 | 100% | 100% |
 
+
+
+<!-- run smoke test -->
+## Run smoke test (applications)
+
+Each application sub-project is run for 500 cycles with its inputs at their defaults
+(no I/O simulation): MAIN, else a program named like it, else each program. Files with check
+errors are left out (repeatedly, until the rest checks clean); the program runs when it is still
+there, so everything it uses checks clean. This shows whether real machine code executes in
+rootplc, not whether it behaves correctly.
+
+| Outcome | Sub-projects |
+|---|---|
+| ran | 35 (40%) |
+| UNSUPPORTED | 6 (7%) |
+| fault | 0 (0%) |
+| not runnable | 44 (51%) |
+| no program | 2 (2%) |
+
+*ran*: all cycles without a fault; *UNSUPPORTED*: stopped at a library block RootPLC declares
+but does not implement; *fault*: a run-time error (index, division, watchdog, ...); *not runnable*:
+the program or something it uses has check errors.
+<!-- /run smoke test -->
+
 ## What blocks the rest
 
 In the core set without the holdout projects.
@@ -265,9 +289,9 @@ Units using each construct RootPLC does not support yet:
 
 | Construct | Units |
 |---|---|
-| vendor pragmas {..} | 1115 (7%) |
-| SIZEOF | 919 (6%) |
-| __ system calls | 545 (4%) |
+| vendor pragmas {..} | 1106 (7%) |
+| SIZEOF | 903 (6%) |
+| __ system calls | 537 (3%) |
 | __SYSTEM types | 262 (2%) |
 | UNION | 180 (1%) |
 | VAR_STAT | 43 (0%) |
@@ -276,18 +300,18 @@ Most frequent error codes:
 
 | Code | Count |
 |---|---|
-| RP0203 | 22469 |
-| RP0103 | 5052 |
-| RP0111 | 4653 |
-| RP0201 | 3769 |
-| RP0301 | 1351 |
-| RP0005 | 1199 |
-| RP0121 | 803 |
-| RP0204 | 743 |
+| RP0203 | 20141 |
+| RP0103 | 4935 |
+| RP0111 | 4581 |
+| RP0201 | 3603 |
+| RP0301 | 1339 |
+| RP0005 | 1178 |
+| RP0121 | 771 |
+| RP0204 | 506 |
 | RP0106 | 475 |
 | RP0008 | 258 |
 | RP0004 | 243 |
-| RP0202 | 144 |
+| RP0202 | 134 |
 
 ## Removed from the corpus
 

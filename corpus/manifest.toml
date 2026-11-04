@@ -1588,6 +1588,7 @@ redistribute = true
 format = "twincat"
 kind = "discovered"
 category = "application"
+holdout = true
 
 [[project]]
 name = "bernhardfoelk-beckhoff-smarthome"
@@ -1624,6 +1625,7 @@ redistribute = false
 format = "twincat"
 kind = "discovered"
 category = "application"
+holdout = true
 
 [[project]]
 name = "mitchellquinn-vc-weight-sorter-cell"
@@ -1642,6 +1644,7 @@ redistribute = false
 format = "twincat"
 kind = "discovered"
 category = "application"
+holdout = true
 
 [[project]]
 name = "albertjanpieffers-factoryio-twincat"
@@ -1651,6 +1654,7 @@ redistribute = true
 format = "twincat"
 kind = "discovered"
 category = "application"
+holdout = true
 
 [[project]]
 name = "erdemsabriveli-ac-digital-twin"
@@ -1660,6 +1664,7 @@ redistribute = true
 format = "st"
 kind = "discovered"
 category = "application"
+holdout = true
 
 [[project]]
 name = "autonomy-logic-smart-traffic-light"
@@ -1687,6 +1692,7 @@ redistribute = true
 format = "st"
 kind = "discovered"
 category = "application"
+holdout = true
 
 [[project]]
 name = "mbi-div-b-maxi-beckhoff"
@@ -1714,6 +1720,7 @@ redistribute = true
 format = "st"
 kind = "discovered"
 category = "application"
+holdout = true
 
 [[project]]
 name = "ishansharma97-virtual-manufacturing-cell"
@@ -1732,6 +1739,7 @@ redistribute = true
 format = "twincat"
 kind = "discovered"
 category = "application"
+holdout = true
 
 [[project]]
 name = "aydogandagidir-conveyor-sorting-twin"
@@ -1822,6 +1830,7 @@ redistribute = true
 format = "twincat"
 kind = "discovered"
 category = "application"
+holdout = true
 
 [[project]]
 name = "dalethomas81-arfbotos"
@@ -1840,6 +1849,7 @@ redistribute = true
 format = "st"
 kind = "discovered"
 category = "application"
+holdout = true
 
 [[project]]
 name = "jozamudi-lcls-plc-rix-sample-delivery-old"
@@ -1849,6 +1859,7 @@ redistribute = false
 format = "twincat"
 kind = "discovered"
 category = "application"
+holdout = true
 
 [[project]]
 name = "jozamudi-lcls-plc-mfx-sample-delivery-old"
@@ -1894,6 +1905,7 @@ redistribute = true
 format = "twincat"
 kind = "discovered"
 category = "sample"
+holdout = true
 
 [[project]]
 name = "0w8states-plc-oop-basics"
@@ -1930,6 +1942,7 @@ redistribute = false
 format = "st"
 kind = "discovered"
 category = "sample"
+holdout = true
 
 [[project]]
 name = "sarincr-plc-programming-using-openplc"
@@ -1984,6 +1997,7 @@ redistribute = true
 format = "st"
 kind = "discovered"
 category = "sample"
+holdout = true
 
 [[project]]
 name = "richard-luc-homesight"
@@ -2038,6 +2052,7 @@ redistribute = true
 format = "twincat"
 kind = "discovered"
 category = "library"
+holdout = true
 
 [[project]]
 name = "pcdshub-lcls-twincat-vacuum-system-simulator"

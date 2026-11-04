@@ -5,6 +5,7 @@
     python corpus/corpus.py fetch      # shallow-clone every project into corpus/.cache
     python corpus/corpus.py analyse    # extract ST, run rootplc check, write the report + dashboard
     python corpus/corpus.py dashboard  # rebuild corpus/dashboard.html from the last analysis
+    python corpus/corpus.py run        # run smoke test: execute each clean application program
 
 Writes corpus/REPORT.md and <cache>/analysis.json (cache: $ROOTPLC_CORPUS_CACHE or corpus/.cache). Code is never
 copied into the repository (see manifest.toml).
@@ -595,8 +596,163 @@ def write_report(results, all_codes, all_features) -> None:
     out += ["", "## Licences", "",
             "Only projects marked redistributable (MIT, BSD, Apache, CC0, Unlicense) may be copied into a",
             "published dataset. The others are analysed locally and cited by link.", ""]
-    (HERE / "REPORT.md").write_text("\n".join(out), encoding="utf-8")
+    (HERE / "REPORT.md").write_text(with_run_section("\n".join(out)), encoding="utf-8")
     print(f"wrote {HERE / 'REPORT.md'}")
+
+
+RUN_CYCLES = 500
+RUN_BEGIN, RUN_END = "<!-- run smoke test -->", "<!-- /run smoke test -->"
+
+
+def program_names(files: list[Path]) -> list[str]:
+    names = []
+    for f in files:
+        # not "PROGRAM inst WITH task : prog;" (a program instance in a resource)
+        for m in re.finditer(r"^\s*PROGRAM\s+([A-Za-z_]\w*)\b(?!\s*(?:WITH\b|:))", f.read_text(encoding="utf-8"), re.M | re.I):
+            names.append(m.group(1))
+    return names
+
+
+def entry_programs(files: list[Path]) -> list[str]:
+    """The programs to run: MAIN when there is one, else a program whose name
+    contains "main", else every program (at most five)."""
+    names = program_names(files)
+    for pick in ([n for n in names if n.lower() == "main"], [n for n in names if "main" in n.lower()]):
+        if pick:
+            return pick[:1]
+    return sorted(set(names))[:5]
+
+
+def clean_subset(exe: str, files: list[Path], extra: list[str], work: Path) -> list[Path]:
+    """The largest set of files that checks with no errors: drop the files
+    with errors and check again, until nothing more drops. Files are copied
+    to `work` (the command line stays short)."""
+    keep = list(files)
+    for _ in range(12):
+        if work.exists():
+            shutil.rmtree(work, onexc=_force_remove)
+        work.mkdir(parents=True)
+        where = {}
+        for i, f in enumerate(keep):
+            dst = work / f"{i:04d}_{f.name}"
+            shutil.copyfile(f, dst)
+            where[str(dst.resolve()).lower()] = f
+        r = subprocess.run([exe, "check", str(work), *extra, "--json"], capture_output=True, text=True, encoding="utf-8")
+        rep = json.loads(r.stdout) if r.stdout.strip().startswith("{") else {}
+        bad = {where.get(str(Path(x["file"]).resolve()).lower()) for x in rep.get("diagnostics", [])
+               if x.get("severity") == "error"}
+        bad.discard(None)
+        if not bad:
+            return keep
+        keep = [f for f in keep if f not in bad]
+        if not keep:
+            return []
+    return []
+
+
+def run_smoke() -> None:
+    """Run each application sub-project for RUN_CYCLES cycles with its inputs at
+    their defaults, and record whether it runs, stops with UNSUPPORTED (a
+    declared-only library call) or faults. A project with check errors runs
+    on its largest error-free part when that still contains the program (then
+    everything the program uses is clean). Holdout projects count in the
+    totals; their fault details are not stored."""
+    exe = rootplc()
+    shipped = shipped_libraries(exe)
+    analysis = {r["name"]: r for r in json.loads((CACHE / "analysis.json").read_text(encoding="utf-8"))}
+    rows = []
+    for p in projects():
+        if p.get("category") != "application" or p["name"] not in analysis:
+            continue
+        d = CACHE / p["name"] / "extracted"
+        if not d.exists():
+            continue
+        subdirs = sorted(x for x in d.iterdir() if x.is_dir())
+        top = [f for f in d.glob("*.st")]
+        targets = [(x, sorted(x.rglob("*.st"))) for x in subdirs if any(x.rglob("*.st"))]
+        if top:
+            targets.append((d, top) if not subdirs else (d, top))
+        for folder, files in targets:
+            libs = libraries_for(folder, p["format"], shipped)
+            extra = ["--library", ",".join(libs)] if libs else []
+            progs = entry_programs(files)
+            row = {"project": p["name"], "target": folder.name, "holdout": bool(p.get("holdout")), "runs": [],
+                   "units": len(files)}
+            if not progs:
+                row["outcome"] = "no program"
+                rows.append(row)
+                continue
+            work = CACHE / "_run" / "work"
+            keep = clean_subset(exe, files, extra, work)
+            row["clean_units"] = len(keep)
+            args = [str(work)]
+            for prog in progs:
+                if not program_names(keep) or prog not in program_names(keep):
+                    row["runs"].append({"program": prog, "outcome": "not runnable", "cycles": 0})
+                    continue
+                try:
+                    r = subprocess.run([exe, "run", *args, *extra, "--program", prog, "--cycles", str(RUN_CYCLES), "--json"],
+                                       capture_output=True, text=True, encoding="utf-8", timeout=120)
+                    rep = json.loads(r.stdout) if r.stdout.strip().startswith("{") else {}
+                except subprocess.TimeoutExpired:
+                    rep = {"fault": {"kind": "TIMEOUT", "message": "no result in 120 s"}}
+                errors = [x for x in rep.get("diagnostics", []) if x.get("severity") == "error"]
+                fault = rep.get("fault")
+                if errors:
+                    outcome = "not runnable"
+                elif fault:
+                    outcome = "UNSUPPORTED" if fault.get("kind") == "UNSUPPORTED" else "fault"
+                elif rep.get("ok"):
+                    outcome = "ran"
+                else:
+                    outcome = "not runnable"
+                run = {"program": prog, "outcome": outcome, "cycles": rep.get("cycles", 0)}
+                if fault and not p.get("holdout"):
+                    run["fault"] = {k: fault.get(k) for k in ("kind", "message", "file", "line")}
+                if errors and not p.get("holdout"):
+                    run["errors"] = len(errors)
+                row["runs"].append(run)
+            order = ["fault", "UNSUPPORTED", "not runnable", "ran"]
+            row["outcome"] = min((x["outcome"] for x in row["runs"]), key=order.index)
+            rows.append(row)
+            print(f"run  {p['name'][:40]:40} {folder.name[:30]:30} {row['outcome']}")
+    if (CACHE / "_run").exists():
+        shutil.rmtree(CACHE / "_run", onexc=_force_remove)
+    (CACHE / "run.json").write_text(json.dumps(rows, indent=1), encoding="utf-8")
+    report = HERE / "REPORT.md"
+    report.write_text(with_run_section(report.read_text(encoding="utf-8")), encoding="utf-8")
+    print(f"wrote {report}")
+
+
+def with_run_section(text: str) -> str:
+    """REPORT.md with the run smoke test section from <cache>/run.json."""
+    text = re.sub(re.escape(RUN_BEGIN) + r".*?" + re.escape(RUN_END) + r"\n?", "", text, flags=re.S)
+    path = CACHE / "run.json"
+    if not path.exists():
+        return text
+    rows = json.loads(path.read_text(encoding="utf-8"))
+    out = Counter(r["outcome"] for r in rows)
+    kinds = Counter(x["fault"]["kind"] for r in rows for x in r["runs"] if x.get("fault") and x["outcome"] == "fault")
+    n = len(rows)
+    sec = [RUN_BEGIN, "## Run smoke test (applications)", "",
+           f"Each application sub-project is run for {RUN_CYCLES} cycles with its inputs at their defaults",
+           "(no I/O simulation): MAIN, else a program named like it, else each program. Files with check",
+           "errors are left out (repeatedly, until the rest checks clean); the program runs when it is still",
+           "there, so everything it uses checks clean. This shows whether real machine code executes in",
+           "rootplc, not whether it behaves correctly.", "",
+           "| Outcome | Sub-projects |", "|---|---|"]
+    for k in ("ran", "UNSUPPORTED", "fault", "not runnable", "no program"):
+        sec.append(f"| {k} | {out.get(k, 0)} ({pct(out.get(k, 0), n)}) |")
+    if kinds:
+        sec += ["", "Faults by kind (holdout projects not shown): " +
+                ", ".join(f"{k} {v}" for k, v in kinds.most_common()) + "."]
+    sec += ["", "*ran*: all cycles without a fault; *UNSUPPORTED*: stopped at a library block RootPLC declares",
+            "but does not implement; *fault*: a run-time error (index, division, watchdog, ...); *not runnable*:",
+            "the program or something it uses has check errors.", RUN_END, ""]
+    marker = "## What blocks the rest"
+    if marker in text:
+        return text.replace(marker, "\n".join(sec) + "\n" + marker, 1)
+    return text + "\n" + "\n".join(sec)
 
 
 def record_history(results) -> None:
@@ -650,6 +806,8 @@ if __name__ == "__main__":
     elif cmd in ("analyse", "analyze"):
         analyse()
         dashboard()
+    elif cmd == "run":
+        run_smoke()
     elif cmd == "dashboard":
         dashboard()
     else:
