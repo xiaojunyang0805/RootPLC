@@ -4640,6 +4640,49 @@ impl<'a> Checker<'a> {
             };
             return V::with(ty, span, ExprKind::Const(Const::Str(name)));
         }
+        // [stdlib.compat.unit]: __ROOTPLC_UNIT_RESULT(suite, test, status,
+        // message) records one test result (status 0 passed, 1 failed,
+        // 2 skipped) for the suite instance `suite` refers to
+        if up == "__ROOTPLC_UNIT_RESULT" && self.intrinsics.contains(&up) && args.len() == 4 {
+            let irs: Vec<ir::Expr> = args.iter().map(|a| self.expr(a.expr).ir()).collect();
+            let call = ir::Call {
+                target: CallTarget::Builtin {
+                    name: up.clone(),
+                    ty: None,
+                },
+                inputs: Vec::new(),
+                outputs: Vec::new(),
+                args: irs,
+            };
+            return V::with(Ty::Unknown, span, ExprKind::Call(Box::new(call)));
+        }
+        // [stdlib.compat.unit]: __ROOTPLC_ANY_EQUAL(a, b) compares two ANY
+        // values (same type class and equal values); __ROOTPLC_ANY_TEXT(a)
+        // is the value as IEC literal text
+        if (up == "__ROOTPLC_ANY_EQUAL" && args.len() == 2
+            || up == "__ROOTPLC_ANY_TEXT" && args.len() == 1)
+            && self.intrinsics.contains(&up)
+        {
+            let irs: Vec<ir::Expr> = args.iter().map(|a| self.expr(a.expr).ir()).collect();
+            let rty = if up == "__ROOTPLC_ANY_EQUAL" {
+                Ty::Elem(Elem::Bool)
+            } else {
+                Ty::Str {
+                    wide: false,
+                    len: 255,
+                }
+            };
+            let call = ir::Call {
+                target: CallTarget::Builtin {
+                    name: up.clone(),
+                    ty: None,
+                },
+                inputs: Vec::new(),
+                outputs: Vec::new(),
+                args: irs,
+            };
+            return V::with(rty, span, ExprKind::Call(Box::new(call)));
+        }
         if args.is_empty() && self.intrinsics.contains(&up) && up == "TIME" {
             let call = ir::Call {
                 target: CallTarget::Builtin {

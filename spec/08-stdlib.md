@@ -171,3 +171,17 @@ block itself, for its methods (also those a derived block inherits and
 does not override) and for reading or writing its properties; a library can
 also mark a single method as declared only. Declaring instances, passing
 them and assigning them to interfaces needs no implementation.
+
+**[stdlib.compat.unit]** The library `TcUnit` provides the API of TcUnit,
+the open-source unit-test framework for TwinCAT 3, written from its public
+documentation: `FB_TestSuite` with its assert methods, `TEST`,
+`TEST_ORDERED`, `TEST_FINISHED`, `TEST_FINISHED_NAMED`, `IS_TEST_FINISHED`,
+`RUN`, `RUN_IN_SEQUENCE` and `TCUNIT_ADSLOGSTR`. Every `FB_TestSuite`
+instance registers itself in `FB_init` ([pous.oop.fb-init]); `RUN()` calls
+the body of every suite with unfinished tests once per cycle. An assert fails
+the current test and keeps the first failure's text; a test named
+`DISABLED_...` is skipped. When all suites have finished, each test's result
+(suite instance path, test name, passed / failed / skipped, message) is
+reported by `rootplc run` (JSON field `tests`). The library enables the
+intrinsics `__ROOTPLC_UNIT_RESULT`, `__ROOTPLC_ANY_EQUAL` and
+`__ROOTPLC_ANY_TEXT` for this; they are not part of any vendor interface.

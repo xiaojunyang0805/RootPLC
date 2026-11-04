@@ -106,8 +106,12 @@ Their results are fully defined:
 - bit string to integer and back: the same bits, with the target width;
 - to `STRING` / `WSTRING`: the text form. Integers and bit strings are
   written in decimal, `BOOL` as `TRUE` / `FALSE`, reals in the shortest
-  decimal form that reads back as the same value, `TIME` as `T#<n>ms`,
-  `LTIME` as `LT#<n>ns`, and `DATE`, `TOD`, `DT` and their `L` forms as
+  decimal form that reads back as the same value of their own type (`REAL`
+  0.1 is `0.1`), whole numbers with `.0` (`1.0`) and very large or small
+  magnitudes (from 1E16, below 1E-5) in exponent form without `+`
+  (`-3.402823E38`, `1E-7`); `TIME` and `LTIME` as literals in their largest
+  units with zero units left out (`T#49d17h2m47s295ms`, `T#1s500ms`,
+  `T#0ms`, `LT#1ms500us`), as TwinCAT writes them; and `DATE`, `TOD`, `DT` and their `L` forms as
   literals: `D#2017-04-04`, `TOD#12:42:42.5`, `DT#2017-04-04-12:42:42`
   (fractions of a second only when not zero). `CHAR` / `WCHAR` give the
   one-character string.

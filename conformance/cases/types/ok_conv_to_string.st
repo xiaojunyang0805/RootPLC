@@ -3,7 +3,7 @@
    run: PRG_Main cycles=1
    assert: a = '42'
    assert: b = '255'
-   assert: c = 'T#1500ms'
+   assert: c = 'T#1s500ms'
    assert: d = 'A'
    assert: e = 'TRUE'
    assert: f = '-7' *)

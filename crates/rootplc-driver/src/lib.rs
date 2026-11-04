@@ -322,6 +322,9 @@ pub struct RunReport {
     pub fault: Option<rootplc_vm::Fault>,
     /// Variables after the last cycle: name and IEC literal text.
     pub variables: Vec<(String, String)>,
+    /// Test results reported by a unit-test library (TcUnit) while the
+    /// program ran, [stdlib.compat.unit].
+    pub tests: Vec<rootplc_vm::UnitResult>,
 }
 
 impl RunReport {
@@ -356,6 +359,7 @@ pub fn run_report(
             cycles: 0,
             fault: None,
             variables: Vec::new(),
+            tests: Vec::new(),
         });
     };
     let programs: Vec<usize> = (0..prog.defs.len())
@@ -393,11 +397,14 @@ pub fn run_report(
         })
         .collect();
     let name = prog.defs[def].name.clone();
+    let tests = std::mem::take(&mut vm.unit_results);
+    drop(vm);
     Ok(RunReport {
         check,
         program: name,
         cycles: done,
         fault,
         variables,
+        tests,
     })
 }

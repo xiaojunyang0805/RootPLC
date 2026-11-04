@@ -6,6 +6,7 @@
     python corpus/corpus.py analyse    # extract ST, run rootplc check, write the report + dashboard
     python corpus/corpus.py dashboard  # rebuild corpus/dashboard.html from the last analysis
     python corpus/corpus.py run        # run smoke test: execute each clean application program
+    python corpus/corpus.py unit       # run the projects' own TcUnit tests (bundled TcUnit library)
 
 Writes corpus/REPORT.md and <cache>/analysis.json (cache: $ROOTPLC_CORPUS_CACHE or corpus/.cache). Code is never
 copied into the repository (see manifest.toml).
@@ -447,7 +448,7 @@ def analyse() -> None:
                     # a library the corpus provides (TcUnit), or one this
                     # repository builds itself (TcOpen's TcoCore next to the
                     # projects using it)
-                    dep = provided.get(r.lower()) or siblings.get(r.lower())
+                    dep = None if r.lower() in shipped else (provided.get(r.lower()) or siblings.get(r.lower()))
                     if not dep or dep in seen_dep or str(folder).startswith(str(dep) + os.sep):
                         continue
                     seen_dep.add(dep)
@@ -659,7 +660,7 @@ def write_report(results, all_codes, all_features, all_vendor=None, all_forms=No
     out += ["", "## Licences", "",
             "Only projects marked redistributable (MIT, BSD, Apache, CC0, Unlicense) may be copied into a",
             "published dataset. The others are analysed locally and cited by link.", ""]
-    (HERE / "REPORT.md").write_text(with_run_section("\n".join(out)), encoding="utf-8")
+    (HERE / "REPORT.md").write_text(with_unit_section(with_run_section("\n".join(out))), encoding="utf-8")
     print(f"wrote {HERE / 'REPORT.md'}")
 
 
@@ -787,6 +788,189 @@ def run_smoke() -> None:
     print(f"wrote {report}")
 
 
+UNIT_CYCLES = 3000
+UNIT_BEGIN, UNIT_END = "<!-- unit tests -->", "<!-- /unit tests -->"
+
+
+def test_programs(files: list[Path]) -> list[str]:
+    """Programs that run TcUnit (call RUN or RUN_IN_SEQUENCE)."""
+    out = []
+    for f in files:
+        text = f.read_text(encoding="utf-8", errors="replace")
+        for m in re.finditer(r"^\s*PROGRAM\s+([A-Za-z_]\w*)\b(?!\s*(?:WITH\b|:))(.*?)^\s*END_PROGRAM", text, re.M | re.I | re.S):
+            if re.search(r"\bRUN(_IN_SEQUENCE)?\s*\(\s*\)", m.group(2), re.I):
+                out.append(m.group(1))
+    return out
+
+
+SUITE_RE = re.compile(r"^\s*FUNCTION_BLOCK\s+((?:PUBLIC|INTERNAL|FINAL|ABSTRACT)\s+)*([A-Za-z_]\w*)\s+EXTENDS\s+([\w.]+)",
+                      re.M | re.I)
+
+
+def test_suites(files: list[Path]) -> list[str]:
+    """Test suites declared in the files that can be instantiated: blocks
+    extending FB_TestSuite (directly or through another suite), not ABSTRACT
+    and not extended by another suite."""
+    ext, abstract = {}, set()
+    for f in files:
+        for m in SUITE_RE.finditer(f.read_text(encoding="utf-8", errors="replace")):
+            ext[m.group(2).lower()] = (m.group(2), m.group(3).split(".")[-1].lower())
+            if m.group(1) and "abstract" in m.group(1).lower():
+                abstract.add(m.group(2).lower())
+
+    def is_suite(n, depth=0):
+        if n == "fb_testsuite":
+            return True
+        return depth < 10 and n in ext and is_suite(ext[n][1], depth + 1)
+
+    bases = {b for _, b in ext.values()}
+    return sorted(name for k, (name, _) in ext.items()
+                  if is_suite(k) and k not in abstract and k not in bases)
+
+
+RUNNER = "RootPLC_TestRunner"
+
+
+def run_unit() -> None:
+    """Method 3: run each project's own TcUnit tests with RootPLC's bundled
+    TcUnit library, for UNIT_CYCLES cycles of 10 ms, on the largest part of
+    the test project that checks clean (with the library under test from a
+    sibling folder). Records every test's result. Holdout projects count in
+    the totals; their tests are not listed."""
+    exe = rootplc()
+    shipped = shipped_libraries(exe)
+    if "tcunit" not in shipped:
+        sys.exit("this rootplc has no bundled TcUnit library")
+    rows = []
+    for p in projects():
+        if p.get("category") not in CORE:
+            continue
+        d = CACHE / p["name"] / "extracted"
+        if not d.exists():
+            continue
+        subdirs = sorted(x for x in d.iterdir() if x.is_dir())
+        folders = subdirs + ([d] if list(d.glob("*.st")) else [])
+        siblings: dict[str, Path] = {}
+        for x in subdirs:
+            label = re.sub(r"_\d+$", "", x.name).lower()
+            siblings.setdefault(label, x)
+            siblings.setdefault(label.rsplit("_", 1)[-1], x)
+        for folder in folders:
+            files = sorted(folder.glob("*.st")) if folder == d else sorted(folder.rglob("*.st"))
+            lt = folder / "libraries.txt"
+            refs = [r.lower() for r in lt.read_text(encoding="utf-8").split()] if lt.exists() else []
+            if "tcunit" not in refs:
+                continue
+            progs = test_programs(files)
+            all_suites = test_suites(files)
+            if not progs and not all_suites:
+                continue
+            libs = libraries_for(folder, p["format"], shipped)
+            deps = []
+            for r in refs:
+                dep = siblings.get(r)
+                if dep and dep != folder and r not in shipped:
+                    deps.append(str(dep))
+                    libs = sorted(set(libs) | set(libraries_for(dep, p["format"], shipped)))
+            extra = deps + ["--library", ",".join(libs)]
+            work = CACHE / "_unit" / "work"
+            keep = clean_subset(exe, files, extra, work)
+            row = {"project": p["name"], "target": folder.name, "holdout": bool(p.get("holdout")),
+                   "units": len(files), "clean_units": len(keep), "runs": [],
+                   "suites": len(all_suites)}
+            # the project's own suites, run by a generated program that
+            # instantiates each one that checks clean (a suite with errors
+            # would otherwise keep the project's test program from running)
+            suites = [s for s in test_suites(keep) if s.lower() in {x.lower() for x in all_suites}]
+            row["clean_suites"] = len(suites)
+            progs = [RUNNER] if suites else []
+            if suites:
+                decl = "".join(f"    s{i} : {s};\n" for i, s in enumerate(suites))
+                (work / "_rootplc_test_runner.st").write_text(
+                    f"PROGRAM {RUNNER}\nVAR\n{decl}END_VAR\nTcUnit.RUN();\nEND_PROGRAM\n", encoding="utf-8")
+            else:
+                row["runs"].append({"program": "", "outcome": "no clean suite", "tests": []})
+            for prog in progs:
+                run = {"program": prog, "tests": []}
+                try:
+                    r = subprocess.run([exe, "run", str(work), *extra, "--program", prog, "--cycles", str(UNIT_CYCLES),
+                                        "--cycle-ms", "10", "--json"], capture_output=True, text=True, encoding="utf-8",
+                                       timeout=600)
+                    rep = json.loads(r.stdout) if r.stdout.strip().startswith("{") else {}
+                except subprocess.TimeoutExpired:
+                    rep = {"fault": {"kind": "TIMEOUT", "message": "no result in 600 s"}}
+                fault = rep.get("fault")
+                tests = rep.get("tests", [])
+                errs = [x for x in rep.get("diagnostics", []) if x.get("severity") == "error"]
+                if errs:
+                    run["outcome"] = "not runnable"
+                    if not p.get("holdout"):
+                        run["errors"] = [f"{Path(x['file']).name}:{x['line']} {x['code']} {x['message'][:100]}" for x in errs[:5]]
+                elif fault:
+                    run["outcome"] = "UNSUPPORTED" if fault.get("kind") == "UNSUPPORTED" else "fault"
+                    if not p.get("holdout"):
+                        run["fault"] = {k: fault.get(k) for k in ("kind", "message", "file", "line")}
+                elif tests:
+                    run["outcome"] = "finished"
+                else:
+                    run["outcome"] = "unfinished"
+                run["tests"] = [{"suite": t["suite"], "test": t["test"], "status": t["status"],
+                                 "message": "" if p.get("holdout") else t["message"]} for t in tests]
+                run["counts"] = dict(Counter(t["status"] for t in tests))
+                row["runs"].append(run)
+            rows.append(row)
+            c = Counter(t["status"] for x in row["runs"] for t in x["tests"])
+            print(f"unit {p['name'][:40]:40} {folder.name[:28]:28} " + " ".join(x["outcome"] for x in row["runs"]) +
+                  f"  passed {c.get('passed', 0)} failed {c.get('failed', 0)}", flush=True)
+    if (CACHE / "_unit").exists():
+        shutil.rmtree(CACHE / "_unit", onexc=_force_remove)
+    (CACHE / "unit.json").write_text(json.dumps(rows, indent=1), encoding="utf-8")
+    report = HERE / "REPORT.md"
+    report.write_text(with_unit_section(report.read_text(encoding="utf-8")), encoding="utf-8")
+    print(f"wrote {report}")
+
+
+def with_unit_section(text: str) -> str:
+    """REPORT.md with the TcUnit section from <cache>/unit.json."""
+    text = re.sub(re.escape(UNIT_BEGIN) + r".*?" + re.escape(UNIT_END) + r"\n?", "", text, flags=re.S)
+    path = CACHE / "unit.json"
+    if not path.exists():
+        return text
+    rows = json.loads(path.read_text(encoding="utf-8"))
+    runs = [x for r in rows for x in r["runs"]]
+    out = Counter(x["outcome"] for x in runs)
+    tests = Counter(t["status"] for x in runs for t in x["tests"])
+    nt = sum(tests.values())
+    sec = [UNIT_BEGIN, "## The projects' own unit tests (TcUnit)", "",
+           f"The test suites of {len(rows)} sub-projects that use TcUnit, run unchanged with RootPLC's bundled",
+           f"TcUnit library for {UNIT_CYCLES} cycles of 10 ms. A generated program instantiates every suite that",
+           "checks clean (with the library under test) and calls TcUnit.RUN(). Unlike the figures above,",
+           "this checks behaviour: each test asserts what the code must compute.", "",
+           "| Sub-projects | Count |", "|---|---|"]
+    for k in ("finished", "unfinished", "UNSUPPORTED", "fault", "not runnable", "no clean suite"):
+        sec.append(f"| {k} | {out.get(k, 0)} |")
+    ns, nc = sum(r.get("suites", 0) for r in rows), sum(r.get("clean_suites", 0) for r in rows)
+    sec += ["", f"Test suites: {ns} declared, {nc} check clean and run ({pct1(nc, ns)}); the others have check",
+            "errors themselves or use code that has."]
+    sec += ["", f"**Tests: {nt} reported, {tests.get('passed', 0)} passed ({pct1(tests.get('passed', 0), nt)}), "
+                f"{tests.get('failed', 0)} failed, {tests.get('skipped', 0)} skipped.**", ""]
+    shown = [r for r in rows if not r["holdout"] and any(x["tests"] for x in r["runs"])]
+    if shown:
+        sec += ["| Project | Sub-project | Passed | Failed | Skipped |", "|---|---|---|---|---|"]
+        for r in shown:
+            c = Counter(t["status"] for x in r["runs"] for t in x["tests"])
+            sec.append(f"| {r['project']} | {r['target']} | {c.get('passed', 0)} | {c.get('failed', 0)} | {c.get('skipped', 0)} |")
+    sec += ["", "*finished*: every suite reported its tests; *unfinished*: tests still running after the last",
+            "cycle (or a suite never finishes a test); *no clean suite*: every suite has check errors;",
+            "*UNSUPPORTED*: a library block RootPLC declares but does not implement; *fault*: a run-time",
+            "error; *not runnable*: the test program or something it uses has check errors. Holdout projects",
+            "count in the totals and are not listed.", UNIT_END, ""]
+    marker = "## What blocks the rest"
+    if marker in text:
+        return text.replace(marker, "\n".join(sec) + "\n" + marker, 1)
+    return text + "\n" + "\n".join(sec)
+
+
 def with_run_section(text: str) -> str:
     """REPORT.md with the run smoke test section from <cache>/run.json."""
     text = re.sub(re.escape(RUN_BEGIN) + r".*?" + re.escape(RUN_END) + r"\n?", "", text, flags=re.S)
@@ -871,6 +1055,8 @@ if __name__ == "__main__":
         dashboard()
     elif cmd == "run":
         run_smoke()
+    elif cmd == "unit":
+        run_unit()
     elif cmd == "dashboard":
         dashboard()
     else:

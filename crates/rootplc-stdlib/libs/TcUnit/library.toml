@@ -1,0 +1,18 @@
+# Compatibility library: the API of TcUnit, the open-source unit-test
+# framework for TwinCAT 3 (MIT licence). Written only from the public
+# documentation and release notes below; no TcUnit source is used. RootPLC is
+# an independent project, not affiliated with or endorsed by the TcUnit
+# project or Beckhoff Automation.
+name = "TcUnit"
+vendor = "TcUnit project (open source)"
+version = "1.0.0"
+description = "TcUnit: FB_TestSuite with all documented asserts (AssertEquals, typed, REAL/LREAL with delta, 1D/2D/3D arrays, AssertTrue/False), TEST, TEST_ORDERED, TEST_FINISHED, TEST_FINISHED_NAMED, IS_TEST_FINISHED, RUN, RUN_IN_SEQUENCE, TCUNIT_ADSLOGSTR; results appear in rootplc run --json"
+requires = ["Tc2_System", "TwinCAT_BuiltIns"]
+declare_only = []
+intrinsics = ["__ROOTPLC_UNIT_RESULT", "__ROOTPLC_ANY_EQUAL", "__ROOTPLC_ANY_TEXT"]
+references = [
+  "https://tcunit.org/#/api (FB_TestSuite and every assert method: names, parameters, semantics)",
+  "https://tcunit.org/#/introduction-user-guide (test suites, TEST, TEST_FINISHED, PRG_TEST with TcUnit.RUN)",
+  "https://tcunit.org/#/faq (DISABLED_ tests, RUN_IN_SEQUENCE, TEST_ORDERED, TCUNIT_ADSLOGSTR, GVL_Param_TcUnit)",
+  "https://github.com/tcunit/TcUnit/releases (TEST_FINISHED_NAMED, IS_TEST_FINISHED, 2D/3D REAL/LREAL array asserts)",
+]

@@ -3,7 +3,7 @@
    run: PRG_Main cycles=2
    assert: a.hits = 2
    assert: b.hits = 4
-   assert: order = 12 *)
+   assert: seen = 12 *)
 VAR_GLOBAL
     count : UINT;
     order : INT;
@@ -48,7 +48,9 @@ VAR
     b : FB_Double;
     a : FB_Single;
     i : UINT;
+    seen : INT;
 END_VAR
+seen := order;
 FOR i := 1 TO count DO
     suites[i]^();
 END_FOR;

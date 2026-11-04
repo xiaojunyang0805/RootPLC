@@ -113,14 +113,28 @@ pub fn run(r: &RunReport) -> String {
         .iter()
         .map(|(n, v)| format!("{}:{}", json_string(n), json_string(v)))
         .collect();
+    let tests: Vec<String> = r
+        .tests
+        .iter()
+        .map(|t| {
+            let status = ["passed", "failed", "skipped"][usize::from(t.status.min(2))];
+            format!(
+                "{{\"suite\":{},\"test\":{},\"status\":\"{status}\",\"message\":{}}}",
+                json_string(&t.suite),
+                json_string(&t.test),
+                json_string(&t.message)
+            )
+        })
+        .collect();
     format!(
-        "{{\"command\":\"run\",\"ok\":{},\"program\":{},\"cycles\":{},\"fault\":{},\"diagnostics\":{},\"variables\":{{{}}}}}",
+        "{{\"command\":\"run\",\"ok\":{},\"program\":{},\"cycles\":{},\"fault\":{},\"diagnostics\":{},\"variables\":{{{}}},\"tests\":[{}]}}",
         r.ok(),
         json_string(&r.program),
         r.cycles,
         fault(&r.check, r.fault.as_ref()),
         diagnostics(&r.check),
-        vars.join(",")
+        vars.join(","),
+        tests.join(",")
     )
 }
 

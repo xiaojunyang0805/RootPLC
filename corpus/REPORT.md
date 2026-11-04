@@ -281,6 +281,45 @@ but does not implement; *fault*: a run-time error (index, division, watchdog, ..
 the program or something it uses has check errors.
 <!-- /run smoke test -->
 
+
+
+<!-- unit tests -->
+## The projects' own unit tests (TcUnit)
+
+The test suites of 36 sub-projects that use TcUnit, run unchanged with RootPLC's bundled
+TcUnit library for 3000 cycles of 10 ms. A generated program instantiates every suite that
+checks clean (with the library under test) and calls TcUnit.RUN(). Unlike the figures above,
+this checks behaviour: each test asserts what the code must compute.
+
+| Sub-projects | Count |
+|---|---|
+| finished | 5 |
+| unfinished | 4 |
+| UNSUPPORTED | 4 |
+| fault | 1 |
+| not runnable | 4 |
+| no clean suite | 18 |
+
+Test suites: 366 declared, 85 check clean and run (23.2%); the others have check
+errors themselves or use code that has.
+
+**Tests: 67 reported, 62 passed (92.5%), 5 failed, 0 skipped.**
+
+| Project | Sub-project | Passed | Failed | Skipped |
+|---|---|---|---|---|
+| oc-twincat-core | extracted | 35 | 0 | 0 |
+| babe-kimr-tc1200-plc-sample-oop-design-patterns-plc | PLC_20 | 1 | 2 | 0 |
+| pcdshub-lcls-twincat-general | extracted | 1 | 1 | 0 |
+| bengeisler-tclog | TcLog_0 | 17 | 2 | 0 |
+| roald87-tcerror | extracted | 8 | 0 | 0 |
+
+*finished*: every suite reported its tests; *unfinished*: tests still running after the last
+cycle (or a suite never finishes a test); *no clean suite*: every suite has check errors;
+*UNSUPPORTED*: a library block RootPLC declares but does not implement; *fault*: a run-time
+error; *not runnable*: the test program or something it uses has check errors. Holdout projects
+count in the totals and are not listed.
+<!-- /unit tests -->
+
 ## What blocks the rest
 
 In the core set without the holdout projects.

@@ -176,6 +176,19 @@ pub struct Fault {
 
 /// A failed assertion (spec/07-test-blocks.md).
 #[derive(Debug, Clone)]
+pub struct UnitResult {
+    /// Instance path of the test suite, e.g. `PRG_TEST.fbSuite`.
+    pub suite: String,
+    /// Test name.
+    pub test: String,
+    /// 0 passed, 1 failed, 2 skipped.
+    pub status: u8,
+    /// Failure message (empty when passed).
+    pub message: String,
+}
+
+/// A failed assertion of a TEST block.
+#[derive(Debug, Clone, PartialEq)]
 pub struct AssertFailure {
     /// File index.
     pub file: usize,
@@ -219,6 +232,9 @@ pub struct Vm<'p> {
     pub now_ns: i128,
     /// Failed assertions so far.
     pub failures: Vec<AssertFailure>,
+    /// Test results reported by a unit-test library such as TcUnit,
+    /// [stdlib.compat.unit].
+    pub unit_results: Vec<UnitResult>,
     steps: u64,
     file: usize,
     /// Root holding the global variables, [config.global-list].
@@ -323,6 +339,48 @@ fn conv_elem(v: Value, e: Elem) -> Value {
     }
 }
 
+/// [types.conversion.string]: a REAL or LREAL as text: the shortest digits
+/// that read back to the same value of its type, `1.0` for whole numbers,
+/// and the exponent form `-3.402823E38` (no `+`) for very large and very
+/// small magnitudes (from 1E16, below 1E-5).
+fn real_text(x: f64, single: bool) -> String {
+    let s = if single {
+        format!("{:?}", x as f32)
+    } else {
+        format!("{x:?}")
+    };
+    s.replace('e', "E")
+}
+
+/// [types.conversion.string]: a duration as a literal in its largest units,
+/// zero units left out: `T#49d17h2m47s295ms`, `T#0ms`; `n` is in ms (TIME) or
+/// ns (LTIME, which also shows us and ns).
+fn duration_text(prefix: &str, n: i128, nanos: bool) -> String {
+    let (sign, mut rest) = if n < 0 { ("-", -n) } else { ("", n) };
+    let ms = if nanos { 1_000_000 } else { 1 };
+    let mut units: Vec<(i128, &str)> = vec![
+        (86_400_000 * ms, "d"),
+        (3_600_000 * ms, "h"),
+        (60_000 * ms, "m"),
+        (1000 * ms, "s"),
+        (ms, "ms"),
+    ];
+    if nanos {
+        units.extend([(1000, "us"), (1, "ns")]);
+    }
+    let mut out = format!("{sign}{prefix}");
+    for (size, name) in &units {
+        if rest >= *size {
+            out.push_str(&format!("{}{name}", rest / size));
+            rest %= size;
+        }
+    }
+    if out.len() == sign.len() + prefix.len() {
+        out.push_str(if nanos { "0ns" } else { "0ms" });
+    }
+    out
+}
+
 /// `yyyy-mm-dd` of a day count since 1970-01-01 (proleptic Gregorian).
 fn civil_date(days: i128) -> String {
     // Howard Hinnant's days_from_civil inverse
@@ -402,6 +460,7 @@ impl<'p> Vm<'p> {
             startup_fault: None,
             now_ns: 0,
             failures: Vec::new(),
+            unit_results: Vec::new(),
             steps: 0,
             file: 0,
             globals: None,
@@ -779,6 +838,39 @@ impl<'p> Vm<'p> {
         }
     }
 
+    /// The instance path of a place: the root's name, then member names and
+    /// array positions (`PRG_TEST.suites[2]`).
+    fn path_name(&self, loc: &Loc) -> String {
+        let prog = self.prog;
+        let Some(&r) = self.root_defs.get(loc.root) else {
+            return String::new();
+        };
+        let mut out = prog.defs[r].name.clone();
+        let mut ty = Ty::Named(r);
+        for &k in &loc.path {
+            ty = match self.strip(&ty) {
+                Ty::Array { elem, dims } => {
+                    let lo = dims.first().copied().flatten().map_or(0, |d| d.0);
+                    out.push_str(&format!("[{}]", lo + i128::from(k)));
+                    *elem
+                }
+                Ty::Named(d) => {
+                    let v = match &prog.defs[d].kind {
+                        DefKind::Struct(fields) => fields.get(k as usize),
+                        DefKind::Pou(p) => p.vars.get(k as usize),
+                        _ => None,
+                    };
+                    let Some(v) = v else { break };
+                    out.push('.');
+                    out.push_str(&v.name);
+                    v.ty.clone()
+                }
+                _ => break,
+            };
+        }
+        out
+    }
+
     /// Whether block `d` is `base` or extends it, [pous.oop.extends].
     fn extends(&self, mut d: usize, base: usize) -> bool {
         for _ in 0..64 {
@@ -862,8 +954,8 @@ impl<'p> Vm<'p> {
     /// Render a value of type `ty` as IEC literal text.
     pub fn display(&self, v: &Value, ty: &Ty) -> String {
         match (v, self.strip(ty)) {
-            (Value::Int(n), Ty::Elem(Elem::Time)) => format!("T#{n}ms"),
-            (Value::Int(n), Ty::Elem(Elem::Ltime)) => format!("LT#{n}ns"),
+            (Value::Int(n), Ty::Elem(Elem::Time)) => duration_text("T#", *n, false),
+            (Value::Int(n), Ty::Elem(Elem::Ltime)) => duration_text("LT#", *n, true),
             // [types.elementary]: DATE / DT in seconds, TOD in ms, L types in ns
             (Value::Int(n), Ty::Elem(Elem::Date)) => {
                 format!("D#{}", civil_date(n.div_euclid(86_400)))
@@ -893,7 +985,8 @@ impl<'p> Vm<'p> {
                 },
                 _ => n.to_string(),
             },
-            (Value::Real(x), _) => format!("{x:?}"),
+            (Value::Real(x), Ty::Elem(Elem::Real)) => real_text(*x, true),
+            (Value::Real(x), _) => real_text(*x, false),
             (Value::Str(s), Ty::Str { wide: true, .. }) => format!("\"{s}\""),
             (Value::Str(s), _) => format!("'{s}'"),
             (Value::Ref(None) | Value::Obj(None), _) => "NULL".into(),
@@ -1363,8 +1456,9 @@ impl<'p> Vm<'p> {
                 let loc = self.place(inst, cx)?;
                 // [pous.oop.override]: a body called through a reference runs
                 // the block of the instance itself, a derived one included
+                // body; SUPER^() (and THIS^()) run the block they are typed as
                 let id = &match self.block_at(&loc) {
-                    Some(d) if d != *id && self.extends(d, *id) => d,
+                    Some(d) if !is_this_expr(inst) && d != *id && self.extends(d, *id) => d,
                     _ => *id,
                 };
                 let Some(pou) = prog.pou(*id) else {
@@ -1655,6 +1749,42 @@ impl<'p> Vm<'p> {
             }
             // [stdlib.compat.intrinsics]: time since start, ms (virtual clock)
             "TIME" => Ok(Value::Int(self.now_ns / 1_000_000)),
+            "__ROOTPLC_UNIT_RESULT" => {
+                let suite = match arg(0) {
+                    Value::Ref(Some(l)) => self.path_name(&l),
+                    _ => String::new(),
+                };
+                self.unit_results.push(UnitResult {
+                    suite,
+                    test: to_text(&arg(1)),
+                    status: int(&arg(2)).clamp(0, 2) as u8,
+                    message: to_text(&arg(3)),
+                });
+                Ok(Value::Int(0))
+            }
+            "__ROOTPLC_ANY_EQUAL" | "__ROOTPLC_ANY_TEXT" => {
+                // an ANY value is (type class, reference, size)
+                let parts = |v: &Value| match v {
+                    Value::Agg(xs) if xs.len() == 3 => Some((xs[0].clone(), xs[1].clone())),
+                    _ => None,
+                };
+                let target = |vm: &Self, r: &Value| match r {
+                    Value::Ref(Some(l)) => vm.get(l, e.span).ok().cloned(),
+                    _ => None,
+                };
+                let a = parts(&arg(0)).map(|(c, r)| (c, target(self, &r)));
+                if name == "__ROOTPLC_ANY_TEXT" {
+                    let t = a
+                        .and_then(|(_, v)| v)
+                        .map(|v| to_text(&v))
+                        .unwrap_or_default();
+                    return Ok(Value::Str(t));
+                }
+                let b = parts(&arg(1)).map(|(c, r)| (c, target(self, &r)));
+                Ok(Value::Bool(
+                    matches!((a, b), (Some((ca, Some(va))), Some((cb, Some(vb)))) if ca == cb && va == vb),
+                ))
+            }
             "ADVANCE" => {
                 // [tests.time]: TIME is in ms, LTIME in ns.
                 let n = int(&arg(0)).max(0);
@@ -1853,7 +1983,7 @@ impl<'p> Vm<'p> {
                 );
                 if to_str && !chars && !matches!(v, Value::Str(_)) {
                     let text = match (&v, ty) {
-                        (Value::Int(_), Some(t)) => self.display(&v, t),
+                        (Value::Int(_) | Value::Real(_), Some(t)) => self.display(&v, t),
                         _ => to_text(&v),
                     };
                     v = Value::Str(text);

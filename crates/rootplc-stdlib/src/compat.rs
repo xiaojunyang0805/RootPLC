@@ -93,6 +93,10 @@ const BUNDLED: &[(&str, &[(&str, &str)])] = &[
             include_str!("../libs/TwinCAT_BuiltIns/1.0.0/TwinCAT_BuiltIns.st"),
         )],
     ),
+    (
+        include_str!("../libs/TcUnit/library.toml"),
+        &[("TcUnit.st", include_str!("../libs/TcUnit/1.0.0/TcUnit.st"))],
+    ),
 ];
 
 /// A string value or a list of strings from the small TOML subset the
