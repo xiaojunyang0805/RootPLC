@@ -121,8 +121,19 @@ runs the body of A on the same instance.
 **[pous.oop.override]** A method of B with the name of a method of A
 overrides it. Every call on an instance runs the method of the instance's own
 block, also when the call is made inside a method inherited from A
-(`THIS^.M()` or `M()`): this is dynamic dispatch. `SUPER^.M()` runs A's
-method without dispatch.
+(`THIS^.M()` or `M()`) or through a reference or pointer of type A
+(`p^.M()`): this is dynamic dispatch. `SUPER^.M()` runs A's method without
+dispatch. Calling the body through such a reference, `p^()`, likewise runs the
+body of the instance's own block (TwinCAT).
+
+**[pous.oop.fb-init]** A method named `FB_init` (CODESYS and TwinCAT) runs
+once for every instance of its block when the instance is created, before
+the first cycle: instances inside a block before the block, in declaration
+order, global variables before program instances. Its inputs `bInitRetains`
+and `bInCopyCode` are TRUE and FALSE; arguments given in the declaration are
+not passed yet ([variables.init-arguments]). A fault in `FB_init` is reported
+by the first cycle. Because the call is implicit, declaring `FB_init` is
+warning RP0135 ([scope.vendor-forms]).
 
 **[pous.oop.this]** Inside a function block, program or method, `THIS` is a
 reference to the current instance and `SUPER` the same instance seen as its

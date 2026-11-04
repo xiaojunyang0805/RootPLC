@@ -209,6 +209,12 @@ const MAX_DEPTH: usize = 256;
 pub struct Vm<'p> {
     prog: &'p Program,
     roots: Vec<Value>,
+    /// The definition each root is an instance or frame of (parallel to
+    /// `roots`): the type of any place follows from it, [pous.oop.override].
+    root_defs: Vec<usize>,
+    /// A fault raised by FB_init while instances were created; the next
+    /// cycle reports it, [pous.oop.fb-init].
+    startup_fault: Option<Fault>,
     /// Virtual clock in nanoseconds; timers read it.
     pub now_ns: i128,
     /// Failed assertions so far.
@@ -392,6 +398,8 @@ impl<'p> Vm<'p> {
         let mut vm = Vm {
             prog,
             roots: Vec::new(),
+            root_defs: Vec::new(),
+            startup_fault: None,
             now_ns: 0,
             failures: Vec::new(),
             steps: 0,
@@ -630,11 +638,166 @@ impl<'p> Vm<'p> {
     pub fn instantiate(&mut self, def: usize) -> usize {
         let v = self.default_named(def);
         self.roots.push(v);
-        self.roots.len() - 1
+        self.root_defs.push(def);
+        let root = self.roots.len() - 1;
+        // [pous.oop.fb-init]: FB_init of every block instance, inner ones first
+        if let Err(f) = self.fb_init_tree(
+            &Loc {
+                root,
+                path: Vec::new(),
+            },
+            &Ty::Named(def),
+        ) {
+            self.startup_fault.get_or_insert(f);
+        }
+        root
+    }
+
+    /// Run FB_init (bInitRetains TRUE, bInCopyCode FALSE) on each function
+    /// block instance inside the place `at` of type `ty`, inner instances
+    /// before the one containing them, in declaration order.
+    fn fb_init_tree(&mut self, at: &Loc, ty: &Ty) -> R<()> {
+        let prog = self.prog;
+        match self.strip(ty) {
+            Ty::Array { elem, dims } => {
+                let n: usize = dims
+                    .iter()
+                    .map(|d| d.map_or(0, |(a, b)| (b - a + 1) as usize))
+                    .product();
+                for k in 0..n {
+                    self.fb_init_tree(&at.child(k), &elem)?;
+                }
+            }
+            Ty::Named(d) => match &prog.defs[d].kind {
+                DefKind::Struct(fields) => {
+                    for (k, f) in fields.iter().enumerate() {
+                        self.fb_init_tree(&at.child(k), &f.ty)?;
+                    }
+                }
+                DefKind::Pou(p) if !p.builtin && p.kind != rootplc_sema::ir::PouKind::Interface => {
+                    for (k, v) in p.vars.iter().enumerate() {
+                        if v.section != Section::InOut && !matches!(v.ty, Ty::Ref(_)) {
+                            self.fb_init_tree(&at.child(k), &v.ty)?;
+                        }
+                    }
+                    if let Some(&(_, m)) = p
+                        .methods
+                        .iter()
+                        .find(|(n, _)| n.eq_ignore_ascii_case("FB_init"))
+                    {
+                        let args = prog.pou(m).map_or(Vec::new(), |mp| {
+                            mp.vars
+                                .iter()
+                                .enumerate()
+                                .filter(|(_, v)| v.section == Section::Input)
+                                .filter_map(|(k, v)| {
+                                    if v.name.eq_ignore_ascii_case("bInitRetains") {
+                                        Some((k, Value::Bool(true)))
+                                    } else if v.name.eq_ignore_ascii_case("bInCopyCode") {
+                                        Some((k, Value::Bool(false)))
+                                    } else {
+                                        None
+                                    }
+                                })
+                                .collect()
+                        });
+                        self.call_method_direct(m, at.clone(), d, &args)?;
+                    }
+                }
+                _ => {}
+            },
+            _ => {}
+        }
+        Ok(())
+    }
+
+    /// Call method `m` on the instance at `inst` (of block `rt`) with the
+    /// given input values, outside any expression (FB_init at start-up).
+    fn call_method_direct(
+        &mut self,
+        m: usize,
+        inst: Loc,
+        rt: usize,
+        args: &[(usize, Value)],
+    ) -> R<()> {
+        let prog = self.prog;
+        let Some(pou) = prog.pou(m) else {
+            return Ok(());
+        };
+        let frame = self.default_named(m);
+        self.roots.push(frame);
+        self.root_defs.push(m);
+        let root = self.roots.len() - 1;
+        let floc = Loc {
+            root,
+            path: Vec::new(),
+        };
+        for (slot, v) in args {
+            self.store(
+                &floc.child(*slot),
+                v.clone(),
+                &pou.vars[*slot].ty,
+                Span::new(0, 0),
+            )?;
+        }
+        let saved = self.file;
+        self.file = prog.defs[m].file;
+        self.steps = 0;
+        let r = self.exec_block(
+            &pou.body,
+            &Ctx {
+                this: floc,
+                inst: Some((inst, rt)),
+            },
+        );
+        self.file = saved;
+        self.roots.truncate(root);
+        self.root_defs.truncate(root);
+        r.map(|_| ())
+    }
+
+    /// The function block or program stored at `loc`, from the type of its
+    /// root and the slot path: through a reference or pointer this is the
+    /// instance's own block, a derived one included, [pous.oop.override].
+    fn block_at(&self, loc: &Loc) -> Option<usize> {
+        let prog = self.prog;
+        let mut ty = Ty::Named(*self.root_defs.get(loc.root)?);
+        for &k in &loc.path {
+            ty = match self.strip(&ty) {
+                Ty::Array { elem, .. } => *elem,
+                Ty::Named(d) => match &prog.defs[d].kind {
+                    DefKind::Struct(fields) => fields.get(k as usize)?.ty.clone(),
+                    DefKind::Pou(p) => p.vars.get(k as usize)?.ty.clone(),
+                    _ => return None,
+                },
+                _ => return None,
+            };
+        }
+        match self.strip(&ty) {
+            Ty::Named(d) if prog.pou(d).is_some() => Some(d),
+            _ => None,
+        }
+    }
+
+    /// Whether block `d` is `base` or extends it, [pous.oop.extends].
+    fn extends(&self, mut d: usize, base: usize) -> bool {
+        for _ in 0..64 {
+            if d == base {
+                return true;
+            }
+            match self.prog.pou(d).and_then(|p| p.base) {
+                Some(b) => d = b,
+                None => return false,
+            }
+        }
+        false
     }
 
     /// Execute the body of POU `def` once on the instance at `root` (one cycle).
     pub fn cycle(&mut self, root: usize, def: usize) -> R<()> {
+        if let Some(f) = self.startup_fault.take() {
+            return Err(f);
+        }
         self.steps = 0;
         let Some(pou) = self.prog.pou(def) else {
             return Ok(());
@@ -1198,6 +1361,12 @@ impl<'p> Vm<'p> {
         match &c.target {
             CallTarget::Instance(inst, id) => {
                 let loc = self.place(inst, cx)?;
+                // [pous.oop.override]: a body called through a reference runs
+                // the block of the instance itself, a derived one included
+                let id = &match self.block_at(&loc) {
+                    Some(d) if d != *id && self.extends(d, *id) => d,
+                    _ => *id,
+                };
                 let Some(pou) = prog.pou(*id) else {
                     return Ok(Value::Int(0));
                 };
@@ -1268,7 +1437,10 @@ impl<'p> Vm<'p> {
                     let loc = self.place(inst, cx)?;
                     let rt = match &cx.inst {
                         Some((_, d)) if is_this_expr(inst) => *d,
-                        _ => *fb,
+                        _ => match self.block_at(&loc) {
+                            Some(d) if *dispatch && d != *fb && self.extends(d, *fb) => d,
+                            _ => *fb,
+                        },
                     };
                     (loc, rt)
                 };
@@ -1328,6 +1500,7 @@ impl<'p> Vm<'p> {
         }
         let frame = self.default_named(id);
         self.roots.push(frame);
+        self.root_defs.push(id);
         let root = self.roots.len() - 1;
         let floc = Loc {
             root,
@@ -1363,6 +1536,7 @@ impl<'p> Vm<'p> {
             self.store(&tl, v, &target.ty, target.span)?;
         }
         self.roots.truncate(root);
+        self.root_defs.truncate(root);
         Ok(result)
     }
 

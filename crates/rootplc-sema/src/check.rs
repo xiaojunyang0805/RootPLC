@@ -892,6 +892,15 @@ impl<'a> Checker<'a> {
             if let Some(mt) = self.decl_name(m) {
                 let full = format!("{fbname}.{}", self.text(mt));
                 let ms = self.tok_span(mt);
+                // [pous.oop.fb-init]: run implicitly when the instance is created
+                if m.kind == N::Method && self.text(mt).eq_ignore_ascii_case("FB_init") {
+                    self.diag(
+                        codes::VENDOR_MEANING,
+                        "FB_init runs implicitly when an instance is created (CODESYS / TwinCAT); IEC 61131-3 has no initialisation method".into(),
+                        ms,
+                        None,
+                    );
+                }
                 let mid = self.add_def(&full, Kind::Pending, Some(m), ms);
                 self.owner.insert(mid, fb);
             }
