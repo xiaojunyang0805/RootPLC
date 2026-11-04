@@ -2283,6 +2283,15 @@ first, and `__DELETE(p)`, which frees the variable `p` refers to and sets
 `p` to NULL; using a reference to a freed variable is the fault `NULL_REF`.
 Indexing such a reference as a pointer (`p[i]`) is not supported.
 
+**[stdlib.compat.any]** With `TwinCAT_BuiltIns`, an input of a generic type
+(`ANY`, `ANY_NUM`, ...) in a user POU is a `__SYSTEM.AnyType`: `TypeClass`
+(`__SYSTEM.TYPE_CLASS`), `pValue` (a reference to the argument; a value that
+is not a variable is copied to a new variable) and `diSize` (its size in
+bytes, as `SIZEOF`). `pValue` is an untyped reference, so it converts to a
+reference of the argument's type; reading it byte by byte (pointer
+arithmetic) is not supported. Without the library, generic types in user
+declarations stay RP0104.
+
 **[stdlib.compat.sizeof]** A library may enable compiler operators;
 `TwinCAT_BuiltIns` enables `SIZEOF(x)` and `XSIZEOF(x)`: the size in bytes
 of a variable or type, a constant, with TwinCAT's 64-bit layout and default

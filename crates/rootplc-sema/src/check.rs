@@ -417,6 +417,95 @@ impl<'a> Checker<'a> {
         Some(format!("{}.{m}", self.qualifier_path(base)?))
     }
 
+    /// [stdlib.compat.any]: an argument for an ANY input, as a
+    /// __SYSTEM.AnyType value: type class, reference to the argument (a
+    /// value that is not a variable is copied to a new variable), size.
+    fn any_argument(&mut self, target: &Ty, v: &V) -> Option<ir::Expr> {
+        let any = *self.types.get("anytype")?;
+        if !self.intrinsics.contains("ANY") || *target != Ty::Named(any) {
+            return None;
+        }
+        let vt = self.strip(&v.ty);
+        if vt == Ty::Named(any) || vt == Ty::Unknown {
+            return None;
+        }
+        let class: i128 = match &vt {
+            Ty::Elem(e) => match e {
+                Elem::Bool => 0,
+                Elem::Byte => 2,
+                Elem::Word => 3,
+                Elem::Dword => 4,
+                Elem::Lword => 5,
+                Elem::Sint => 6,
+                Elem::Int => 7,
+                Elem::Dint => 8,
+                Elem::Lint => 9,
+                Elem::Usint => 10,
+                Elem::Uint => 11,
+                Elem::Udint => 12,
+                Elem::Ulint => 13,
+                Elem::Real => 14,
+                Elem::Lreal => 15,
+                Elem::Time => 18,
+                Elem::Date => 19,
+                Elem::Dt => 20,
+                Elem::Tod => 21,
+                Elem::Ltime => 37,
+                _ => 28,
+            },
+            Ty::IntLit => 7,
+            Ty::RealLit => 15,
+            Ty::Str { wide: false, .. } => 16,
+            Ty::Str { wide: true, .. } => 17,
+            Ty::Ref(_) | Ty::Null => 23,
+            Ty::Array { .. } => 26,
+            Ty::Named(i) => match &self.defs[*i].kind {
+                Kind::Enum(_) => 25,
+                Kind::Subrange { .. } => 24,
+                _ => 28,
+            },
+            _ => 28,
+        };
+        let size = self.layout(&vt, 0).map_or(0, |(s, _)| s as i128);
+        let span = v.span;
+        let konst = |n: i128| ir::Expr {
+            ty: Ty::Elem(Elem::Dint),
+            kind: ExprKind::Const(Const::Int(n)),
+            span,
+        };
+        let place = matches!(
+            v.e,
+            ExprKind::Var(_)
+                | ExprKind::Global(_)
+                | ExprKind::Member(..)
+                | ExprKind::Index(..)
+                | ExprKind::Deref(_)
+        ) && v.k.is_none();
+        let arg = if place {
+            ir::Expr {
+                ty: Ty::Ref(Box::new(vt.clone())),
+                kind: ExprKind::Ref(Box::new(v.clone().ir())),
+                span,
+            }
+        } else {
+            v.clone().ir()
+        };
+        let call = ir::Call {
+            target: CallTarget::Builtin {
+                name: "__ROOTPLC_ANY".into(),
+                ty: Some(vt),
+            },
+            inputs: Vec::new(),
+            outputs: Vec::new(),
+            args: vec![arg, konst(class), konst(size), konst(i128::from(place))],
+        };
+        Some(ir::Expr {
+            ty: Ty::Named(any),
+            kind: ExprKind::Call(Box::new(call)),
+            span,
+        })
+    }
+
     fn builtin_fb(&mut self, name: &str, inputs: &[(&str, Elem)], outputs: &[(&str, Elem)]) {
         let var = |(n, e): &(&str, Elem), section| Var {
             name: (*n).to_string(),
@@ -1389,6 +1478,9 @@ impl<'a> Checker<'a> {
     /// [pous.oop.interface-ref]; otherwise the usual conversion rules apply.
     fn adapt(&mut self, target: &Ty, v: V) -> ir::Expr {
         let tt = self.strip(target);
+        if let Some(e) = self.any_argument(&tt, &v) {
+            return e;
+        }
         if let Ty::Named(t) = tt {
             if self.is_itf(&tt) {
                 let vt = self.strip(&v.ty);
@@ -2048,6 +2140,15 @@ impl<'a> Checker<'a> {
                 return Ty::Unknown;
             }
             return self.named_ref(id);
+        }
+        // [stdlib.compat.any]: with TwinCAT_BuiltIns an ANY input is a
+        // __SYSTEM.AnyType (type class, address, size)
+        if GENERIC_TYPES.iter().any(|g| g.eq_ignore_ascii_case(name))
+            && self.intrinsics.contains("ANY")
+        {
+            if let Some(&id) = self.types.get("anytype") {
+                return Ty::Named(id);
+            }
         }
         if GENERIC_TYPES.iter().any(|g| g.eq_ignore_ascii_case(name)) {
             self.diag(

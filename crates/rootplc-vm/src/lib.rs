@@ -1312,6 +1312,24 @@ impl<'p> Vm<'p> {
                 .map_err(|k| vm.fault(k, e.span, "result outside the subrange"))
         };
         match name {
+            // [stdlib.compat.any]: (type class, reference, size); a value
+            // that is not a variable gets a variable of its own
+            "__ROOTPLC_ANY" => {
+                let r = if int(&arg(3)) != 0 {
+                    arg(0)
+                } else {
+                    let v = match ty {
+                        Some(t) => self.convert(arg(0), t).unwrap_or_else(|_| arg(0)),
+                        None => arg(0),
+                    };
+                    self.heap.push(Some(v));
+                    Value::Ref(Some(Loc {
+                        root: HEAP + self.heap.len() - 1,
+                        path: Vec::new(),
+                    }))
+                };
+                Ok(Value::Agg(vec![arg(1), r, arg(2)]))
+            }
             // [stdlib.compat.dynamic]
             "__NEW" => {
                 let t = ty.cloned().unwrap_or(Ty::Unknown);

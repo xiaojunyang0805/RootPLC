@@ -247,7 +247,8 @@ mod tests {
                 "__POUNAME",
                 "TIME",
                 "__NEW",
-                "__DELETE"
+                "__DELETE",
+                "ANY"
             ]
         );
     }

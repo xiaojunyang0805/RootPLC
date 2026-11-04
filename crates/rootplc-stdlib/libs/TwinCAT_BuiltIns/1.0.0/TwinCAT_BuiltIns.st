@@ -69,6 +69,14 @@ TYPE
         TYPE_LTIME := 37,
         TYPE_BITCONST := 38
     );
+    (* AnyType: what an ANY input holds (CODESYS documentation of ANY).
+       pValue is an untyped reference here (CODESYS: POINTER TO BYTE), so
+       it converts to a reference of the argument's type. *)
+    AnyType : STRUCT
+        TypeClass : TYPE_CLASS;
+        pValue : PVOID;
+        diSize : DINT;
+    END_STRUCT;
 END_TYPE
 END_NAMESPACE
 
