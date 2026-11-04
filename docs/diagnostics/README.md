@@ -57,6 +57,7 @@ Codes RP00xx are lexical, RP01xx types, RP02xx names and structure, RP03xx synta
 | [RP0126](#rp0126) | warning | bit string used as a number, or bitwise operator on integers (not portable) |
 | [RP0127](#rp0127) | warning | integer literal 0 or 1 used as BOOL, or 0 as a reference (not portable) |
 | [RP0128](#rp0128) | warning | duration field after the first out of its range, T#1h90m (not portable) |
+| [RP0129](#rp0129) | warning | enumeration value used as an integer, or an integer stored in an enumeration (not portable) |
 
 ## RP0001
 
@@ -424,7 +425,8 @@ allowed when exactly one enumeration in scope has it, otherwise error RP0106.
 The CODESYS and TwinCAT spelling `Mode.Auto` (also qualified by a namespace,
 `NS.Mode.Auto`) means `Mode#Auto` and is accepted with warning RP0122 when
 `Mode` is not the name of a variable, also as a CASE label.
-Enumerations do not convert implicitly to integers (RP0103); use `TO_INT`.
+Enumerations do not convert implicitly to integers (RP0103); use `TO_INT`,
+except as [types.derived.enum.integer] allows.
 
 ## RP0107
 
@@ -583,7 +585,8 @@ allowed when exactly one enumeration in scope has it, otherwise error RP0106.
 The CODESYS and TwinCAT spelling `Mode.Auto` (also qualified by a namespace,
 `NS.Mode.Auto`) means `Mode#Auto` and is accepted with warning RP0122 when
 `Mode` is not the name of a variable, also as a CASE label.
-Enumerations do not convert implicitly to integers (RP0103); use `TO_INT`.
+Enumerations do not convert implicitly to integers (RP0103); use `TO_INT`,
+except as [types.derived.enum.integer] allows.
 
 ## RP0123
 
@@ -627,7 +630,8 @@ allowed when exactly one enumeration in scope has it, otherwise error RP0106.
 The CODESYS and TwinCAT spelling `Mode.Auto` (also qualified by a namespace,
 `NS.Mode.Auto`) means `Mode#Auto` and is accepted with warning RP0122 when
 `Mode` is not the name of a variable, also as a CASE label.
-Enumerations do not convert implicitly to integers (RP0103); use `TO_INT`.
+Enumerations do not convert implicitly to integers (RP0103); use `TO_INT`,
+except as [types.derived.enum.integer] allows.
 
 ## RP0114
 
@@ -773,3 +777,20 @@ units are case-insensitive, and `_` may separate fields (`T#1h_30m`).
   added): warning RP0128.
 
 A literal that breaks any other of these is error RP0011.
+
+## RP0129
+
+warning: enumeration value used as an integer, or an integer stored in an enumeration (not portable)
+
+Rule `types.derived.enum.integer` in `spec/02-types.md`:
+
+**[types.derived.enum.integer]** CODESYS and TwinCAT let enumeration values
+stand for their integers; RootPLC accepts this with warning RP0129. An
+enumeration value converts implicitly to an integer or bit-string type, and
+in a comparison with an integer or with a value of another enumeration both
+sides are compared as integers. Unless the enumeration is declared with
+`{attribute 'strict'}` before its name, an integer (or a value of another
+enumeration) may also be assigned to an enumeration variable and arithmetic
+on enumeration values gives a result of the base type; with the attribute
+these stay RP0103, except that a constant equal to one of the type's values
+may be assigned. The value is not checked against the enumeration's values.

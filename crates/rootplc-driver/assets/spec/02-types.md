@@ -158,7 +158,19 @@ allowed when exactly one enumeration in scope has it, otherwise error RP0106.
 The CODESYS and TwinCAT spelling `Mode.Auto` (also qualified by a namespace,
 `NS.Mode.Auto`) means `Mode#Auto` and is accepted with warning RP0122 when
 `Mode` is not the name of a variable, also as a CASE label.
-Enumerations do not convert implicitly to integers (RP0103); use `TO_INT`.
+Enumerations do not convert implicitly to integers (RP0103); use `TO_INT`,
+except as [types.derived.enum.integer] allows.
+
+**[types.derived.enum.integer]** CODESYS and TwinCAT let enumeration values
+stand for their integers; RootPLC accepts this with warning RP0129. An
+enumeration value converts implicitly to an integer or bit-string type, and
+in a comparison with an integer or with a value of another enumeration both
+sides are compared as integers. Unless the enumeration is declared with
+`{attribute 'strict'}` before its name, an integer (or a value of another
+enumeration) may also be assigned to an enumeration variable and arithmetic
+on enumeration values gives a result of the base type; with the attribute
+these stay RP0103, except that a constant equal to one of the type's values
+may be assigned. The value is not checked against the enumeration's values.
 
 **[types.derived.struct]** `STRUCT ... END_STRUCT` declares members with
 optional initial values. A structure that contains itself, directly or

@@ -243,6 +243,8 @@ pub(crate) struct Checker<'a> {
     intrinsics: HashSet<String>,
     /// Base type of enumerations declared with one (`INT (a, b)`).
     enum_base: HashMap<usize, Elem>,
+    /// Enumerations declared with {attribute 'strict'}.
+    strict_enums: HashSet<usize>,
     /// Property accessor definition -> (its PROPERTY node, is the getter).
     prop_info: HashMap<usize, (&'a Node, bool)>,
     /// Structure types declared as UNION ([types.derived.union]).
@@ -319,6 +321,7 @@ impl<'a> Checker<'a> {
             qualifiers: HashSet::new(),
             intrinsics: HashSet::new(),
             enum_base: HashMap::new(),
+            strict_enums: HashSet::new(),
             prop_info: HashMap::new(),
             unions: HashSet::new(),
             diags: Vec::new(),
@@ -2282,6 +2285,18 @@ impl<'a> Checker<'a> {
             next = val + 1;
         }
         let id_ty = self.make_def(decl, Kind::Enum(values));
+        // [types.derived.enum.integer]: {attribute 'strict'} before the name
+        if let Ty::Named(id) = id_ty {
+            let before = &self.src()[..self.span(e).start as usize];
+            let from = ["END_TYPE", "END_STRUCT", ";"]
+                .iter()
+                .filter_map(|m| before.rfind(m).map(|i| i + m.len()))
+                .max()
+                .unwrap_or(0);
+            if before[from..].to_ascii_lowercase().contains("'strict'") {
+                self.strict_enums.insert(id);
+            }
+        }
         // [types.derived.enum]: the vendor spelling with the base type after the values
         let trailing = self.items(e).into_iter().find_map(|i| match i {
             Item::Tok(t) if self.tkind(t) == T::TypeName => Elem::from_name(self.text(t)),
@@ -3028,6 +3043,20 @@ impl<'a> Checker<'a> {
         matches!(t, Ty::Named(i) if matches!(self.defs[*i].kind, Kind::Enum(_)))
     }
 
+    /// The base type of enumeration type `t` (INT unless declared).
+    fn enum_base_of(&self, t: &Ty) -> Option<Elem> {
+        match t {
+            Ty::Named(i) if self.is_enum(t) => {
+                Some(self.enum_base.get(i).copied().unwrap_or(Elem::Int))
+            }
+            _ => None,
+        }
+    }
+
+    fn is_strict_enum(&self, t: &Ty) -> bool {
+        matches!(t, Ty::Named(i) if self.strict_enums.contains(i))
+    }
+
     /// [types.conversion.implicit], [types.equivalence], [types.derived.alias].
     fn compatible(&self, to: &Ty, from: &Ty) -> bool {
         let (to, from) = (self.strip(to), self.strip(from));
@@ -3106,6 +3135,22 @@ impl<'a> Checker<'a> {
                     }
                     // the TwinCAT idiom 0 for an empty interface reference
                     Ty::Named(_) if self.is_itf(&tb) && v.k == Some(K::Int(0)) => true,
+                    // [types.derived.enum.integer]: a constant stored in an enumeration
+                    Ty::Named(i) if self.is_enum(&tb) => {
+                        let listed = matches!(&self.defs[*i].kind, Kind::Enum(vals)
+                            if vals.iter().any(|(_, x)| Some(K::Int(*x)) == v.k));
+                        if listed || !self.is_strict_enum(&tb) {
+                            let msg = format!(
+                                "integer stored in enumeration {}; IEC 61131-3 names the value",
+                                self.ty_name(to)
+                            );
+                            self.diag(codes::ENUM_AS_INTEGER, msg, v.span, None);
+                            true
+                        } else {
+                            self.mismatch(to, v);
+                            false
+                        }
+                    }
                     Ty::Ref(_) if v.k == Some(K::Int(0)) => {
                         let msg = "0 used as a reference; IEC 61131-3 writes NULL";
                         self.diag(codes::INTEGER_AS_BOOL_OR_NULL, msg.into(), v.span, None);
@@ -3137,6 +3182,30 @@ impl<'a> Checker<'a> {
             return true;
         }
         if !self.compatible(to, &v.ty) {
+            // [types.derived.enum.integer]: an enumeration value as an integer,
+            // or an integer / other enumeration stored in a non-strict one
+            let fb = self.strip(&v.ty);
+            if self.is_enum(&fb) && int_like(&tb) {
+                let msg = format!(
+                    "enumeration {} used as {}; IEC 61131-3 converts explicitly",
+                    self.ty_name(&v.ty),
+                    self.ty_name(to)
+                );
+                self.diag(codes::ENUM_AS_INTEGER, msg, v.span, None);
+                return true;
+            }
+            if self.is_enum(&tb)
+                && !self.is_strict_enum(&tb)
+                && (int_like(&fb) || self.is_enum(&fb))
+            {
+                let msg = format!(
+                    "{} stored in enumeration {}; IEC 61131-3 converts explicitly",
+                    self.ty_name(&v.ty),
+                    self.ty_name(to)
+                );
+                self.diag(codes::ENUM_AS_INTEGER, msg, v.span, None);
+                return true;
+            }
             // CODESYS / TwinCAT: UDINT to DWORD and back (same size); RP0126
             if let (Ty::Elem(a), Ty::Elem(b)) = (&tb, self.strip(&v.ty)) {
                 if same_size_bits(*a, b).is_some() {
@@ -3191,6 +3260,18 @@ impl<'a> Checker<'a> {
             (Ty::Unknown, _) | (_, Ty::Unknown) => Ty::Unknown,
             (Ty::IntLit, Ty::IntLit) => Ty::IntLit,
             (Ty::IntLit | Ty::RealLit, Ty::RealLit) | (Ty::RealLit, Ty::IntLit) => Ty::RealLit,
+            // [types.derived.enum.integer]: an enumeration with an integer constant
+            (Ty::IntLit, t) | (t, Ty::IntLit) if self.is_enum(t) => {
+                let b = self.enum_base_of(t).unwrap_or(Elem::Int);
+                let msg = format!(
+                    "operands of {what} mix {} and {} as integers; IEC 61131-3 converts explicitly",
+                    self.ty_name(&l.ty),
+                    self.ty_name(&r.ty)
+                );
+                let span = Span::new(l.span.start as usize, r.span.end as usize);
+                self.diag(codes::ENUM_AS_INTEGER, msg, span, None);
+                Ty::Elem(b)
+            }
             (Ty::IntLit | Ty::RealLit | Ty::Null, _) => {
                 if self.coerce(&rt, l) {
                     rt
@@ -3218,6 +3299,27 @@ impl<'a> Checker<'a> {
                 let span = Span::new(l.span.start as usize, r.span.end as usize);
                 self.diag(codes::BIT_STRING_AS_NUMBER, msg, span, None);
                 Ty::Elem(same_size_bits(*a, *b).unwrap_or(*a))
+            }
+            // [types.derived.enum.integer]: compared (or computed) as integers
+            _ if (self.is_enum(&lt) || self.is_enum(&rt))
+                && [&lt, &rt].iter().all(|t| self.is_enum(t) || int_like(t)) =>
+            {
+                let msg = format!(
+                    "operands of {what} mix {} and {} as integers; IEC 61131-3 converts explicitly",
+                    self.ty_name(&l.ty),
+                    self.ty_name(&r.ty)
+                );
+                let span = Span::new(l.span.start as usize, r.span.end as usize);
+                self.diag(codes::ENUM_AS_INTEGER, msg, span, None);
+                let base = |t: &Ty| match t {
+                    Ty::Elem(e) => Some(*e),
+                    _ => self.enum_base_of(t),
+                };
+                match (base(&lt), base(&rt)) {
+                    (Some(a), Some(b)) if a.widens_to(b) => Ty::Elem(b),
+                    (Some(a), _) => Ty::Elem(a),
+                    _ => Ty::Elem(Elem::Dint),
+                }
             }
             _ => {
                 let msg = format!(
@@ -3694,11 +3796,37 @@ impl<'a> Checker<'a> {
             }
         }
         let what = format!("'{}'", self.text(op));
+        // [types.derived.enum.integer]: no arithmetic on a strict enumeration
+        if cls != Cls::Cmp {
+            let strict = [&l.ty, &r.ty]
+                .into_iter()
+                .map(|t| self.strip(t))
+                .find(|t| self.is_strict_enum(t));
+            if let Some(t) = strict {
+                let msg = format!(
+                    "operator {what} is not defined for {} (declared with attribute 'strict')",
+                    self.ty_name(&t)
+                );
+                self.diag(codes::IMPLICIT_CONVERSION, msg, span, None);
+                return V::unknown(span);
+            }
+        }
         let ty = self.unify(&l, &r, &what);
         if ty == Ty::Unknown {
             return V::unknown(span);
         }
-        let st = self.strip(&ty);
+        let mut st = self.strip(&ty);
+        // [types.derived.enum.integer]: arithmetic on a non-strict enumeration
+        if cls != Cls::Cmp && !self.is_strict_enum(&st) {
+            if let Some(b) = self.enum_base_of(&st) {
+                let msg = format!(
+                    "operator {what} on enumeration {}; IEC 61131-3 converts first",
+                    self.ty_name(&ty)
+                );
+                self.diag(codes::ENUM_AS_INTEGER, msg, span, None);
+                st = Ty::Elem(b);
+            }
+        }
         let num = matches!(st, Ty::IntLit | Ty::RealLit) || matches!(st, Ty::Elem(e) if e.is_num());
         let ok = match cls {
             Cls::Arith => {
@@ -4547,6 +4675,11 @@ impl<'a> Checker<'a> {
 
 /// The bit-string type when `a` and `b` are an unsigned integer and a bit
 /// string of the same size (UDINT and DWORD), else None.
+/// An integer or bit-string type other than BOOL.
+fn int_like(t: &Ty) -> bool {
+    matches!(t, Ty::Elem(e) if e.is_int() || (e.is_bit() && *e != Elem::Bool))
+}
+
 fn same_size_bits(a: Elem, b: Elem) -> Option<Elem> {
     use Elem::*;
     let pair = |u: Elem, w: Elem| {

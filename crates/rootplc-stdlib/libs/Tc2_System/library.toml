@@ -5,10 +5,13 @@
 name = "Tc2_System"
 vendor = "Beckhoff Automation GmbH"
 version = "1.0.0"
-description = "TwinCAT Tc2_System: T_MaxString, system constants, ADS logging, ST_LibVersion, AMS address types, task index, CPU counter, F_CreateAmsNetId; declared only: MEMCPY/MEMMOVE/MEMSET/MEMCMP, DRAND, file blocks, ADSREAD/ADSWRITE, F_GetSystemTime"
+description = "TwinCAT Tc2_System: T_MaxString, system constants, ADS logging, ST_LibVersion, AMS address types, task index, CPU counter, F_CreateAmsNetId, the ADS error enumerations E_AdsErr and E_HRESULTAdsErr (device and client codes); declared only: MEMCPY/MEMMOVE/MEMSET/MEMCMP, DRAND, file blocks, ADSREAD/ADSWRITE, F_GetSystemTime"
 requires = ["TwinCAT_BuiltIns"]
 declare_only = ["ADSLOGSTR", "ADSLOGDINT", "ADSLOGLREAL", "GETCPUCOUNTER", "MEMCPY", "MEMMOVE", "MEMSET", "MEMCMP", "DRAND", "FB_FileOpen", "FB_FileClose", "FB_FileWrite", "FB_FileRead", "FB_FilePuts", "FB_FileGets", "FB_FileDelete", "FB_CreateDir", "ADSREAD", "ADSWRITE", "F_GetSystemTime"]
 references = [
+  "https://infosys.beckhoff.com/content/1033/tcplclib_tc2_iofunctions/374277003.html (ADS return codes: values, names, HRESULT form; E_AdsErr, E_HRESULTAdsErr)",
+  "https://infosys.beckhoff.com/content/1033/tf6311_tc3_tcpudp/1679006603.html (the 16#9811 codes are the enumeration E_HRESULTAdsErr in the PLC)",
+  "https://infosys.beckhoff.com/content/1033/tf7xxx_tc3_vision/2334733579.html (HRESULT member names INVALIDPARM, NOTFOUND, ... for the device codes)",
   "https://infosys.beckhoff.com/content/1033/tcplclib_tc2_system/31084171.html (global constants)",
   "https://infosys.beckhoff.com/content/1033/tcplclib_tc2_system/31062795.html (T_MaxString)",
   "https://infosys.beckhoff.com/content/1033/tcplclib_tc2_system/31033611.html (ADSLOGSTR)",

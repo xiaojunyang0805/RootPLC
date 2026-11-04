@@ -216,6 +216,7 @@ pub mod codes {
         BIT_STRING_AS_NUMBER = 126, Warning;
         INTEGER_AS_BOOL_OR_NULL = 127, Warning;
         DURATION_FIELD_OVERFLOW = 128, Warning;
+        ENUM_AS_INTEGER = 129, Warning;
     }
 
     /// Severity of a code, if the code exists.

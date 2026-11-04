@@ -358,3 +358,10 @@ severity = "warning"
 summary = "duration field after the first out of its range, T#1h90m (not portable)"
 spec = "lexical.literal.duration"
 stage = "lex"
+
+[[code]]
+id = "RP0129"
+severity = "warning"
+summary = "enumeration value used as an integer, or an integer stored in an enumeration (not portable)"
+spec = "types.derived.enum.integer"
+stage = "sema"

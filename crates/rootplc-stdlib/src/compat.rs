@@ -274,7 +274,7 @@ mod tests {
                 "F_GetSystemTime"
             ]
         );
-        assert_eq!(tc.references.len(), 20);
+        assert_eq!(tc.references.len(), 23);
         assert!(find("nope").is_none());
         let r = resolve(&["Tc2_Utilities".into()]).expect("resolve");
         let names: Vec<&str> = r.iter().map(|l| l.name.as_str()).collect();
