@@ -386,8 +386,10 @@ mod tests {
             ),
         ]);
         let s: Vec<_> = r.units.iter().map(|u| u.status).collect();
-        assert_eq!(s, [Status::Dialect, Status::Dependent, Status::Dialect]);
-        assert_eq!(r.units[1].blocked_by, [PathBuf::from("lib.st")]);
+        // the declarations of a unit with a syntax error stay visible (the
+        // parser recovers), so the unit using FB_Lib checks clean
+        assert_eq!(s, [Status::Dialect, Status::Portable, Status::Dialect]);
+        assert!(r.units[1].blocked_by.is_empty());
         assert_eq!(
             r.units[2].constructs[0].name,
             "implicit narrowing conversion"

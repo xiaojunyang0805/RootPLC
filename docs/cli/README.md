@@ -43,8 +43,9 @@ snippet to merge is printed.
 
 ## check
 
-Lexes, parses and type-checks. Files with syntax errors are not type-checked,
-so one typo does not cause a cascade of follow-on errors.
+Lexes, parses and type-checks. A file with syntax errors reports only those,
+so one typo does not cause a cascade of follow-on errors; the declarations
+recovered from it stay visible to the other files.
 
 Text: `file:line:col: error[RP0103]: INT does not convert implicitly to SINT`,
 then `  hint: …`.

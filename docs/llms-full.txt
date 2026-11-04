@@ -73,8 +73,9 @@ snippet to merge is printed.
 
 ## check
 
-Lexes, parses and type-checks. Files with syntax errors are not type-checked,
-so one typo does not cause a cascade of follow-on errors.
+Lexes, parses and type-checks. A file with syntax errors reports only those,
+so one typo does not cause a cascade of follow-on errors; the declarations
+recovered from it stay visible to the other files.
 
 Text: `file:line:col: error[RP0103]: INT does not convert implicitly to SINT`,
 then `  hint: …`.
@@ -1781,7 +1782,10 @@ never lose comments.
 **[syntax.recovery]** A syntax error does not stop parsing. The parser reports
 the error, skips to the next `;` or block keyword (`END_…`, `ELSE`, `ELSIF`,
 `UNTIL`, a statement keyword or a new POU) and continues. All syntax errors in
-a file are reported in one run, so an agent can fix them together.
+a file are reported in one run, so an agent can fix them together. The
+declarations the parser recovers from a file with syntax errors are visible
+to the other files; that file's own type errors are reported once its
+syntax errors are fixed.
 
 **[syntax.general]** A token that cannot start or continue the expected
 construct is error RP0201. The message names what was expected and what was

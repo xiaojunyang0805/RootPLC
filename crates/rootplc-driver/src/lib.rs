@@ -250,18 +250,24 @@ fn check_files(
             clean.push(i);
         }
     }
-    let input: Vec<_> = clean
+    // Every file takes part in the analysis, so the declarations of a file
+    // with a syntax error stay visible to the others (the parser recovers);
+    // its own semantic diagnostics are left out, the syntax errors come first.
+    let all: Vec<usize> = (0..files.len()).collect();
+    let input: Vec<_> = all
         .iter()
         .map(|&i| (&parses[i], files[i].source.as_str()))
         .collect();
     let analysis = rootplc_sema::analyze_with(&input, &opts);
-    for (&i, diags) in clean.iter().zip(analysis.diagnostics) {
-        files[i].diagnostics.extend(diags);
+    for (&i, diags) in all.iter().zip(analysis.diagnostics) {
+        if clean.contains(&i) {
+            files[i].diagnostics.extend(diags);
+        }
     }
     let mut report = CheckReport {
         files,
         program: None,
-        ir_files: clean,
+        ir_files: all,
     };
     if report.ok() {
         report.program = Some(analysis.program);

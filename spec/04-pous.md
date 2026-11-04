@@ -17,7 +17,10 @@ never lose comments.
 **[syntax.recovery]** A syntax error does not stop parsing. The parser reports
 the error, skips to the next `;` or block keyword (`END_…`, `ELSE`, `ELSIF`,
 `UNTIL`, a statement keyword or a new POU) and continues. All syntax errors in
-a file are reported in one run, so an agent can fix them together.
+a file are reported in one run, so an agent can fix them together. The
+declarations the parser recovers from a file with syntax errors are visible
+to the other files; that file's own type errors are reported once its
+syntax errors are fixed.
 
 **[syntax.general]** A token that cannot start or continue the expected
 construct is error RP0201. The message names what was expected and what was
