@@ -13,4 +13,11 @@ The repository holds only `manifest.toml` (URL, licence, format) and the
 tools. Code is never copied here. Only projects with permissive licences
 (`redistribute = true`) may go into a published dataset.
 
+Every project is reviewed and given a `category`; the headline figures use
+applications, libraries and samples only, and a holdout set (never used to
+choose fixes) shows whether improvements generalise. Projects that are empty,
+duplicated, not Structured Text or too small to matter are removed and listed
+under `[[excluded]]` in the manifest. *Clean* is rootplc's own verdict, not a
+vendor compiler's.
+
 Latest result: [REPORT.md](REPORT.md).

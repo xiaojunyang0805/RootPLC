@@ -12,6 +12,16 @@
 # dialect: the code is not IEC 61131-3 Structured Text as CODESYS / TwinCAT
 #   write it (e.g. "lasal": Sigmatek LASAL with C preprocessor lines); it is
 #   analysed and listed, but kept out of the totals.
+# category: "application" (a program for a machine or plant), "library",
+#   "sample" (vendor samples, tutorials, blog and course code) or
+#   "tool-input" (test inputs and examples of compilers, parsers, editors, AI
+#   tools, benchmarks). The headline figures use the first three only.
+# holdout = true: the project's errors are never ranked or stored; its figure
+#   shows whether fixes chosen on the rest generalise. Do not inspect them.
+# [[excluded]] (end of file): reviewed and removed, with the reason: no ST to
+#   analyse, duplicate (80% or more copied units), chaos (not IEC 61131-3 ST,
+#   fragments) or valueless (a tool or agent repository with 5 units or fewer,
+#   or at most 2 units and at most one GitHub star).
 # format: "st" (plain files), "twincat" (.TcPOU/.TcDUT/.TcGVL XML),
 #         "brx" (B&R: declarations in .fun/.typ/.var, bodies in .st),
 #         "binary" / "none": nothing to extract (see note)
@@ -23,6 +33,7 @@ licence = "MIT (custom text)"
 redistribute = false
 format = "twincat"
 kind = "test framework"
+category = "library"
 # a library other corpus projects reference (.plcproj): analysed with them
 provides = "TcUnit"
 provides_folder = "TcUnit"
@@ -34,6 +45,8 @@ licence = "MIT"
 redistribute = true
 format = "twincat"
 kind = "library"
+category = "library"
+holdout = true
 
 [[project]]
 name = "fisothemes-standard-library"
@@ -42,6 +55,8 @@ licence = "MIT"
 redistribute = true
 format = "twincat"
 kind = "library"
+category = "library"
+holdout = true
 
 [[project]]
 name = "tccontrol"
@@ -50,6 +65,7 @@ licence = "MIT"
 redistribute = true
 format = "twincat"
 kind = "control library"
+category = "library"
 
 [[project]]
 name = "oc-twincat-core"
@@ -58,6 +74,7 @@ licence = "BSD-3-Clause"
 redistribute = true
 format = "twincat"
 kind = "library"
+category = "library"
 
 [[project]]
 name = "tcmath"
@@ -66,6 +83,7 @@ licence = "MIT"
 redistribute = true
 format = "twincat"
 kind = "example with unit tests"
+category = "sample"
 
 [[project]]
 name = "zeugwerk-testbench"
@@ -74,15 +92,7 @@ licence = "MIT"
 redistribute = true
 format = "twincat"
 kind = "test library"
-
-[[project]]
-name = "oscat-basic-twincat"
-url = "https://github.com/sagatowski/alltwincat.com-oscat-basic"
-licence = "OSCAT licence (no SPDX)"
-redistribute = false
-format = "binary"
-note = "compiled TwinCAT .library only"
-kind = "standard library (OSCAT)"
+category = "library"
 
 [[project]]
 name = "aixocat"
@@ -91,6 +101,7 @@ licence = "MIT"
 redistribute = true
 format = "twincat"
 kind = "building automation library (OSCAT based)"
+category = "library"
 
 [[project]]
 name = "br-oscat"
@@ -99,23 +110,7 @@ licence = "MIT"
 redistribute = true
 format = "brx"
 kind = "standard library (OSCAT, B&R)"
-
-[[project]]
-name = "structured-text-utilities"
-url = "https://github.com/WengerAG/structured-text-utilities"
-licence = "MIT"
-redistribute = true
-format = "st"
-kind = "utilities"
-
-[[project]]
-name = "codesys-oop-examples"
-url = "https://github.com/Aliazzzz/OOP-Concept-Examples-in-CODESYS-V3"
-licence = "Unlicense"
-redistribute = true
-format = "binary"
-note = "CODESYS .project files only; not extractable without CODESYS"
-kind = "examples (OOP)"
+category = "library"
 
 [[project]]
 name = "fb-case-state-machine"
@@ -124,24 +119,7 @@ licence = "CC0-1.0"
 redistribute = true
 format = "twincat"
 kind = "example"
-
-[[project]]
-name = "spec2control"
-url = "https://github.com/hkoziolek/Spec2Control"
-licence = "Apache-2.0"
-redistribute = true
-format = "none"
-note = "interface specs (CSV) and control narratives, no ST source: a source of bench tasks"
-kind = "LLM-generated control logic (research)"
-
-[[project]]
-name = "echidna"
-url = "https://github.com/61131/echidna"
-licence = "BSD-2-Clause"
-redistribute = true
-format = "none"
-note = "compiler written in C; no ST corpus in the repository"
-kind = "compiler test programs"
+category = "library"
 
 [[project]]
 name = "struckig"
@@ -150,6 +128,7 @@ licence = "GPL-3.0"
 redistribute = false
 format = "twincat"
 kind = "motion library (analysis only)"
+category = "library"
 
 [[project]]
 name = "iec-checker"
@@ -159,21 +138,7 @@ licence = "LGPL-3.0"
 redistribute = false
 format = "st"
 kind = "static-analysis test programs (analysis only)"
-
-[[project]]
-name = "conveyor-pid"
-url = "https://github.com/Spatelio/conveyer-belt-automation-control"
-licence = "MIT"
-redistribute = true
-format = "binary"
-note = "CODESYS .project file only"
-kind = "application"
-
-# ---------------------------------------------------------------------------
-# Added 3 Nov 2026 from GitHub search (topics twincat, codesys, structured-text,
-# iec-61131-3, beckhoff, oscat, plc-programming; name/description search).
-# Only licensed, non-fork repositories whose tree contains PLC source files.
-# Repositories without a licence are not listed. Re-run discovery to extend.
+category = "tool-input"
 
 [[project]]
 name = "tcopengroup-tcopen"
@@ -182,6 +147,7 @@ licence = "MIT License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
+category = "library"
 
 [[project]]
 name = "johannespettersson80-trust-platform"
@@ -190,6 +156,7 @@ licence = "Apache License 2.0"
 redistribute = true
 format = "st"
 kind = "discovered"
+category = "tool-input"
 
 [[project]]
 name = "thorstenbrach-srci"
@@ -198,6 +165,7 @@ licence = "MIT License"
 redistribute = true
 format = "st"
 kind = "discovered"
+category = "library"
 
 [[project]]
 name = "tomookay-toast"
@@ -206,6 +174,7 @@ licence = "MIT License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
+category = "application"
 
 [[project]]
 name = "lorenz-software-tc3unittest"
@@ -214,6 +183,7 @@ licence = "MIT License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
+category = "library"
 
 [[project]]
 name = "haud-ba-plc-motion-layer"
@@ -222,14 +192,7 @@ licence = "other (see repository)"
 redistribute = false
 format = "twincat"
 kind = "discovered"
-
-[[project]]
-name = "mihaiginta-tcoscatbasic"
-url = "https://github.com/mihaiginta/TcOscatBasic"
-licence = "other (see repository)"
-redistribute = false
-format = "twincat"
-kind = "discovered"
+category = "library"
 
 [[project]]
 name = "trofimich-twincat-openframework"
@@ -238,6 +201,7 @@ licence = "MIT License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
+category = "library"
 
 [[project]]
 name = "tkucic-unitest"
@@ -246,6 +210,7 @@ licence = "MIT License"
 redistribute = true
 format = "st"
 kind = "discovered"
+category = "library"
 
 [[project]]
 name = "inxton-axsharp"
@@ -254,6 +219,7 @@ licence = "MIT License"
 redistribute = true
 format = "st"
 kind = "discovered"
+category = "tool-input"
 
 [[project]]
 name = "tchaxx-protobuf"
@@ -262,6 +228,7 @@ licence = "MIT License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
+category = "library"
 
 [[project]]
 name = "babe-kimr-tc1200-plc-sample-oop-design-patterns-plc"
@@ -270,6 +237,7 @@ licence = "BSD 2-Clause \"Simplified\" License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
+category = "sample"
 
 [[project]]
 name = "pcdshub-lcls-twincat-vacuum"
@@ -278,6 +246,7 @@ licence = "other (see repository)"
 redistribute = false
 format = "twincat"
 kind = "discovered"
+category = "library"
 
 [[project]]
 name = "pcdshub-lcls-twincat-motion"
@@ -286,6 +255,7 @@ licence = "other (see repository)"
 redistribute = false
 format = "twincat"
 kind = "discovered"
+category = "library"
 
 [[project]]
 name = "eponce00-tcforge"
@@ -294,6 +264,8 @@ licence = "MIT License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
+category = "library"
+holdout = true
 
 [[project]]
 name = "fisothemes-fisothemes-common-library-for-twincat"
@@ -302,6 +274,7 @@ licence = "MIT License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
+category = "library"
 
 [[project]]
 name = "beckhoff-tf6310-samples"
@@ -310,6 +283,7 @@ licence = "other (see repository)"
 redistribute = false
 format = "twincat"
 kind = "discovered"
+category = "sample"
 
 [[project]]
 name = "haud-ba-xts-transport-layer"
@@ -318,6 +292,7 @@ licence = "other (see repository)"
 redistribute = false
 format = "twincat"
 kind = "discovered"
+category = "library"
 
 [[project]]
 name = "intecre-twincat-utils"
@@ -326,6 +301,7 @@ licence = "MIT License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
+category = "library"
 
 [[project]]
 name = "pcdshub-lcls-twincat-pmps"
@@ -334,6 +310,7 @@ licence = "other (see repository)"
 redistribute = false
 format = "twincat"
 kind = "discovered"
+category = "library"
 
 [[project]]
 name = "pierredantas-esbmc-plc-benchmark-suite"
@@ -342,6 +319,7 @@ licence = "Creative Commons Attribution 4.0 International"
 redistribute = false
 format = "st"
 kind = "discovered"
+category = "tool-input"
 
 [[project]]
 name = "ironplc-ironplc"
@@ -351,6 +329,7 @@ licence = "MIT License"
 redistribute = true
 format = "st"
 kind = "discovered"
+category = "tool-input"
 
 [[project]]
 name = "mbc-engineering-log4tc"
@@ -359,15 +338,7 @@ licence = "Apache License 2.0"
 redistribute = true
 format = "twincat"
 kind = "discovered"
-
-[[project]]
-name = "dergraph-conveyorcontrol-with-plc"
-url = "https://github.com/derGraph/ConveyorControl-with-PLC"
-licence = "GNU General Public License v3.0"
-redistribute = false
-format = "st"
-kind = "discovered"
-dialect = "lasal"
+category = "library"
 
 [[project]]
 name = "qubernetic-flowforge"
@@ -376,6 +347,7 @@ licence = "GNU Affero General Public License v3.0"
 redistribute = false
 format = "twincat"
 kind = "discovered"
+category = "tool-input"
 
 [[project]]
 name = "beckhoff-tf7xxx-samples"
@@ -384,6 +356,7 @@ licence = "BSD Zero Clause License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
+category = "sample"
 
 [[project]]
 name = "ahuca-tcbase"
@@ -392,14 +365,7 @@ licence = "MIT License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
-
-[[project]]
-name = "diyplc-lib-plc"
-url = "https://github.com/DIYPLC/LIB_PLC"
-licence = "GNU General Public License v2.0"
-redistribute = false
-format = "st"
-kind = "discovered"
+category = "library"
 
 [[project]]
 name = "pcdshub-lcls-twincat-general"
@@ -408,6 +374,7 @@ licence = "other (see repository)"
 redistribute = false
 format = "twincat"
 kind = "discovered"
+category = "library"
 
 [[project]]
 name = "beckhoff-tf6100-samples"
@@ -416,6 +383,7 @@ licence = "other (see repository)"
 redistribute = false
 format = "twincat"
 kind = "discovered"
+category = "sample"
 
 [[project]]
 name = "controlforge-systems-controlforge-structured-text"
@@ -424,6 +392,7 @@ licence = "MIT License"
 redistribute = true
 format = "st"
 kind = "discovered"
+category = "tool-input"
 
 [[project]]
 name = "pcdshub-lcls-twincat-common-components"
@@ -432,6 +401,7 @@ licence = "other (see repository)"
 redistribute = false
 format = "twincat"
 kind = "discovered"
+category = "library"
 
 [[project]]
 name = "sa1ntsinner-rung"
@@ -440,14 +410,7 @@ licence = "other (see repository)"
 redistribute = false
 format = "st"
 kind = "discovered"
-
-[[project]]
-name = "codepiercertechnology-tctidier"
-url = "https://github.com/CodePiercerTechnology/TcTidier"
-licence = "MIT License"
-redistribute = true
-format = "twincat"
-kind = "discovered"
+category = "tool-input"
 
 [[project]]
 name = "sionverhoef-twincat-st"
@@ -456,6 +419,7 @@ licence = "MIT License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
+category = "tool-input"
 
 [[project]]
 name = "burksengineering-tcmatrix"
@@ -464,6 +428,7 @@ licence = "MIT License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
+category = "library"
 
 [[project]]
 name = "fisothemes-twincat-dynamic-string-kit"
@@ -472,6 +437,7 @@ licence = "MIT License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
+category = "library"
 
 [[project]]
 name = "roald87-twincattutorials"
@@ -480,6 +446,7 @@ licence = "MIT License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
+category = "sample"
 
 [[project]]
 name = "krystian-l-lis-stage"
@@ -488,6 +455,8 @@ licence = "MIT License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
+category = "library"
+holdout = true
 
 [[project]]
 name = "siyka-au-mobject-ext"
@@ -496,6 +465,7 @@ licence = "MIT License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
+category = "library"
 
 [[project]]
 name = "fisothemes-twincat-retentive-timers"
@@ -504,6 +474,7 @@ licence = "MIT License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
+category = "library"
 
 [[project]]
 name = "fisothemes-fisothemes-controller-toolbox-library-for-twincat"
@@ -512,6 +483,7 @@ licence = "MIT License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
+category = "library"
 
 [[project]]
 name = "karishmapremnath4-plc-st-bug-detector-ml"
@@ -521,6 +493,7 @@ licence = "MIT License"
 redistribute = true
 format = "st"
 kind = "discovered"
+category = "tool-input"
 
 [[project]]
 name = "malgaroshy-maker-factoryforge"
@@ -529,6 +502,7 @@ licence = "MIT License"
 redistribute = true
 format = "st"
 kind = "discovered"
+category = "sample"
 
 [[project]]
 name = "visualplc-blocklyplc"
@@ -537,6 +511,7 @@ licence = "MIT License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
+category = "tool-input"
 
 [[project]]
 name = "teodorapetrovska02-twincat3-plc-projects"
@@ -545,6 +520,7 @@ licence = "MIT License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
+category = "application"
 
 [[project]]
 name = "georgeturneruk-tckit"
@@ -553,6 +529,7 @@ licence = "MIT License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
+category = "tool-input"
 
 [[project]]
 name = "beckhoff-tf6701-samples"
@@ -561,6 +538,7 @@ licence = "other (see repository)"
 redistribute = false
 format = "twincat"
 kind = "discovered"
+category = "sample"
 
 [[project]]
 name = "peterzerlauth-tc3-unittest"
@@ -569,6 +547,7 @@ licence = "GNU General Public License v3.0"
 redistribute = false
 format = "twincat"
 kind = "discovered"
+category = "library"
 
 [[project]]
 name = "fisothemes-labview-twincat-ads"
@@ -577,6 +556,8 @@ licence = "MIT License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
+category = "sample"
+holdout = true
 
 [[project]]
 name = "sarparslan-ev-charging-controller"
@@ -585,14 +566,7 @@ licence = "MIT License"
 redistribute = true
 format = "st"
 kind = "discovered"
-
-[[project]]
-name = "pcdshub-lcls-twincat-vacuum-serialdrivers"
-url = "https://github.com/pcdshub/lcls-twincat-vacuum-serialdrivers"
-licence = "other (see repository)"
-redistribute = false
-format = "twincat"
-kind = "discovered"
+category = "application"
 
 [[project]]
 name = "peterzerlauth-tc3-logging"
@@ -601,6 +575,7 @@ licence = "GNU General Public License v3.0"
 redistribute = false
 format = "twincat"
 kind = "discovered"
+category = "library"
 
 [[project]]
 name = "babe-kimr-tc1200-plc-training-oop-plc"
@@ -609,6 +584,7 @@ licence = "BSD Zero Clause License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
+category = "sample"
 
 [[project]]
 name = "beckhoff-te2000-client-samples"
@@ -617,6 +593,7 @@ licence = "other (see repository)"
 redistribute = false
 format = "twincat"
 kind = "discovered"
+category = "sample"
 
 [[project]]
 name = "andyp01-gdt-utilities-library"
@@ -625,6 +602,7 @@ licence = "MIT License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
+category = "library"
 
 [[project]]
 name = "milanlazov-twincat-dual-axis-coordinator"
@@ -633,6 +611,7 @@ licence = "MIT License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
+category = "library"
 
 [[project]]
 name = "tchaxx-rplc"
@@ -641,6 +620,7 @@ licence = "MIT License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
+category = "library"
 
 [[project]]
 name = "tchaxx-snappy"
@@ -649,6 +629,7 @@ licence = "MIT License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
+category = "library"
 
 [[project]]
 name = "undort-st2cpp"
@@ -658,6 +639,7 @@ licence = "GNU General Public License v3.0"
 redistribute = false
 format = "st"
 kind = "discovered"
+category = "tool-input"
 
 [[project]]
 name = "pcdshub-lcls-twincat-optics"
@@ -666,6 +648,7 @@ licence = "other (see repository)"
 redistribute = false
 format = "twincat"
 kind = "discovered"
+category = "library"
 
 [[project]]
 name = "bengeisler-tclog"
@@ -674,14 +657,7 @@ licence = "MIT License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
-
-[[project]]
-name = "ldnano-o-fn"
-url = "https://github.com/ldnano/o-fn"
-licence = "GNU General Public License v3.0"
-redistribute = false
-format = "st"
-kind = "discovered"
+category = "library"
 
 [[project]]
 name = "roald87-tcblack"
@@ -690,6 +666,7 @@ licence = "MIT License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
+category = "tool-input"
 
 [[project]]
 name = "fisothemes-fisothemes-error-library-for-twincat"
@@ -698,6 +675,7 @@ licence = "MIT License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
+category = "library"
 
 [[project]]
 name = "adamfisher-plcinfo"
@@ -706,6 +684,7 @@ licence = "GNU General Public License v3.0"
 redistribute = false
 format = "twincat"
 kind = "discovered"
+category = "tool-input"
 
 [[project]]
 name = "felipehornink-hplc"
@@ -714,6 +693,7 @@ licence = "other (see repository)"
 redistribute = false
 format = "st"
 kind = "discovered"
+category = "tool-input"
 
 [[project]]
 name = "burksengineering-tctransform"
@@ -722,6 +702,7 @@ licence = "MIT License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
+category = "library"
 
 [[project]]
 name = "fisothemes-twincat-abstract-data-structures"
@@ -730,6 +711,8 @@ licence = "MIT License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
+category = "library"
+holdout = true
 
 [[project]]
 name = "arthurkax-plc-browser-io"
@@ -738,6 +721,7 @@ licence = "MIT License"
 redistribute = true
 format = "st"
 kind = "discovered"
+category = "library"
 
 [[project]]
 name = "iswunistuttgart-rtnnigen"
@@ -746,6 +730,8 @@ licence = "GNU General Public License v3.0"
 redistribute = false
 format = "twincat"
 kind = "discovered"
+category = "library"
+holdout = true
 
 [[project]]
 name = "arthurkax-cds-text-sync"
@@ -754,6 +740,7 @@ licence = "MIT License"
 redistribute = true
 format = "st"
 kind = "discovered"
+category = "tool-input"
 
 [[project]]
 name = "fisothemes-fisothemes-time-library-for-twincat"
@@ -762,6 +749,8 @@ licence = "MIT License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
+category = "library"
+holdout = true
 
 [[project]]
 name = "klauer-blark"
@@ -770,6 +759,7 @@ licence = "GNU General Public License v2.0"
 redistribute = false
 format = "st"
 kind = "discovered"
+category = "tool-input"
 
 [[project]]
 name = "cristianmori-morifixplc"
@@ -778,6 +768,7 @@ licence = "Apache License 2.0"
 redistribute = true
 format = "twincat"
 kind = "discovered"
+category = "library"
 
 [[project]]
 name = "beckhoff-tc3eventlogger-samples"
@@ -786,6 +777,7 @@ licence = "BSD Zero Clause License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
+category = "sample"
 
 [[project]]
 name = "rassrollers-tctcpudprt"
@@ -794,6 +786,8 @@ licence = "MIT License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
+category = "library"
+holdout = true
 
 [[project]]
 name = "stefanhenneken-blog-2014-01-iec61131-interfaces-sample01"
@@ -802,6 +796,7 @@ licence = "BSD 2-Clause \"Simplified\" License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
+category = "sample"
 
 [[project]]
 name = "beckhoff-tf6000-ads-dotnet-v5-samples"
@@ -810,6 +805,7 @@ licence = "BSD Zero Clause License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
+category = "sample"
 
 [[project]]
 name = "technical-software-solutions-twincat-tools"
@@ -818,6 +814,7 @@ licence = "MIT License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
+category = "library"
 
 [[project]]
 name = "heytalepazguato-plc-st-review"
@@ -826,6 +823,7 @@ licence = "MIT License"
 redistribute = true
 format = "st"
 kind = "discovered"
+category = "tool-input"
 
 [[project]]
 name = "fisothemes-tcads-rs"
@@ -834,6 +832,7 @@ licence = "MIT License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
+category = "sample"
 
 [[project]]
 name = "beckhoff-tf6760-samples"
@@ -842,6 +841,7 @@ licence = "other (see repository)"
 redistribute = false
 format = "twincat"
 kind = "discovered"
+category = "sample"
 
 [[project]]
 name = "cgainsworks-plc-cip-batch-control"
@@ -850,6 +850,7 @@ licence = "MIT License"
 redistribute = true
 format = "st"
 kind = "discovered"
+category = "application"
 
 [[project]]
 name = "roald87-tcerror"
@@ -858,6 +859,7 @@ licence = "MIT License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
+category = "library"
 
 [[project]]
 name = "heytalepazguato-tree-sitter-iec61131-3-st"
@@ -866,6 +868,7 @@ licence = "MIT License"
 redistribute = true
 format = "st"
 kind = "discovered"
+category = "tool-input"
 
 [[project]]
 name = "pneutronic-ptc-xae-mcp"
@@ -874,6 +877,7 @@ licence = "Apache License 2.0"
 redistribute = true
 format = "twincat"
 kind = "discovered"
+category = "tool-input"
 
 [[project]]
 name = "fisothemes-twincat-hashing-algorithms"
@@ -882,22 +886,7 @@ licence = "MIT License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
-
-[[project]]
-name = "stefanhenneken-blog-2016-04-iec61131-command-sample02"
-url = "https://github.com/StefanHenneken/Blog-2016-04-IEC61131-Command-Sample02"
-licence = "BSD 2-Clause \"Simplified\" License"
-redistribute = true
-format = "twincat"
-kind = "discovered"
-
-[[project]]
-name = "yaskawaeurope-mlx-examples"
-url = "https://github.com/YaskawaEurope/mlx-examples"
-licence = "MIT License"
-redistribute = true
-format = "st"
-kind = "discovered"
+category = "library"
 
 [[project]]
 name = "loupeteam-tcpiper"
@@ -906,6 +895,8 @@ licence = "MIT License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
+category = "library"
+holdout = true
 
 [[project]]
 name = "stefanhenneken-blog-2016-04-iec61131-command-sample03"
@@ -914,14 +905,8 @@ licence = "BSD 2-Clause \"Simplified\" License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
-
-[[project]]
-name = "stefanhenneken-blog-2016-04-iec61131-command-sample01"
-url = "https://github.com/StefanHenneken/Blog-2016-04-IEC61131-Command-Sample01"
-licence = "BSD 2-Clause \"Simplified\" License"
-redistribute = true
-format = "twincat"
-kind = "discovered"
+category = "sample"
+holdout = true
 
 [[project]]
 name = "jozefchmelar-beckhoff-examples"
@@ -930,6 +915,7 @@ licence = "MIT License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
+category = "sample"
 
 [[project]]
 name = "benhar-dev-tc3-oop-serial"
@@ -938,14 +924,7 @@ licence = "MIT License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
-
-[[project]]
-name = "ptku-tc-prober"
-url = "https://github.com/PTKu/tc.prober"
-licence = "MIT License"
-redistribute = true
-format = "twincat"
-kind = "discovered"
+category = "sample"
 
 [[project]]
 name = "ninjamonkeytutorials-functions-part-two"
@@ -954,6 +933,7 @@ licence = "Apache License 2.0"
 redistribute = true
 format = "twincat"
 kind = "discovered"
+category = "sample"
 
 [[project]]
 name = "controltheplant-pid-controller"
@@ -962,6 +942,7 @@ licence = "other (see repository)"
 redistribute = false
 format = "st"
 kind = "discovered"
+category = "library"
 
 [[project]]
 name = "stefanhenneken-blog-2022-04-iec61131-lsp-sample01"
@@ -970,6 +951,7 @@ licence = "BSD 2-Clause \"Simplified\" License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
+category = "sample"
 
 [[project]]
 name = "arthurkax-netflux"
@@ -978,14 +960,7 @@ licence = "MIT License"
 redistribute = true
 format = "st"
 kind = "discovered"
-
-[[project]]
-name = "stefanhenneken-blog-2022-04-iec61131-lsp-sample03"
-url = "https://github.com/StefanHenneken/Blog-2022-04-IEC61131-LSP-Sample03"
-licence = "BSD 2-Clause \"Simplified\" License"
-redistribute = true
-format = "twincat"
-kind = "discovered"
+category = "library"
 
 [[project]]
 name = "loupeteam-tccommando"
@@ -994,6 +969,7 @@ licence = "MIT License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
+category = "library"
 
 [[project]]
 name = "sulemanali5760-twincat3-pickplace-framework"
@@ -1002,6 +978,7 @@ licence = "MIT License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
+category = "library"
 
 [[project]]
 name = "ptku-tcopen-examples"
@@ -1010,14 +987,7 @@ licence = "MIT License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
-
-[[project]]
-name = "stefanhenneken-blog-2022-02-iec61131-srp-sample01"
-url = "https://github.com/StefanHenneken/Blog-2022-02-IEC61131-SRP-Sample01"
-licence = "BSD 2-Clause \"Simplified\" License"
-redistribute = true
-format = "twincat"
-kind = "discovered"
+category = "sample"
 
 [[project]]
 name = "ignacbrychta-smarthouseiot"
@@ -1026,6 +996,7 @@ licence = "MIT License"
 redistribute = true
 format = "st"
 kind = "discovered"
+category = "application"
 
 [[project]]
 name = "ignacbrychta-elevatorsim-plc"
@@ -1034,14 +1005,7 @@ licence = "MIT License"
 redistribute = true
 format = "st"
 kind = "discovered"
-
-[[project]]
-name = "osologic-platform"
-url = "https://github.com/OSOlogic/platform"
-licence = "GNU Affero General Public License v3.0"
-redistribute = false
-format = "st"
-kind = "discovered"
+category = "application"
 
 [[project]]
 name = "fbarresi-twincatadstool"
@@ -1050,6 +1014,7 @@ licence = "MIT License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
+category = "sample"
 
 [[project]]
 name = "fbarresi-beckhoffhttpclient"
@@ -1058,6 +1023,7 @@ licence = "MIT License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
+category = "library"
 
 [[project]]
 name = "stefanbesler-twinson"
@@ -1066,6 +1032,7 @@ licence = "GNU General Public License v3.0"
 redistribute = false
 format = "twincat"
 kind = "discovered"
+category = "library"
 
 [[project]]
 name = "codepiercertechnology-tcview"
@@ -1074,6 +1041,7 @@ licence = "MIT License"
 redistribute = true
 format = "st"
 kind = "discovered"
+category = "tool-input"
 
 [[project]]
 name = "benhar-dev-tc3-data-logger"
@@ -1082,6 +1050,7 @@ licence = "MIT License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
+category = "sample"
 
 [[project]]
 name = "dalageo-twincat-virtual-elevator"
@@ -1090,6 +1059,7 @@ licence = "other (see repository)"
 redistribute = false
 format = "twincat"
 kind = "discovered"
+category = "application"
 
 [[project]]
 name = "dalageo-twincat-virtual-agv"
@@ -1098,6 +1068,7 @@ licence = "other (see repository)"
 redistribute = false
 format = "twincat"
 kind = "discovered"
+category = "application"
 
 [[project]]
 name = "dalageo-twincat-virtual-tram"
@@ -1106,6 +1077,8 @@ licence = "other (see repository)"
 redistribute = false
 format = "twincat"
 kind = "discovered"
+category = "application"
+holdout = true
 
 [[project]]
 name = "zhugongzhugongzhugong-xz-pickplace-codesys"
@@ -1114,14 +1087,7 @@ licence = "other (see repository)"
 redistribute = false
 format = "st"
 kind = "discovered"
-
-[[project]]
-name = "stefanhenneken-blog-2014-03-iec61131-abstractfactory-sample03"
-url = "https://github.com/StefanHenneken/Blog-2014-03-IEC61131-AbstractFactory-Sample03"
-licence = "BSD 2-Clause \"Simplified\" License"
-redistribute = true
-format = "twincat"
-kind = "discovered"
+category = "application"
 
 [[project]]
 name = "cristianmori-mori-escaflow"
@@ -1130,6 +1096,7 @@ licence = "Apache License 2.0"
 redistribute = true
 format = "st"
 kind = "discovered"
+category = "tool-input"
 
 [[project]]
 name = "agenticcontrolio-twincat-validator-mcp"
@@ -1138,30 +1105,7 @@ licence = "MIT License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
-
-[[project]]
-name = "roald87-twincateventloggerexample"
-url = "https://github.com/Roald87/TwinCatEventLoggerExample"
-licence = "MIT License"
-redistribute = true
-format = "twincat"
-kind = "discovered"
-
-[[project]]
-name = "wayan123-multi-plc-agent"
-url = "https://github.com/Wayan123/multi-plc-agent"
-licence = "Apache License 2.0"
-redistribute = true
-format = "st"
-kind = "discovered"
-
-[[project]]
-name = "ottomeister-siemens-tia-portal-pid-controller"
-url = "https://github.com/OttoMeister/Siemens-Tia-Portal-PID-Controller"
-licence = "Do What The F*ck You Want To Public License"
-redistribute = false
-format = "st"
-kind = "discovered"
+category = "tool-input"
 
 [[project]]
 name = "stefanhenneken-blog-2021-05-iec61131-dip-sample01"
@@ -1170,14 +1114,7 @@ licence = "BSD 2-Clause \"Simplified\" License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
-
-[[project]]
-name = "flhofer-iec-61131-3-testlib"
-url = "https://github.com/flhofer/IEC_61131-3_TestLib"
-licence = "GNU General Public License v3.0"
-redistribute = false
-format = "st"
-kind = "discovered"
+category = "sample"
 
 [[project]]
 name = "stefanhenneken-blog-2021-05-iec61131-dip-sample02"
@@ -1186,6 +1123,7 @@ licence = "BSD 2-Clause \"Simplified\" License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
+category = "sample"
 
 [[project]]
 name = "stefanhenneken-blog-2018-08-iec61131-decoratorpattern-sample03"
@@ -1194,6 +1132,7 @@ licence = "BSD 2-Clause \"Simplified\" License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
+category = "sample"
 
 [[project]]
 name = "tommy-berg-simpleplc"
@@ -1202,14 +1141,7 @@ licence = "MIT License"
 redistribute = true
 format = "st"
 kind = "discovered"
-
-[[project]]
-name = "eclipse-4diac-4diac-ide"
-url = "https://github.com/eclipse-4diac/4diac-ide"
-licence = "Eclipse Public License 2.0"
-redistribute = false
-format = "st"
-kind = "discovered"
+category = "tool-input"
 
 [[project]]
 name = "logohere-rustplc"
@@ -1218,6 +1150,7 @@ licence = "other (see repository)"
 redistribute = false
 format = "st"
 kind = "discovered"
+category = "tool-input"
 
 [[project]]
 name = "stefanbesler-twingrind"
@@ -1226,6 +1159,7 @@ licence = "GNU General Public License v3.0"
 redistribute = false
 format = "twincat"
 kind = "discovered"
+category = "library"
 
 [[project]]
 name = "stefanhenneken-blog-2018-06-iec61131-statepattern-sample03"
@@ -1234,6 +1168,7 @@ licence = "BSD 2-Clause \"Simplified\" License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
+category = "sample"
 
 [[project]]
 name = "nikvoronin-tc3-pcspeaker"
@@ -1242,6 +1177,7 @@ licence = "MIT License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
+category = "library"
 
 [[project]]
 name = "stefanhenneken-blog-2018-02-iec61131-observerpattern-sample02"
@@ -1250,14 +1186,7 @@ licence = "BSD 2-Clause \"Simplified\" License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
-
-[[project]]
-name = "ufukefekaya-tr-delta-plc-agent"
-url = "https://github.com/ufukefekaya-tr/delta-plc-agent"
-licence = "MIT License"
-redistribute = true
-format = "st"
-kind = "discovered"
+category = "sample"
 
 [[project]]
 name = "stefanhenneken-blog-2023-06-iec61131-lod-sample01"
@@ -1266,6 +1195,7 @@ licence = "BSD 2-Clause \"Simplified\" License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
+category = "sample"
 
 [[project]]
 name = "hopperpop-tclinkedlist"
@@ -1274,6 +1204,7 @@ licence = "MIT License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
+category = "sample"
 
 [[project]]
 name = "loupeteam-tcsequencer"
@@ -1282,6 +1213,7 @@ licence = "MIT License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
+category = "library"
 
 [[project]]
 name = "barteling-twincat-meets-project-euler"
@@ -1290,6 +1222,7 @@ licence = "MIT License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
+category = "sample"
 
 [[project]]
 name = "dalageo-twincat-virtual-washer"
@@ -1298,6 +1231,7 @@ licence = "other (see repository)"
 redistribute = false
 format = "twincat"
 kind = "discovered"
+category = "application"
 
 [[project]]
 name = "stefanhenneken-blog-2019-04-iec61131-fbinit-sample01"
@@ -1306,6 +1240,7 @@ licence = "BSD 2-Clause \"Simplified\" License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
+category = "sample"
 
 [[project]]
 name = "peterzerlauth-tc3-state"
@@ -1314,6 +1249,7 @@ licence = "GNU General Public License v2.0"
 redistribute = false
 format = "twincat"
 kind = "discovered"
+category = "library"
 
 [[project]]
 name = "stefanhenneken-blog-2016-06-iec61131-namespaces-sample01"
@@ -1322,6 +1258,7 @@ licence = "BSD 2-Clause \"Simplified\" License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
+category = "sample"
 
 [[project]]
 name = "stefanhenneken-blog-2014-03-iec61131-abstractfactory-sample01"
@@ -1330,6 +1267,7 @@ licence = "BSD 2-Clause \"Simplified\" License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
+category = "sample"
 
 [[project]]
 name = "hafizul-husni-plc-fundamentals"
@@ -1338,6 +1276,7 @@ licence = "MIT License"
 redistribute = true
 format = "st"
 kind = "discovered"
+category = "sample"
 
 [[project]]
 name = "svroonland-twinrx"
@@ -1346,6 +1285,8 @@ licence = "Apache License 2.0"
 redistribute = true
 format = "twincat"
 kind = "discovered"
+category = "sample"
+holdout = true
 
 [[project]]
 name = "beckhoff-adstojava"
@@ -1354,14 +1295,7 @@ licence = "MIT License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
-
-[[project]]
-name = "greenforge-labs-codescribe"
-url = "https://github.com/greenforge-labs/codescribe"
-licence = "Apache License 2.0"
-redistribute = true
-format = "st"
-kind = "discovered"
+category = "sample"
 
 [[project]]
 name = "stefanhenneken-blog-2020-03-iec61131-abstract-sample03"
@@ -1370,6 +1304,7 @@ licence = "BSD 2-Clause \"Simplified\" License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
+category = "sample"
 
 [[project]]
 name = "stefanhenneken-blog-2017-08-iec61131-unittests-sample01"
@@ -1378,6 +1313,7 @@ licence = "BSD 2-Clause \"Simplified\" License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
+category = "sample"
 
 [[project]]
 name = "stefanhenneken-blog-2018-02-iec61131-observerpattern-sample01"
@@ -1386,6 +1322,7 @@ licence = "BSD 2-Clause \"Simplified\" License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
+category = "sample"
 
 [[project]]
 name = "stefanhenneken-blog-2010-04-lightsample-tc3"
@@ -1394,22 +1331,7 @@ licence = "BSD 2-Clause \"Simplified\" License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
-
-[[project]]
-name = "andreas-schwenk-st2cc"
-url = "https://github.com/andreas-schwenk/st2cc"
-licence = "GNU General Public License v3.0"
-redistribute = false
-format = "st"
-kind = "discovered"
-
-[[project]]
-name = "esinbegumkaya-plcflow"
-url = "https://github.com/esinbegumkaya/PLCFlow"
-licence = "MIT License"
-redistribute = true
-format = "st"
-kind = "discovered"
+category = "sample"
 
 [[project]]
 name = "stefanhenneken-blog-2020-03-iec61131-abstract-sample01"
@@ -1418,14 +1340,7 @@ licence = "BSD 2-Clause \"Simplified\" License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
-
-[[project]]
-name = "czarnak-tia-portal-mcp"
-url = "https://github.com/Czarnak/tia-portal-mcp"
-licence = "MIT License"
-redistribute = true
-format = "st"
-kind = "discovered"
+category = "sample"
 
 [[project]]
 name = "lmyhit-ubuntu-twincat-adscommunication"
@@ -1434,14 +1349,7 @@ licence = "MIT License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
-
-[[project]]
-name = "opcfoundation-ua-edgetranslator"
-url = "https://github.com/OPCFoundation/UA-EdgeTranslator"
-licence = "MIT License"
-redistribute = true
-format = "st"
-kind = "discovered"
+category = "sample"
 
 [[project]]
 name = "jozefchmelar-streaming-plc-grafana"
@@ -1450,6 +1358,8 @@ licence = "MIT License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
+category = "sample"
+holdout = true
 
 [[project]]
 name = "stiana-sarutils"
@@ -1458,14 +1368,7 @@ licence = "MIT License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
-
-[[project]]
-name = "serhioromano-vscode-st"
-url = "https://github.com/Serhioromano/vscode-st"
-licence = "MIT License"
-redistribute = true
-format = "st"
-kind = "discovered"
+category = "library"
 
 [[project]]
 name = "benhar-dev-ads-xbox-controller"
@@ -1474,6 +1377,7 @@ licence = "MIT License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
+category = "sample"
 
 [[project]]
 name = "ptku-tc-prober-examples"
@@ -1482,14 +1386,8 @@ licence = "MIT License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
-
-[[project]]
-name = "jadehuang-realplc-agent"
-url = "https://github.com/JadeHuang/RealPLC-Agent"
-licence = "other (see repository)"
-redistribute = false
-format = "st"
-kind = "discovered"
+category = "sample"
+holdout = true
 
 [[project]]
 name = "stefanhenneken-blog-2018-06-iec61131-statepattern-sample01"
@@ -1498,6 +1396,7 @@ licence = "BSD 2-Clause \"Simplified\" License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
+category = "sample"
 
 [[project]]
 name = "stefanhenneken-blog-2017-01-iec61131-methods-sample01"
@@ -1506,6 +1405,8 @@ licence = "BSD 2-Clause \"Simplified\" License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
+category = "sample"
+holdout = true
 
 [[project]]
 name = "stefanhenneken-blog-2018-06-iec61131-statepattern-sample02"
@@ -1514,30 +1415,7 @@ licence = "BSD 2-Clause \"Simplified\" License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
-
-[[project]]
-name = "radfar-building-irrigation-scada"
-url = "https://github.com/Radfar/building-irrigation-scada"
-licence = "MIT License"
-redistribute = true
-format = "st"
-kind = "discovered"
-
-[[project]]
-name = "islammdmajharul116-hue-omron-plc-kiln-conveyor-control"
-url = "https://github.com/islammdmajharul116-hue/OMRON-PLC-Kiln-Conveyor-Control"
-licence = "MIT License"
-redistribute = true
-format = "st"
-kind = "discovered"
-
-[[project]]
-name = "sm1820-matiec"
-url = "https://github.com/sm1820/matiec"
-licence = "GNU General Public License v3.0"
-redistribute = false
-format = "st"
-kind = "discovered"
+category = "sample"
 
 [[project]]
 name = "stefanhenneken-blog-2018-08-iec61131-decoratorpattern-sample01"
@@ -1546,6 +1424,7 @@ licence = "BSD 2-Clause \"Simplified\" License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
+category = "sample"
 
 [[project]]
 name = "fortiphyd-grficsv2"
@@ -1554,6 +1433,7 @@ licence = "GNU General Public License v3.0"
 redistribute = false
 format = "st"
 kind = "discovered"
+category = "application"
 
 [[project]]
 name = "jarmocluyse-ads-go"
@@ -1562,6 +1442,8 @@ licence = "MIT License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
+category = "sample"
+holdout = true
 
 [[project]]
 name = "evanmj-tcjoy"
@@ -1570,14 +1452,7 @@ licence = "MIT License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
-
-[[project]]
-name = "zeugwerk-twinpack"
-url = "https://github.com/Zeugwerk/Twinpack"
-licence = "GNU General Public License v3.0"
-redistribute = false
-format = "twincat"
-kind = "discovered"
+category = "sample"
 
 [[project]]
 name = "fbarresi-beckhoffs7client"
@@ -1586,6 +1461,7 @@ licence = "MIT License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
+category = "library"
 
 [[project]]
 name = "stefanhenneken-blog-2017-08-iec61131-unittests-tcunit"
@@ -1594,6 +1470,7 @@ licence = "BSD 2-Clause \"Simplified\" License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
+category = "sample"
 
 [[project]]
 name = "stefanhenneken-blog-2016-03-iec61131-arrays-sample04"
@@ -1602,6 +1479,7 @@ licence = "BSD 2-Clause \"Simplified\" License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
+category = "sample"
 
 [[project]]
 name = "stefanhenneken-blog-2016-03-iec61131-arrays-sample02"
@@ -1610,78 +1488,7 @@ licence = "BSD 2-Clause \"Simplified\" License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
-
-[[project]]
-name = "cdilga-ladder-logic-editor"
-url = "https://github.com/cdilga/ladder-logic-editor"
-licence = "MIT License"
-redistribute = true
-format = "st"
-kind = "discovered"
-
-[[project]]
-name = "hhirsch-sps-buddy"
-url = "https://github.com/hhirsch/sps-buddy"
-licence = "GNU General Public License v3.0"
-redistribute = false
-format = "st"
-kind = "discovered"
-
-[[project]]
-name = "1337leets-automated-assembly-line-control-system-openplc"
-url = "https://github.com/1337leets/Automated-Assembly-Line-Control-System-OpenPLC"
-licence = "BSD 3-Clause \"New\" or \"Revised\" License"
-redistribute = true
-format = "st"
-kind = "discovered"
-
-[[project]]
-name = "rongxuan-zhou-multi-robot-assembly-cell"
-url = "https://github.com/Rongxuan-Zhou/multi-robot-assembly-cell"
-licence = "Apache License 2.0"
-redistribute = true
-format = "st"
-kind = "discovered"
-
-[[project]]
-name = "mkamel7-virtual-production-cell"
-url = "https://github.com/MKamel7/virtual-production-cell"
-licence = "MIT License"
-redistribute = true
-format = "st"
-kind = "discovered"
-
-[[project]]
-name = "lian-automation-plc-robot-integration"
-url = "https://github.com/lian-automation/PLC-Robot-Integration"
-licence = "MIT License"
-redistribute = true
-format = "st"
-kind = "discovered"
-
-[[project]]
-name = "serenaptd-sahel-smart-shield"
-url = "https://github.com/SerenaPTD/sahel-smart-shield"
-licence = "MIT License"
-redistribute = true
-format = "st"
-kind = "discovered"
-
-[[project]]
-name = "smailg-plc-programming"
-url = "https://github.com/SmailG/plc-programming"
-licence = "MIT License"
-redistribute = true
-format = "twincat"
-kind = "discovered"
-
-[[project]]
-name = "celikgo-salman"
-url = "https://github.com/celikgo/salman"
-licence = "Apache License 2.0"
-redistribute = true
-format = "st"
-kind = "discovered"
+category = "sample"
 
 [[project]]
 name = "stefanhenneken-blog-2019-06-iec61131-trycatch-sample01"
@@ -1690,6 +1497,7 @@ licence = "BSD 2-Clause \"Simplified\" License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
+category = "sample"
 
 [[project]]
 name = "stefanhenneken-blog-2016-03-iec61131-arrays-sample01"
@@ -1698,14 +1506,7 @@ licence = "BSD 2-Clause \"Simplified\" License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
-
-[[project]]
-name = "rileyphillips802-cursor-plc-demo"
-url = "https://github.com/rileyphillips802/cursor-plc-demo"
-licence = "MIT License"
-redistribute = true
-format = "st"
-kind = "discovered"
+category = "sample"
 
 [[project]]
 name = "nikvoronin-adsremote"
@@ -1714,22 +1515,7 @@ licence = "MIT License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
-
-[[project]]
-name = "philippleidig-twincat-productivitytools"
-url = "https://github.com/philippleidig/TwinCAT.ProductivityTools"
-licence = "MIT License"
-redistribute = true
-format = "twincat"
-kind = "discovered"
-
-[[project]]
-name = "sagatowski-tcstaticanalysisloader"
-url = "https://github.com/sagatowski/TcStaticAnalysisLoader"
-licence = "MIT License"
-redistribute = true
-format = "twincat"
-kind = "discovered"
+category = "sample"
 
 [[project]]
 name = "rruiter87-tctemplate"
@@ -1738,6 +1524,7 @@ licence = "MIT License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
+category = "sample"
 
 [[project]]
 name = "benhar-dev-tc3-guid"
@@ -1746,6 +1533,7 @@ licence = "MIT License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
+category = "sample"
 
 [[project]]
 name = "michielvanwelsenaere-homeautomation-codesys3"
@@ -1754,126 +1542,7 @@ licence = "MIT License"
 redistribute = true
 format = "st"
 kind = "discovered"
-
-[[project]]
-name = "mrlostintheinternet-fluidpyplc"
-url = "https://github.com/MrLostInTheInternet/FluidPyPLC"
-licence = "GNU General Public License v3.0"
-redistribute = false
-format = "st"
-kind = "discovered"
-
-[[project]]
-name = "jubnzv-iec-vim"
-url = "https://github.com/jubnzv/IEC.vim"
-licence = "MIT License"
-redistribute = true
-format = "st"
-kind = "discovered"
-
-[[project]]
-name = "highlightjs-highlightjs-structured-text"
-url = "https://github.com/highlightjs/highlightjs-structured-text"
-licence = "BSD 3-Clause \"New\" or \"Revised\" License"
-redistribute = true
-format = "st"
-kind = "discovered"
-
-[[project]]
-name = "alex-hahn-plcforge"
-url = "https://github.com/alex-hahn/plcforge"
-licence = "other (see repository)"
-redistribute = false
-format = "st"
-kind = "discovered"
-
-[[project]]
-name = "yuzui-best-rl-mar"
-url = "https://github.com/yuzui-best/RL_MAR"
-licence = "other (see repository)"
-redistribute = false
-format = "st"
-kind = "discovered"
-
-[[project]]
-name = "1337leets-pmdc-motor-pid-control-modbus-hmi-openplc"
-url = "https://github.com/1337leets/PMDC-Motor-PID-Control-Modbus-HMI-OpenPLC"
-licence = "Apache License 2.0"
-redistribute = true
-format = "st"
-kind = "discovered"
-
-[[project]]
-name = "feelautom-tia-connect-vscode"
-url = "https://github.com/feelautom/tia-connect-vscode"
-licence = "other (see repository)"
-redistribute = false
-format = "st"
-kind = "discovered"
-
-[[project]]
-name = "basheeraltawil-fuzzy-greenhouse-climate-control"
-url = "https://github.com/basheeraltawil/fuzzy-greenhouse-climate-control"
-licence = "MIT License"
-redistribute = true
-format = "st"
-kind = "discovered"
-
-[[project]]
-name = "brandons-cs-codesys-migrator"
-url = "https://github.com/brandons-cs/codesys-migrator"
-licence = "MIT License"
-redistribute = true
-format = "st"
-kind = "discovered"
-
-[[project]]
-name = "yuri-fernando-industrial-control-lab"
-url = "https://github.com/Yuri-Fernando/Industrial-Control-Lab"
-licence = "MIT License"
-redistribute = true
-format = "st"
-kind = "discovered"
-
-[[project]]
-name = "fatinnihal532-hub-plc-pump-station"
-url = "https://github.com/fatinnihal532-hub/plc-pump-station"
-licence = "MIT License"
-redistribute = true
-format = "st"
-kind = "discovered"
-
-[[project]]
-name = "taborbachelor-controllab"
-url = "https://github.com/taborbachelor/controllab"
-licence = "MIT License"
-redistribute = true
-format = "st"
-kind = "discovered"
-
-[[project]]
-name = "yongjunmun-plc-vision-production-cell"
-url = "https://github.com/yongjunmun/PLC-Vision-Production-Cell"
-licence = "MIT License"
-redistribute = true
-format = "st"
-kind = "discovered"
-
-[[project]]
-name = "masscry-deci-vm"
-url = "https://github.com/masscry/deci.vm"
-licence = "MIT License"
-redistribute = true
-format = "st"
-kind = "discovered"
-
-[[project]]
-name = "radevgit-plc"
-url = "https://github.com/radevgit/plc"
-licence = "MIT License"
-redistribute = true
-format = "st"
-kind = "discovered"
+category = "application"
 
 [[project]]
 name = "beckhoff-ads"
@@ -1882,35 +1551,346 @@ licence = "MIT License"
 redistribute = true
 format = "twincat"
 kind = "discovered"
+category = "sample"
 
-[[project]]
-name = "teozocchi-tank-level-control"
-url = "https://github.com/teozocchi/tank-level-control"
-licence = "MIT License"
-redistribute = true
-format = "st"
-kind = "discovered"
+# Removed from the corpus (kept so that discovery does not add them again).
 
-[[project]]
+[[excluded]]
+name = "1337leets-automated-assembly-line-control-system-openplc"
+url = "https://github.com/1337leets/Automated-Assembly-Line-Control-System-OpenPLC"
+reason = "valueless: at most 2 units and at most one GitHub star (too small to matter, unvetted)"
+
+[[excluded]]
+name = "1337leets-pmdc-motor-pid-control-modbus-hmi-openplc"
+url = "https://github.com/1337leets/PMDC-Motor-PID-Control-Modbus-HMI-OpenPLC"
+reason = "valueless: at most 2 units and at most one GitHub star (too small to matter, unvetted)"
+
+[[excluded]]
+name = "alex-hahn-plcforge"
+url = "https://github.com/alex-hahn/plcforge"
+reason = "no Structured Text to analyse (binary project, other language or none in the repository)"
+
+[[excluded]]
+name = "andreas-schwenk-st2cc"
+url = "https://github.com/andreas-schwenk/st2cc"
+reason = "valueless: a tool or AI-agent repository with 5 units or fewer of example input"
+
+[[excluded]]
+name = "basheeraltawil-fuzzy-greenhouse-climate-control"
+url = "https://github.com/basheeraltawil/fuzzy-greenhouse-climate-control"
+reason = "valueless: at most 2 units and at most one GitHub star (too small to matter, unvetted)"
+
+[[excluded]]
+name = "brandons-cs-codesys-migrator"
+url = "https://github.com/brandons-cs/codesys-migrator"
+reason = "valueless: a tool or AI-agent repository with 5 units or fewer of example input"
+
+[[excluded]]
+name = "cdilga-ladder-logic-editor"
+url = "https://github.com/cdilga/ladder-logic-editor"
+reason = "valueless: a tool or AI-agent repository with 5 units or fewer of example input"
+
+[[excluded]]
+name = "celikgo-salman"
+url = "https://github.com/celikgo/salman"
+reason = "valueless: a tool or AI-agent repository with 5 units or fewer of example input"
+
+[[excluded]]
+name = "codepiercertechnology-tctidier"
+url = "https://github.com/CodePiercerTechnology/TcTidier"
+reason = "valueless: a tool or AI-agent repository with 5 units or fewer of example input"
+
+[[excluded]]
+name = "codesys-oop-examples"
+url = "https://github.com/Aliazzzz/OOP-Concept-Examples-in-CODESYS-V3"
+reason = "no Structured Text to analyse (binary project, other language or none in the repository)"
+
+[[excluded]]
+name = "conveyor-pid"
+url = "https://github.com/Spatelio/conveyer-belt-automation-control"
+reason = "no Structured Text to analyse (binary project, other language or none in the repository)"
+
+[[excluded]]
+name = "czarnak-tia-portal-mcp"
+url = "https://github.com/Czarnak/tia-portal-mcp"
+reason = "no Structured Text to analyse (binary project, other language or none in the repository)"
+
+[[excluded]]
+name = "dergraph-conveyorcontrol-with-plc"
+url = "https://github.com/derGraph/ConveyorControl-with-PLC"
+reason = "chaos: not IEC 61131-3 Structured Text (Sigmatek LASAL with C preprocessor lines)"
+
+[[excluded]]
+name = "diyplc-lib-plc"
+url = "https://github.com/DIYPLC/LIB_PLC"
+reason = "no Structured Text to analyse (binary project, other language or none in the repository)"
+
+[[excluded]]
+name = "echidna"
+url = "https://github.com/61131/echidna"
+reason = "no Structured Text to analyse (binary project, other language or none in the repository)"
+
+[[excluded]]
+name = "eclipse-4diac-4diac-ide"
+url = "https://github.com/eclipse-4diac/4diac-ide"
+reason = "no Structured Text to analyse (binary project, other language or none in the repository)"
+
+[[excluded]]
+name = "esinbegumkaya-plcflow"
+url = "https://github.com/esinbegumkaya/PLCFlow"
+reason = "valueless: a tool or AI-agent repository with 5 units or fewer of example input"
+
+[[excluded]]
+name = "fatinnihal532-hub-plc-pump-station"
+url = "https://github.com/fatinnihal532-hub/plc-pump-station"
+reason = "valueless: at most 2 units and at most one GitHub star (too small to matter, unvetted)"
+
+[[excluded]]
+name = "feelautom-tia-connect-vscode"
+url = "https://github.com/feelautom/tia-connect-vscode"
+reason = "no Structured Text to analyse (binary project, other language or none in the repository)"
+
+[[excluded]]
+name = "flhofer-iec-61131-3-testlib"
+url = "https://github.com/flhofer/IEC_61131-3_TestLib"
+reason = "no Structured Text to analyse (binary project, other language or none in the repository)"
+
+[[excluded]]
+name = "greenforge-labs-codescribe"
+url = "https://github.com/greenforge-labs/codescribe"
+reason = "valueless: a tool or AI-agent repository with 5 units or fewer of example input"
+
+[[excluded]]
+name = "hhirsch-sps-buddy"
+url = "https://github.com/hhirsch/sps-buddy"
+reason = "no Structured Text to analyse (binary project, other language or none in the repository)"
+
+[[excluded]]
+name = "highlightjs-highlightjs-structured-text"
+url = "https://github.com/highlightjs/highlightjs-structured-text"
+reason = "no Structured Text to analyse (binary project, other language or none in the repository)"
+
+[[excluded]]
+name = "islammdmajharul116-hue-omron-plc-kiln-conveyor-control"
+url = "https://github.com/islammdmajharul116-hue/OMRON-PLC-Kiln-Conveyor-Control"
+reason = "chaos: statement fragments without POU declarations"
+
+[[excluded]]
+name = "jadehuang-realplc-agent"
+url = "https://github.com/JadeHuang/RealPLC-Agent"
+reason = "valueless: a tool or AI-agent repository with 5 units or fewer of example input"
+
+[[excluded]]
 name = "jessalguacil-solidmotorexamplest"
 url = "https://github.com/JessAlguacil/SolidMotorExampleST"
-licence = "MIT License"
-redistribute = true
-format = "st"
-kind = "discovered"
+reason = "valueless: at most 2 units and at most one GitHub star (too small to matter, unvetted)"
 
-[[project]]
-name = "ntufar-c2st"
-url = "https://github.com/ntufar/c2st"
-licence = "MIT License"
-redistribute = true
-format = "st"
-kind = "discovered"
+[[excluded]]
+name = "jubnzv-iec-vim"
+url = "https://github.com/jubnzv/IEC.vim"
+reason = "valueless: a tool or AI-agent repository with 5 units or fewer of example input"
 
-[[project]]
+[[excluded]]
+name = "ldnano-o-fn"
+url = "https://github.com/ldnano/o-fn"
+reason = "chaos: statement fragments without POU declarations"
+
+[[excluded]]
+name = "lian-automation-plc-robot-integration"
+url = "https://github.com/lian-automation/PLC-Robot-Integration"
+reason = "no Structured Text to analyse (binary project, other language or none in the repository)"
+
+[[excluded]]
 name = "lilkiddy007-twincat3-plc-motion-control"
 url = "https://github.com/LilKiddy007/twincat3-plc-motion-control"
-licence = "other (see repository)"
-redistribute = false
-format = "st"
-kind = "discovered"
+reason = "valueless: at most 2 units and at most one GitHub star (too small to matter, unvetted)"
+
+[[excluded]]
+name = "masscry-deci-vm"
+url = "https://github.com/masscry/deci.vm"
+reason = "chaos: not IEC 61131-3 Structured Text (a self-described ST-like-ish toy language)"
+
+[[excluded]]
+name = "mihaiginta-tcoscatbasic"
+url = "https://github.com/mihaiginta/TcOscatBasic"
+reason = "duplicate: 80% or more of its units are copies of aixocat (both OSCAT)"
+
+[[excluded]]
+name = "mkamel7-virtual-production-cell"
+url = "https://github.com/MKamel7/virtual-production-cell"
+reason = "valueless: at most 2 units and at most one GitHub star (too small to matter, unvetted)"
+
+[[excluded]]
+name = "mrlostintheinternet-fluidpyplc"
+url = "https://github.com/MrLostInTheInternet/FluidPyPLC"
+reason = "chaos: generated text with Markdown in the .st file"
+
+[[excluded]]
+name = "ntufar-c2st"
+url = "https://github.com/ntufar/c2st"
+reason = "valueless: a tool or AI-agent repository with 5 units or fewer of example input"
+
+[[excluded]]
+name = "opcfoundation-ua-edgetranslator"
+url = "https://github.com/OPCFoundation/UA-EdgeTranslator"
+reason = "no Structured Text to analyse (binary project, other language or none in the repository)"
+
+[[excluded]]
+name = "oscat-basic-twincat"
+url = "https://github.com/sagatowski/alltwincat.com-oscat-basic"
+reason = "no Structured Text to analyse (binary project, other language or none in the repository)"
+
+[[excluded]]
+name = "osologic-platform"
+url = "https://github.com/OSOlogic/platform"
+reason = "chaos: not IEC 61131-3 Structured Text (PROCEDURE / TRAP language)"
+
+[[excluded]]
+name = "ottomeister-siemens-tia-portal-pid-controller"
+url = "https://github.com/OttoMeister/Siemens-Tia-Portal-PID-Controller"
+reason = "no Structured Text to analyse (binary project, other language or none in the repository)"
+
+[[excluded]]
+name = "pcdshub-lcls-twincat-vacuum-serialdrivers"
+url = "https://github.com/pcdshub/lcls-twincat-vacuum-serialdrivers"
+reason = "duplicate: 80% or more of its units are copies of pcdshub-lcls-twincat-vacuum"
+
+[[excluded]]
+name = "philippleidig-twincat-productivitytools"
+url = "https://github.com/philippleidig/TwinCAT.ProductivityTools"
+reason = "valueless: a tool or AI-agent repository with 5 units or fewer of example input"
+
+[[excluded]]
+name = "ptku-tc-prober"
+url = "https://github.com/PTKu/tc.prober"
+reason = "duplicate: 80% or more of its units are copies of tcopengroup-tcopen"
+
+[[excluded]]
+name = "radevgit-plc"
+url = "https://github.com/radevgit/plc"
+reason = "no Structured Text to analyse (binary project, other language or none in the repository)"
+
+[[excluded]]
+name = "radfar-building-irrigation-scada"
+url = "https://github.com/Radfar/building-irrigation-scada"
+reason = "chaos: broken fragment (unclosed comment, statements outside a POU)"
+
+[[excluded]]
+name = "rileyphillips802-cursor-plc-demo"
+url = "https://github.com/rileyphillips802/cursor-plc-demo"
+reason = "valueless: a tool or AI-agent repository with 5 units or fewer of example input"
+
+[[excluded]]
+name = "roald87-twincateventloggerexample"
+url = "https://github.com/Roald87/TwinCatEventLoggerExample"
+reason = "duplicate: 80% or more of its units are copies of roald87-twincattutorials"
+
+[[excluded]]
+name = "rongxuan-zhou-multi-robot-assembly-cell"
+url = "https://github.com/Rongxuan-Zhou/multi-robot-assembly-cell"
+reason = "valueless: at most 2 units and at most one GitHub star (too small to matter, unvetted)"
+
+[[excluded]]
+name = "sagatowski-tcstaticanalysisloader"
+url = "https://github.com/sagatowski/TcStaticAnalysisLoader"
+reason = "valueless: a tool or AI-agent repository with 5 units or fewer of example input"
+
+[[excluded]]
+name = "serenaptd-sahel-smart-shield"
+url = "https://github.com/SerenaPTD/sahel-smart-shield"
+reason = "valueless: at most 2 units and at most one GitHub star (too small to matter, unvetted)"
+
+[[excluded]]
+name = "serhioromano-vscode-st"
+url = "https://github.com/Serhioromano/vscode-st"
+reason = "chaos: syntax-highlighting sample, not a program"
+
+[[excluded]]
+name = "sm1820-matiec"
+url = "https://github.com/sm1820/matiec"
+reason = "valueless: a tool or AI-agent repository with 5 units or fewer of example input"
+
+[[excluded]]
+name = "smailg-plc-programming"
+url = "https://github.com/SmailG/plc-programming"
+reason = "valueless: a tool or AI-agent repository with 5 units or fewer of example input"
+
+[[excluded]]
+name = "spec2control"
+url = "https://github.com/hkoziolek/Spec2Control"
+reason = "no Structured Text to analyse (binary project, other language or none in the repository)"
+
+[[excluded]]
+name = "stefanhenneken-blog-2014-03-iec61131-abstractfactory-sample03"
+url = "https://github.com/StefanHenneken/Blog-2014-03-IEC61131-AbstractFactory-Sample03"
+reason = "duplicate: 80% or more of its units are copies of babe-kimr-tc1200-plc-sample-oop-design-patterns-plc"
+
+[[excluded]]
+name = "stefanhenneken-blog-2016-04-iec61131-command-sample01"
+url = "https://github.com/StefanHenneken/Blog-2016-04-IEC61131-Command-Sample01"
+reason = "duplicate: 80% or more of its units are copies of command-sample02/03"
+
+[[excluded]]
+name = "stefanhenneken-blog-2016-04-iec61131-command-sample02"
+url = "https://github.com/StefanHenneken/Blog-2016-04-IEC61131-Command-Sample02"
+reason = "duplicate: 80% or more of its units are copies of command-sample01/03"
+
+[[excluded]]
+name = "stefanhenneken-blog-2022-02-iec61131-srp-sample01"
+url = "https://github.com/StefanHenneken/Blog-2022-02-IEC61131-SRP-Sample01"
+reason = "duplicate: 80% or more of its units are copies of lsp-sample01"
+
+[[excluded]]
+name = "stefanhenneken-blog-2022-04-iec61131-lsp-sample03"
+url = "https://github.com/StefanHenneken/Blog-2022-04-IEC61131-LSP-Sample03"
+reason = "duplicate: 80% or more of its units are copies of lsp-sample01"
+
+[[excluded]]
+name = "structured-text-utilities"
+url = "https://github.com/WengerAG/structured-text-utilities"
+reason = "chaos: not IEC 61131-3 Structured Text (Pascal-like UNIT / USES / IMPLEMENTATION dialect)"
+
+[[excluded]]
+name = "taborbachelor-controllab"
+url = "https://github.com/taborbachelor/controllab"
+reason = "valueless: at most 2 units and at most one GitHub star (too small to matter, unvetted)"
+
+[[excluded]]
+name = "teozocchi-tank-level-control"
+url = "https://github.com/teozocchi/tank-level-control"
+reason = "no Structured Text to analyse (binary project, other language or none in the repository)"
+
+[[excluded]]
+name = "ufukefekaya-tr-delta-plc-agent"
+url = "https://github.com/ufukefekaya-tr/delta-plc-agent"
+reason = "chaos: statement fragments without POU declarations"
+
+[[excluded]]
+name = "wayan123-multi-plc-agent"
+url = "https://github.com/Wayan123/multi-plc-agent"
+reason = "no Structured Text to analyse (binary project, other language or none in the repository)"
+
+[[excluded]]
+name = "yaskawaeurope-mlx-examples"
+url = "https://github.com/YaskawaEurope/mlx-examples"
+reason = "no Structured Text to analyse (binary project, other language or none in the repository)"
+
+[[excluded]]
+name = "yongjunmun-plc-vision-production-cell"
+url = "https://github.com/yongjunmun/PLC-Vision-Production-Cell"
+reason = "valueless: at most 2 units and at most one GitHub star (too small to matter, unvetted)"
+
+[[excluded]]
+name = "yuri-fernando-industrial-control-lab"
+url = "https://github.com/Yuri-Fernando/Industrial-Control-Lab"
+reason = "valueless: at most 2 units and at most one GitHub star (too small to matter, unvetted)"
+
+[[excluded]]
+name = "yuzui-best-rl-mar"
+url = "https://github.com/yuzui-best/RL_MAR"
+reason = "valueless: a tool or AI-agent repository with 5 units or fewer of example input"
+
+[[excluded]]
+name = "zeugwerk-twinpack"
+url = "https://github.com/Zeugwerk/Twinpack"
+reason = "valueless: a tool or AI-agent repository with 5 units or fewer of example input"

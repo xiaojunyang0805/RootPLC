@@ -83,7 +83,7 @@ const P = DATA.projects.filter(p => p.units > 0).sort((a, b) => b.units - a.unit
 const U = P.reduce((s, p) => s + p.units, 0), L = P.reduce((s, p) => s + p.lines, 0);
 const S = P.reduce((s, p) => s + p.syntax_ok, 0), C = P.reduce((s, p) => s + p.clean, 0);
 $("sub").textContent = `${P.length} public PLC projects (TwinCAT, CODESYS, B&R, plain ST), analysed ${DATA.date}. Code stays in the source repositories; only licence-permissive projects may be redistributed.`;
-const tiles = [[P.length, "projects", `${DATA.listed} listed with licences`], [fmt(U), "program units", "POUs, types, global lists"], [Math.round(L / 1000) + "k", "lines of ST", "real code, not generated"], [pct(S, U) + "%", "parse today", "lexer + parser accept"], [pct(C, U) + "%", "type-check clean", "no errors at all"]];
+const tiles = [[P.length, "projects", `${DATA.listed} listed with licences`], [fmt(U), "program units", "POUs, types, global lists"], [Math.round(L / 1000) + "k", "lines of ST", "real code, not generated"], [pct(S, U) + "%", "parse today", "lexer + parser accept"], [pct(C, U) + "%", "type-check clean", "no errors at all"], [DATA.median_clean + "%", "median project", "share of its units clean"]];
 $("tiles").innerHTML = tiles.map(([v, l, s]) => `<div class="tile"><b>${v}</b><span>${l}</span><small>${s}</small></div>`).join("");
 
 // coverage: 100% stacked bars
@@ -137,7 +137,7 @@ $("tiles").innerHTML = tiles.map(([v, l, s]) => `<div class="tile"><b>${v}</b><s
 (function () {
   const H = DATA.history, svg = $("trend"), W = 460, h = 120, padL = 34, padB = 22;
   if (H.length < 2) { $("trendnote").textContent = `Baseline set on ${DATA.date}: ${pct(S, U)}% parse, ${pct(C, U)}% clean. The line appears from the next analysis run; each extractor or dialect feature should move it up.`; svg.remove(); return; }
-  $("trendnote").textContent = "Parse and clean rate at each analysis run. The corpus grows between runs (from 2,221 to " + fmt(U) + " units on 3 Nov 2026), so a drop can mean new kinds of code, not a regression.";
+  $("trendnote").textContent = "Parse and clean rate at each analysis run. The corpus grows between runs (from 2,221 to " + fmt(U) + " units on 3 Nov 2026), so a drop can mean new kinds of code, not a regression. From 4 Nov 2026 the line is the core set only (applications, libraries, samples; reviewed and deduplicated), so it steps at that point.";
   svg.setAttribute("viewBox", `0 0 ${W} ${h}`);
   for (const v of [0, 50, 100]) { const y = h - padB - (h - padB - 8) * v / 100; el("line", { x1: padL, x2: W, y1: y, y2: y, stroke: "var(--grid)" }, svg); el("text", { x: padL - 6, y: y + 4, "text-anchor": "end" }, svg, v + "%"); }
   const xs = i => padL + 8 + (W - padL - 16) * i / (H.length - 1);

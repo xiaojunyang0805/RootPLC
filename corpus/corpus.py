@@ -29,6 +29,10 @@ REPO = HERE.parent
 # another disk (it grows with the corpus). Default: corpus/.cache.
 CACHE = Path(os.environ.get("ROOTPLC_CORPUS_CACHE") or HERE / ".cache")
 SYNTAX_CODES = {f"RP{n:04d}" for n in list(range(1, 17)) + [201, 202, 301]}
+# Categories whose code is written to run on a PLC: the headline figures use
+# these. "tool-input" (test inputs and examples of compilers, parsers, editors,
+# AI tools, benchmarks) is analysed and reported on its own.
+CORE = ("application", "library", "sample")
 
 # Constructs RootPLC does not support yet (counted in extracted code). Keep in
 # step with the RULES list in crates/rootplc-driver/src/coverage.rs.
@@ -464,15 +468,21 @@ def analyse() -> None:
         names = Counter(f"{x['code']} {m.group(1)}" for xs in per_file.values() for x in xs
                         if x["code"] in ("RP0201", "RP0111", "RP0203")
                         for m in [re.search(r"'([^']*)'", x["message"])] if m)
-        if not p.get("dialect"):  # other dialects stay out of the totals
+        holdout = bool(p.get("holdout"))
+        # holdout projects measure overfitting: their errors are never ranked or
+        # stored, so no fix is ever chosen by looking at them
+        if not p.get("dialect") and not holdout and p.get("category") in CORE:
             all_codes.update(codes)
             all_features.update(feats)
         results.append({"name": p["name"], "url": p["url"], "licence": p["licence"], "redistribute": p["redistribute"],
-                        "kind": p.get("kind", ""), "units": len(files), "lines": lines, "syntax_ok": syntax_ok,
-                        "clean": clean, "codes": codes.most_common(8), "messages": msgs.most_common(6),
-                        "features": dict(feats), "names": names.most_common(60),
+                        "kind": p.get("kind", ""), "category": p.get("category", ""), "holdout": holdout,
+                        "units": len(files), "lines": lines, "syntax_ok": syntax_ok, "clean": clean,
+                        "codes": [] if holdout else codes.most_common(8),
+                        "messages": [] if holdout else msgs.most_common(6),
+                        "features": {} if holdout else dict(feats),
+                        "names": [] if holdout else names.most_common(60),
                         "dialect": p.get("dialect", ""),
-                        "raw": [(m, c, where[m]) for m, c in raw.most_common(300)]})
+                        "raw": [] if holdout else [(m, c, where[m]) for m, c in raw.most_common(300)]})
         print(f"{p['name']:30} units {len(files):5}  syntax ok {syntax_ok:5}  clean {clean:5}")
     (CACHE / "analysis.json").write_text(json.dumps(results, indent=1), encoding="utf-8")
     record_history(results)
@@ -483,13 +493,39 @@ def pct(a, b):
     return f"{100 * a / b:.0f}%" if b else "n/a"
 
 
+def pct1(a, b):
+    return f"{100 * a / b:.1f}%" if b else "n/a"
+
+
+def metrics(results) -> dict:
+    """Headline figures: the core set (application, library, sample) by units,
+    its median project, its holdout part, and everything analysed."""
+    core = [r for r in results if r.get("category") in CORE and not r.get("dialect")]
+    every = [r for r in results if not r.get("dialect")]
+
+    def tot(rs):
+        u = sum(r["units"] for r in rs)
+        return u, sum(r["syntax_ok"] for r in rs), sum(r["clean"] for r in rs)
+
+    rates = sorted(r["clean"] / r["units"] for r in core if r["units"])
+    median = rates[len(rates) // 2] if rates else 0.0
+    return {"core": tot(core), "core_projects": len(core), "median_clean": median,
+            "holdout": tot([r for r in core if r.get("holdout")]),
+            "holdout_projects": sum(1 for r in core if r.get("holdout")),
+            "all": tot(every), "all_projects": len(every),
+            "by_category": {c: tot([r for r in every if r.get("category") == c])
+                            for c in CORE + ("tool-input",)}}
+
+
 def write_report(results, all_codes, all_features) -> None:
     other = [r for r in results if r.get("dialect")]
     results = [r for r in results if not r.get("dialect")]
     U = sum(r["units"] for r in results)
     L = sum(r["lines"] for r in results)
-    S = sum(r["syntax_ok"] for r in results)
-    C = sum(r["clean"] for r in results)
+    m = metrics(results)
+    cu, cs, cc = m["core"]
+    hu, hs, hc = m["holdout"]
+    au, as_, ac = m["all"]
     out = [
         "# Real-world PLC code corpus: what rootplc handles today",
         "",
@@ -498,17 +534,41 @@ def write_report(results, all_codes, all_features) -> None:
         "",
         "A unit is *syntax OK* when rootplc lexes and parses it; *clean* when it also passes the type",
         "checker with no errors. Units are checked per project, so references to other libraries that",
-        "are not in the corpus count as errors.",
+        "are not in the corpus count as errors. *Clean* is rootplc's own verdict: no vendor compiler has",
+        "confirmed that the code is valid, so it measures acceptance, not correctness.",
         "",
-        f"**Overall: syntax OK {pct(S, U)} · clean {pct(C, U)}.**",
+        f"**Headline (applications, libraries and samples; {m['core_projects']} projects, {cu} units): "
+        f"syntax OK {pct1(cs, cu)} · clean {pct1(cc, cu)} · median project clean {100 * m['median_clean']:.1f}%.**",
         "",
-        "| Project | Kind | Licence | Units | Lines | Syntax OK | Clean |",
+        "| Figure | Projects | Units | Syntax OK | Clean |",
+        "|---|---|---|---|---|",
+        f"| Headline (core set) | {m['core_projects']} | {cu} | {pct1(cs, cu)} | {pct1(cc, cu)} |",
+        f"| Holdout part of the core set (never used to choose fixes) | {m['holdout_projects']} | {hu} | "
+        f"{pct1(hs, hu)} | {pct1(hc, hu)} |",
+        f"| Everything analysed, tool inputs included | {m['all_projects']} | {au} | {pct1(as_, au)} | {pct1(ac, au)} |",
+        "",
+        "| Category | Units | Syntax OK | Clean |",
+        "|---|---|---|---|",
+    ]
+    for cat, (u, s, c) in m["by_category"].items():
+        out.append(f"| {cat} | {u} | {pct1(s, u)} | {pct1(c, u)} |")
+    out += [
+        "",
+        "Categories (manifest `category`): *application* (a program for a machine or plant), *library*,",
+        "*sample* (vendor samples, tutorials, blog and course code), *tool-input* (test inputs and examples",
+        "of compilers, parsers, editors, AI tools, benchmarks; not in the headline). A *holdout* project's",
+        "errors are never ranked or stored, so its figure shows whether fixes generalise. Projects removed",
+        "as empty, duplicated, not Structured Text or too small are listed at the end of the manifest.",
+        "",
+        "| Project | Category | Licence | Units | Lines | Syntax OK | Clean |",
         "|---|---|---|---|---|---|---|",
     ]
     for r in sorted(results, key=lambda r: -r["units"]):
-        out.append(f"| [{r['name']}]({r['url']}) | {r['kind']} | {r['licence']} | {r['units']} | {r['lines']:,} | "
+        cat = r.get("category", "") + (" (holdout)" if r.get("holdout") else "")
+        out.append(f"| [{r['name']}]({r['url']}) | {cat} | {r['licence']} | {r['units']} | {r['lines']:,} | "
                    f"{pct(r['syntax_ok'], r['units'])} | {pct(r['clean'], r['units'])} |")
-    out += ["", "## What blocks the rest", "", "Units using each construct RootPLC does not support yet:", "",
+    out += ["", "## What blocks the rest", "", "In the core set without the holdout projects.", "",
+            "Units using each construct RootPLC does not support yet:", "",
             "| Construct | Units |", "|---|---|"]
     for k, v in all_features.most_common():
         out.append(f"| {k} | {v} ({pct(v, U)}) |")
@@ -524,6 +584,14 @@ def write_report(results, all_codes, all_features) -> None:
     if skipped:
         out += ["", "## Listed but not analysed", "", "| Project | Reason |", "|---|---|"]
         out += [f"| [{p['name']}]({p['url']}) | {p.get('note', p['format'])} |" for p in skipped]
+    excluded = tomllib.loads((HERE / "manifest.toml").read_text(encoding="utf-8")).get("excluded", [])
+    if excluded:
+        why = Counter(e["reason"].split(":")[0] if ":" in e["reason"] else "no Structured Text"
+                      for e in excluded)
+        out += ["", "## Removed from the corpus", "",
+                f"{len(excluded)} projects were reviewed and removed (listed with reasons at the end of",
+                "manifest.toml, so that discovery does not add them again):", ""]
+        out += [f"- {k}: {v}" for k, v in why.most_common()]
     out += ["", "## Licences", "",
             "Only projects marked redistributable (MIT, BSD, Apache, CC0, Unlicense) may be copied into a",
             "published dataset. The others are analysed locally and cited by link.", ""]
@@ -534,11 +602,14 @@ def write_report(results, all_codes, all_features) -> None:
 def record_history(results) -> None:
     """Append this run's totals to corpus/history.json (public metrics only)."""
     from datetime import datetime
-    results = [r for r in results if not r.get("dialect")]
-    U = sum(r["units"] for r in results) or 1
+    m = metrics(results)
+    U, S, C = m["core"]
+    U = U or 1
+    # from 4 Nov 2026 the figures are the core set's (see REPORT.md); earlier
+    # rows are everything analysed
     row = {"date": datetime.now().strftime("%Y-%m-%d %H:%M"), "units": U,
-           "parse": round(100 * sum(r["syntax_ok"] for r in results) / U),
-           "clean": round(100 * sum(r["clean"] for r in results) / U)}
+           "parse": round(100 * S / U), "clean": round(100 * C / U),
+           "basis": "core", "median_clean": round(100 * m["median_clean"])}
     path = HERE / "history.json"
     hist = json.loads(path.read_text(encoding="utf-8")) if path.exists() else []
     if not hist or (hist[-1]["units"], hist[-1]["parse"], hist[-1]["clean"]) != (row["units"], row["parse"], row["clean"]):
@@ -549,7 +620,8 @@ def record_history(results) -> None:
 def dashboard() -> None:
     """Write corpus/dashboard.html (self-contained) from the last analysis."""
     results = json.loads((CACHE / "analysis.json").read_text(encoding="utf-8"))
-    results = [r for r in results if not r.get("dialect")]
+    m = metrics(results)
+    results = [r for r in results if not r.get("dialect") and r.get("category") in CORE]
     feats = Counter()
     for r in results:
         feats.update(r["features"])
@@ -559,6 +631,7 @@ def dashboard() -> None:
         "date": date.today().strftime("%d %b %Y"),
         "listed": len(projects()),
         "rootplc": version,
+        "median_clean": round(100 * m["median_clean"]),
         "projects": [{k: r[k] for k in ("name", "licence", "units", "lines", "syntax_ok", "clean")} for r in results],
         "features": feats.most_common(),
         "history": json.loads(hist_path.read_text(encoding="utf-8")) if hist_path.exists() else [],

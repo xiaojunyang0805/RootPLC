@@ -94,5 +94,13 @@
   "units": 14374,
   "parse": 95,
   "clean": 70
+ },
+ {
+  "date": "2026-11-04 10:38",
+  "units": 11476,
+  "parse": 97,
+  "clean": 73,
+  "basis": "core",
+  "median_clean": 75
  }
 ]
