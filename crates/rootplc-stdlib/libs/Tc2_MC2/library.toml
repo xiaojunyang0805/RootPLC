@@ -1,0 +1,13 @@
+# Compatibility library: part of the interface of Beckhoff's Tc2_MC2 (PLCopen
+# motion control). Clean-room: written only from the public references below.
+# RootPLC is an independent project, not affiliated with or endorsed by
+# Beckhoff Automation.
+name = "Tc2_MC2"
+vendor = "Beckhoff Automation GmbH"
+version = "1.0.0"
+description = "TwinCAT Tc2_MC2 (part): AXIS_REF with NcToPlc / PlcToNc / Status, the axis data types; MC_Power, MC_Reset, MC_Stop, MC_Halt, MC_Home, MC_MoveAbsolute, MC_MoveRelative, MC_MoveVelocity, MC_SetPosition, MC_ReadActualPosition, MC_ReadStatus declared"
+requires = ["Tc2_System"]
+declare_only = ["MC_Power", "MC_Reset", "MC_Stop", "MC_Halt", "MC_Home", "MC_MoveAbsolute", "MC_MoveRelative", "MC_MoveVelocity", "MC_SetPosition", "MC_ReadActualPosition", "MC_ReadStatus"]
+references = [
+  "https://download.beckhoff.com/download/Document/automation/twincat3/TwinCAT_3_PLC_Lib_Tc2_MC2_EN.pdf (TE1000 Tc2_MC2 manual 2.18.0: AXIS_REF and its data types, the MC_ function blocks)",
+]

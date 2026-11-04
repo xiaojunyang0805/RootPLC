@@ -45,6 +45,13 @@ const BUNDLED: &[(&str, &[(&str, &str)])] = &[
         )],
     ),
     (
+        include_str!("../libs/Tc2_MC2/library.toml"),
+        &[(
+            "Tc2_MC2.st",
+            include_str!("../libs/Tc2_MC2/1.0.0/Tc2_MC2.st"),
+        )],
+    ),
+    (
         include_str!("../libs/Tc2_Standard/library.toml"),
         &[(
             "Tc2_Standard.st",

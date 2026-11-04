@@ -81,7 +81,9 @@ of namespace `TwinCAT_SystemInfoVarList`, declared but not filled at run
 time)
 and `Tc2_Standard` (TwinCAT's `CTU`, `CTD` and `CTUD` with `RESET`, `LOAD`
 and `WORD` counts, the `LTIME` timers `LTON`, `LTOF`, `LTP`, and the
-`WSTRING` functions `WLEN`, `WMID`, `WCONCAT`, ...) and `Tc3_Module`
+`WSTRING` functions `WLEN`, `WMID`, `WCONCAT`, ...) `Tc2_MC2` (the axis interface `AXIS_REF` with its data
+types; the PLCopen motion blocks `MC_Power`, `MC_MoveAbsolute`, ... are
+declared only, since motion needs the NC) and `Tc3_Module`
 (`S_OK` and the other HRESULT constants, `SUCCEEDED`, `FAILED`; `HRESULT`
 itself, a `DINT`, is in `TwinCAT_BuiltIns`). A library may replace a
 standard function block of [stdlib.fbs]; while it is active its declaration

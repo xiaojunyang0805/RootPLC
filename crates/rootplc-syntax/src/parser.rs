@@ -1621,7 +1621,8 @@ impl<'a> Parser<'a> {
             if self.at(TokenKind::Dot) {
                 self.b.start_at(cp, N::MemberExpr);
                 self.bump();
-                if !self.eat(TokenKind::Integer) {
+                // a member name is a use, not a declaration: no RP0124
+                if !self.eat(TokenKind::Integer) && !self.eat(TokenKind::Ident) {
                     self.name();
                 }
                 self.b.finish();
