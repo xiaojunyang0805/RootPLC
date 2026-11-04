@@ -135,7 +135,9 @@ so that vendor code checks and runs unchanged (spec/08-stdlib.md
 Functions marked *declared only* are type-checked but not run: a call is
 warning RP0120 and running it stops with the fault `UNSUPPORTED`. Each
 library lists the public documentation it was written from; RootPLC is not
-affiliated with the vendors named.
+affiliated with the vendors named. Bundled today: `TwinCAT_BuiltIns`,
+`Tc2_System`, `Tc2_Standard`, `Tc2_Utilities`, `Tc3_Module`, `Tc2_MC2`;
+activating one activates the libraries it requires.
 
 ```json
 {"command":"libraries","ok":true,"libraries":[{"name":"Tc2_System","vendor":"Beckhoff Automation GmbH",
