@@ -1553,6 +1553,537 @@ format = "twincat"
 kind = "discovered"
 category = "sample"
 
+[[project]]
+name = "thorstenbrach-thorbot-software-plc"
+url = "https://github.com/ThorstenBrach/ThorBot_Software_PLC"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+category = "application"
+
+[[project]]
+name = "e13740e-codesys-adaptive-traffic-control"
+url = "https://github.com/e13740e/CODESYS-Adaptive-Traffic-Control"
+licence = "MIT License"
+redistribute = true
+format = "st"
+kind = "discovered"
+category = "application"
+
+[[project]]
+name = "ptw-tuda-eta-factory-building-automation"
+url = "https://github.com/PTW-TUDa/eta-factory-building-automation"
+licence = "BSD 2-Clause \"Simplified\" License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+category = "application"
+
+[[project]]
+name = "verkal1999-fischertechnik-i4-0-modules-simulator-twincat"
+url = "https://github.com/verkal1999/Fischertechnik_I4.0_Modules_Simulator_TwinCAT"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+category = "application"
+
+[[project]]
+name = "bernhardfoelk-beckhoff-smarthome"
+url = "https://github.com/bernhardfoelk/beckhoff_smarthome"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+category = "application"
+
+[[project]]
+name = "mridulnskp-ts2-conveyor-problem"
+url = "https://github.com/mridulnskp/TS2_Conveyor_Problem"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+category = "application"
+
+[[project]]
+name = "niwhuny-factory-io-projek-1"
+url = "https://github.com/NIWHUNY/Factory_io_projek_1"
+licence = "GNU General Public License v3.0"
+redistribute = false
+format = "st"
+kind = "discovered"
+category = "application"
+
+[[project]]
+name = "alexmeissen-starburst-dispenser"
+url = "https://github.com/alexmeissen/starburst-dispenser"
+licence = "Other"
+redistribute = false
+format = "twincat"
+kind = "discovered"
+category = "application"
+
+[[project]]
+name = "mitchellquinn-vc-weight-sorter-cell"
+url = "https://github.com/MitchellQuinn/vc-weight-sorter-cell"
+licence = "Other"
+redistribute = false
+format = "st"
+kind = "discovered"
+category = "application"
+
+[[project]]
+name = "jreyesa0901-twincat-conveyors"
+url = "https://github.com/jreyesa0901/twincat-conveyors"
+licence = "GNU General Public License v3.0"
+redistribute = false
+format = "twincat"
+kind = "discovered"
+category = "application"
+
+[[project]]
+name = "albertjanpieffers-factoryio-twincat"
+url = "https://github.com/AlbertjanPieffers/FactoryIO_TwinCAT"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+category = "application"
+
+[[project]]
+name = "erdemsabriveli-ac-digital-twin"
+url = "https://github.com/ErdemSabriVeli/ac-digital-twin"
+licence = "MIT License"
+redistribute = true
+format = "st"
+kind = "discovered"
+category = "application"
+
+[[project]]
+name = "autonomy-logic-smart-traffic-light"
+url = "https://github.com/Autonomy-Logic/smart-traffic-light"
+licence = "MIT License"
+redistribute = true
+format = "st"
+kind = "discovered"
+category = "application"
+
+[[project]]
+name = "abdmoiz18-process-and-packaging-plant"
+url = "https://github.com/abdmoiz18/process-and-packaging-plant"
+licence = "MIT License"
+redistribute = true
+format = "st"
+kind = "discovered"
+category = "application"
+
+[[project]]
+name = "jgw3-plc-projects"
+url = "https://github.com/JGW3/plc-projects"
+licence = "MIT License"
+redistribute = true
+format = "st"
+kind = "discovered"
+category = "application"
+
+[[project]]
+name = "mbi-div-b-maxi-beckhoff"
+url = "https://github.com/MBI-Div-B/MAXI-beckhoff"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+category = "application"
+
+[[project]]
+name = "atakangudulluogluhv-elevator-plc-agents"
+url = "https://github.com/atakangudulluogluhv/elevator-plc-agents"
+licence = "Other"
+redistribute = false
+format = "twincat"
+kind = "discovered"
+category = "application"
+
+[[project]]
+name = "0xc00be-rsb-lab"
+url = "https://github.com/0xC00BE/rsb-lab"
+licence = "MIT License"
+redistribute = true
+format = "st"
+kind = "discovered"
+category = "application"
+
+[[project]]
+name = "ishansharma97-virtual-manufacturing-cell"
+url = "https://github.com/IshanSharma97/virtual-manufacturing-cell"
+licence = "MIT License"
+redistribute = true
+format = "st"
+kind = "discovered"
+category = "application"
+
+[[project]]
+name = "fortuechip-automation-virtual-industrial-automation-cell"
+url = "https://github.com/fortuechip-automation/virtual-industrial-automation-cell"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+category = "application"
+
+[[project]]
+name = "aydogandagidir-conveyor-sorting-twin"
+url = "https://github.com/aydogandagidir/conveyor-sorting-twin"
+licence = "MIT License"
+redistribute = true
+format = "st"
+kind = "discovered"
+category = "application"
+
+[[project]]
+name = "vishnukarthikbalakrishnan-plc-tank-level-pid"
+url = "https://github.com/vishnukarthikbalakrishnan/PLC_Tank_Level_PID"
+licence = "MIT License"
+redistribute = true
+format = "st"
+kind = "discovered"
+category = "application"
+
+[[project]]
+name = "kathiravankb06-water-tank-level-control-plc"
+url = "https://github.com/kathiravankb06/Water-Tank-Level-Control-PLC"
+licence = "Other"
+redistribute = false
+format = "st"
+kind = "discovered"
+category = "application"
+
+[[project]]
+name = "q3son-concurso-plc"
+url = "https://github.com/Q3son/Concurso_PLC"
+licence = "MIT License"
+redistribute = true
+format = "st"
+kind = "discovered"
+category = "application"
+
+[[project]]
+name = "r9guy-yaskawa-nx100-robot-transporter"
+url = "https://github.com/r9guy/Yaskawa-NX100-robot-transporter"
+licence = "GNU General Public License v3.0"
+redistribute = false
+format = "twincat"
+kind = "discovered"
+category = "application"
+
+[[project]]
+name = "fortiphyd-grficsv3"
+url = "https://github.com/Fortiphyd/GRFICSv3"
+licence = "GNU General Public License v3.0"
+redistribute = false
+format = "st"
+kind = "discovered"
+category = "application"
+
+[[project]]
+name = "mridulnpkd-twincat-oop-vending-machine"
+url = "https://github.com/mridulnpkd/TwinCAT-OOP-Vending-Machine"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+category = "application"
+
+[[project]]
+name = "lance0901-twincat-training-simulator"
+url = "https://github.com/Lance0901/TwinCAT-Training-Simulator"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+category = "application"
+
+[[project]]
+name = "giuliosistilli-twincat-implementation-automated-drill-machine-simulation"
+url = "https://github.com/GiulioSistilli/TwinCAT-Implementation-Automated-Drill-Machine-Simulation"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+category = "application"
+
+[[project]]
+name = "bstiffler582-twincat-modularmachine"
+url = "https://github.com/bstiffler582/TwinCAT-ModularMachine"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+category = "application"
+
+[[project]]
+name = "dalethomas81-arfbotos"
+url = "https://github.com/dalethomas81/ArfBotOS"
+licence = "GNU General Public License v3.0"
+redistribute = false
+format = "st"
+kind = "discovered"
+category = "application"
+
+[[project]]
+name = "luandev27-forja"
+url = "https://github.com/LuanDev27/forja"
+licence = "MIT License"
+redistribute = true
+format = "st"
+kind = "discovered"
+category = "application"
+
+[[project]]
+name = "jozamudi-lcls-plc-rix-sample-delivery-old"
+url = "https://github.com/jozamudi/lcls-plc-rix-sample-delivery-old"
+licence = "Other"
+redistribute = false
+format = "twincat"
+kind = "discovered"
+category = "application"
+
+[[project]]
+name = "jozamudi-lcls-plc-mfx-sample-delivery-old"
+url = "https://github.com/jozamudi/lcls-plc-mfx-sample-delivery-old"
+licence = "Other"
+redistribute = false
+format = "twincat"
+kind = "discovered"
+category = "application"
+
+[[project]]
+name = "ntandolis431-iiot-testbed"
+url = "https://github.com/Ntandolis431/iiot-testbed"
+licence = "MIT License"
+redistribute = true
+format = "st"
+kind = "discovered"
+category = "application"
+
+[[project]]
+name = "liamcarper-ot-security-lab"
+url = "https://github.com/LiamCarPer/OT-Security-Lab"
+licence = "MIT License"
+redistribute = true
+format = "st"
+kind = "discovered"
+category = "application"
+
+[[project]]
+name = "sulemanali5760-twincat3-hrl-virtual-commissioning"
+url = "https://github.com/sulemanali5760/twincat3-hrl-virtual-commissioning"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+category = "application"
+
+[[project]]
+name = "keiji01-tf3685-beckhoffdynamicweighingsamplebr"
+url = "https://github.com/Keiji01/TF3685-BeckhoffDynamicWeighingSampleBR"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+category = "sample"
+
+[[project]]
+name = "0w8states-plc-oop-basics"
+url = "https://github.com/0w8States/PLC-OOP-Basics"
+licence = "BSD 2-Clause \"Simplified\" License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+category = "sample"
+
+[[project]]
+name = "babe-brams-st-qlearning"
+url = "https://github.com/BABE-BramS/ST_QLearning"
+licence = "BSD 2-Clause \"Simplified\" License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+category = "sample"
+
+[[project]]
+name = "virajdesai0309-openplc-tutorials"
+url = "https://github.com/virajdesai0309/OpenPLC_Tutorials"
+licence = "MIT License"
+redistribute = true
+format = "st"
+kind = "discovered"
+category = "sample"
+
+[[project]]
+name = "gracesrm-openplc-sample-programs"
+url = "https://github.com/gracesrm/OpenPLC_Sample_Programs"
+licence = "GNU General Public License v3.0"
+redistribute = false
+format = "st"
+kind = "discovered"
+category = "sample"
+
+[[project]]
+name = "sarincr-plc-programming-using-openplc"
+url = "https://github.com/sarincr/PLC-Programming-using-OpenPLC"
+licence = "MIT License"
+redistribute = true
+format = "st"
+kind = "discovered"
+category = "sample"
+
+[[project]]
+name = "beckhoff-usa-community-te2000-tchmi-advancedtrafficlight"
+url = "https://github.com/Beckhoff-USA-Community/TE2000_TcHMI_AdvancedTrafficLight"
+licence = "BSD Zero Clause License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+category = "sample"
+
+[[project]]
+name = "ishansharma97-plc-portability-lab"
+url = "https://github.com/IshanSharma97/plc-portability-lab"
+licence = "MIT License"
+redistribute = true
+format = "st"
+kind = "discovered"
+category = "sample"
+
+[[project]]
+name = "stefanhenneken-blog-2016-06-iec61131-namespaces-sample03"
+url = "https://github.com/StefanHenneken/Blog-2016-06-IEC61131-Namespaces-Sample03"
+licence = "BSD 2-Clause \"Simplified\" License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+category = "sample"
+
+[[project]]
+name = "beslst-twincat-xbox-controller-service"
+url = "https://github.com/beslst/TwinCAT-XBox-Controller-Service"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+category = "sample"
+
+[[project]]
+name = "yifei-diy-openplc-project"
+url = "https://github.com/yifei-diy/OpenPLC-Project"
+licence = "MIT License"
+redistribute = true
+format = "st"
+kind = "discovered"
+category = "sample"
+
+[[project]]
+name = "richard-luc-homesight"
+url = "https://github.com/richard-luc/HomeSight"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+category = "sample"
+
+[[project]]
+name = "tcnexa-tccylinder"
+url = "https://github.com/TcNexa/TcCylinder"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+category = "library"
+
+[[project]]
+name = "tcnexa-tcdevicebase"
+url = "https://github.com/TcNexa/TcDeviceBase"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+category = "library"
+
+[[project]]
+name = "mtassone1-packml-codesys"
+url = "https://github.com/mtassone1/PackML-CODESYS"
+licence = "MIT License"
+redistribute = true
+format = "st"
+kind = "discovered"
+category = "library"
+
+[[project]]
+name = "rtzz2000-tc3-component"
+url = "https://github.com/rtzz2000/Tc3_Component"
+licence = "GNU General Public License v3.0"
+redistribute = false
+format = "twincat"
+kind = "discovered"
+category = "library"
+
+[[project]]
+name = "mbc-engineering-net-pcs"
+url = "https://github.com/mbc-engineering/net-pcs"
+licence = "Apache License 2.0"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+category = "library"
+
+[[project]]
+name = "pcdshub-lcls-twincat-vacuum-system-simulator"
+url = "https://github.com/pcdshub/lcls-twincat-vacuum-system-simulator"
+licence = "Other"
+redistribute = false
+format = "twincat"
+kind = "discovered"
+category = "library"
+
+[[project]]
+name = "beckhoff-jp-machinealarmmanagement"
+url = "https://github.com/Beckhoff-JP/MachineAlarmManagement"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+category = "library"
+
+[[project]]
+name = "loupeteam-tcabblinkin"
+url = "https://github.com/loupeteam/TcAbbLinkin"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+category = "library"
+
+[[project]]
+name = "mbi-div-b-twincat-libmbidivb"
+url = "https://github.com/MBI-Div-B/twincat-libMBIDivB"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+category = "library"
+
+[[project]]
+name = "rruiter87-tcmeasurementbridge"
+url = "https://github.com/rruiter87/TcMeasurementBridge"
+licence = "MIT License"
+redistribute = true
+format = "twincat"
+kind = "discovered"
+category = "library"
+
 # Removed from the corpus (kept so that discovery does not add them again).
 
 [[excluded]]
@@ -1894,3 +2425,8 @@ reason = "valueless: a tool or AI-agent repository with 5 units or fewer of exam
 name = "zeugwerk-twinpack"
 url = "https://github.com/Zeugwerk/Twinpack"
 reason = "valueless: a tool or AI-agent repository with 5 units or fewer of example input"
+
+[[excluded]]
+name = "leosunset-siemens-simatic-step7-classic-algorithms"
+url = "https://github.com/LeoSunSET/SIEMENS_SIMATIC_STEP7_Classic_Algorithms"
+reason = "chaos: not IEC 61131-3 Structured Text (Siemens STEP 7 SCL source with quoted names and AUTHOR / FAMILY headers)"
