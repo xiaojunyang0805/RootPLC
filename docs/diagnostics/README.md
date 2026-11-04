@@ -222,8 +222,9 @@ Rule `lexical.literal.date` in `spec/01-lexical.md`:
 | `TOD#`, `TIME_OF_DAY#`, `LTOD#`, `LTIME_OF_DAY#` | `hh:mm:ss[.f]` | `TOD#14:30:00.5` |
 | `DT#`, `DATE_AND_TIME#`, `LDT#`, `LDATE_AND_TIME#` | `yyyy-mm-dd-hh:mm:ss[.f]` | `DT#2026-11-03-14:30:00` |
 
-A value outside the calendar or clock (month 13, 30 February, hour 24) is
-error RP0012. A malformed literal is error RP0011.
+The seconds may be left out (`TOD#12:00`, CODESYS and TwinCAT); they are
+then 0. A value outside the calendar or clock (month 13, 30 February, hour
+24) is error RP0012. A malformed literal is error RP0011.
 
 ## RP0013
 
@@ -723,7 +724,9 @@ Rule `types.conversion.vendor` in `spec/02-types.md`:
 **[types.conversion.vendor]** CODESYS and TwinCAT accept some mixes that
 IEC 61131-3 rejects; RootPLC accepts them with a warning: arithmetic on bit
 strings (`dw + 1`), bitwise operators on integers (`n AND 16#FF`) and bit
-strings as array indexes (`a[b]` with `b : BYTE`) are warning RP0126; the
+strings as array indexes (`a[b]` with `b : BYTE`), and an unsigned integer
+mixed with or assigned to a bit string of the same size (`UDINT` and
+`DWORD`) are warning RP0126; the
 integer literals `0` and `1` as `BOOL` and `0` as a reference (`NULL`) are
 warning RP0127.
 
@@ -736,6 +739,8 @@ Rule `types.conversion.vendor` in `spec/02-types.md`:
 **[types.conversion.vendor]** CODESYS and TwinCAT accept some mixes that
 IEC 61131-3 rejects; RootPLC accepts them with a warning: arithmetic on bit
 strings (`dw + 1`), bitwise operators on integers (`n AND 16#FF`) and bit
-strings as array indexes (`a[b]` with `b : BYTE`) are warning RP0126; the
+strings as array indexes (`a[b]` with `b : BYTE`), and an unsigned integer
+mixed with or assigned to a bit string of the same size (`UDINT` and
+`DWORD`) are warning RP0126; the
 integer literals `0` and `1` as `BOOL` and `0` as a reference (`NULL`) are
 warning RP0127.

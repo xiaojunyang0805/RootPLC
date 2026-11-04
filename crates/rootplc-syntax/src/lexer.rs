@@ -770,8 +770,11 @@ fn validate_date(s: &str) -> Result<(), DateError> {
 
 fn validate_tod(s: &str) -> Result<(), DateError> {
     let parts: Vec<&str> = s.split(':').collect();
-    let [h, m, sec] = parts.as_slice() else {
-        return Err(DateError::Malformed);
+    // hh:mm without seconds (CODESYS / TwinCAT) means hh:mm:00
+    let (h, m, sec) = match parts.as_slice() {
+        [h, m, sec] => (h, m, sec),
+        [h, m] => (h, m, &"0"),
+        _ => return Err(DateError::Malformed),
     };
     let (sec_int, frac) = match sec.split_once('.') {
         Some((i, f)) => (i, Some(f)),

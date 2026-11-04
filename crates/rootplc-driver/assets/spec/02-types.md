@@ -163,7 +163,9 @@ must be a structure (RP0111).
 **[types.conversion.vendor]** CODESYS and TwinCAT accept some mixes that
 IEC 61131-3 rejects; RootPLC accepts them with a warning: arithmetic on bit
 strings (`dw + 1`), bitwise operators on integers (`n AND 16#FF`) and bit
-strings as array indexes (`a[b]` with `b : BYTE`) are warning RP0126; the
+strings as array indexes (`a[b]` with `b : BYTE`), and an unsigned integer
+mixed with or assigned to a bit string of the same size (`UDINT` and
+`DWORD`) are warning RP0126; the
 integer literals `0` and `1` as `BOOL` and `0` as a reference (`NULL`) are
 warning RP0127.
 

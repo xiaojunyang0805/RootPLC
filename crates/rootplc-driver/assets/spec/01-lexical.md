@@ -168,8 +168,9 @@ A literal that breaks any of these is error RP0011.
 | `TOD#`, `TIME_OF_DAY#`, `LTOD#`, `LTIME_OF_DAY#` | `hh:mm:ss[.f]` | `TOD#14:30:00.5` |
 | `DT#`, `DATE_AND_TIME#`, `LDT#`, `LDATE_AND_TIME#` | `yyyy-mm-dd-hh:mm:ss[.f]` | `DT#2026-11-03-14:30:00` |
 
-A value outside the calendar or clock (month 13, 30 February, hour 24) is
-error RP0012. A malformed literal is error RP0011.
+The seconds may be left out (`TOD#12:00`, CODESYS and TwinCAT); they are
+then 0. A value outside the calendar or clock (month 13, 30 February, hour
+24) is error RP0012. A malformed literal is error RP0011.
 
 ## 7. Pragmas
 

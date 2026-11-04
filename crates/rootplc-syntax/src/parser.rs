@@ -1655,13 +1655,11 @@ impl<'a> Parser<'a> {
                 if (self.at(TokenKind::Ident) || self.at_kw("TEST"))
                     && matches!(self.nth_kind(1), Some(TokenKind::Assign | TokenKind::Arrow))
                 {
-                    let output = self.nth_kind(1) == Some(TokenKind::Arrow);
                     self.bump();
                     self.bump();
-                    // [pous.call.output]: `Done =>` with no variable ignores the output
-                    if !(output
-                        && matches!(self.kind(), Some(TokenKind::Comma | TokenKind::RParen)))
-                    {
+                    // [statements.call]: `Done =>` with no variable ignores the
+                    // output, `bExecute :=` with no value leaves the input as is
+                    if !matches!(self.kind(), Some(TokenKind::Comma | TokenKind::RParen)) {
                         self.expr();
                     }
                 } else {
@@ -1669,6 +1667,10 @@ impl<'a> Parser<'a> {
                 }
                 self.b.finish();
                 if !self.eat(TokenKind::Comma) {
+                    break;
+                }
+                // a comma before ')' (CODESYS / TwinCAT)
+                if self.at(TokenKind::RParen) {
                     break;
                 }
             }

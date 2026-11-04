@@ -1476,6 +1476,35 @@ impl<'a> Checker<'a> {
     /// A value for a target of type `target`: a function-block instance
     /// becomes a reference when the target is an interface it implements,
     /// [pous.oop.interface-ref]; otherwise the usual conversion rules apply.
+    /// An argument for a parameter: a `REFERENCE TO T` parameter given a
+    /// variable of type `T` refers to that variable ([types.reference.alias]).
+    fn bind_param(&mut self, target: &Ty, alias: bool, v: V) -> ir::Expr {
+        if alias {
+            if let Ty::Ref(inner) = self.strip(target) {
+                let place = matches!(
+                    v.e,
+                    ExprKind::Var(_)
+                        | ExprKind::Global(_)
+                        | ExprKind::Member(..)
+                        | ExprKind::Index(..)
+                        | ExprKind::Deref(_)
+                ) && v.k.is_none();
+                if place
+                    && !matches!(self.strip(&v.ty), Ty::Ref(_))
+                    && self.compatible(&inner, &v.ty)
+                {
+                    let span = v.span;
+                    return ir::Expr {
+                        ty: target.clone(),
+                        kind: ExprKind::Ref(Box::new(v.ir())),
+                        span,
+                    };
+                }
+            }
+        }
+        self.adapt(target, v)
+    }
+
     fn adapt(&mut self, target: &Ty, v: V) -> ir::Expr {
         let tt = self.strip(target);
         if let Some(e) = self.any_argument(&tt, &v) {
@@ -3030,6 +3059,18 @@ impl<'a> Checker<'a> {
             return true;
         }
         if !self.compatible(to, &v.ty) {
+            // CODESYS / TwinCAT: UDINT to DWORD and back (same size); RP0126
+            if let (Ty::Elem(a), Ty::Elem(b)) = (&tb, self.strip(&v.ty)) {
+                if same_size_bits(*a, b).is_some() {
+                    let msg = format!(
+                        "{} converted implicitly to {}; IEC 61131-3 converts explicitly",
+                        b.name(),
+                        a.name()
+                    );
+                    self.diag(codes::BIT_STRING_AS_NUMBER, msg, v.span, None);
+                    return true;
+                }
+            }
             self.mismatch(to, v);
             return false;
         }
@@ -3088,6 +3129,18 @@ impl<'a> Checker<'a> {
             }
             _ if self.compatible(&rt, &lt) => rt,
             _ if self.compatible(&lt, &rt) => lt,
+            // CODESYS / TwinCAT: an unsigned integer and a bit string of the
+            // same size mix (DWORD XOR UDINT); warning RP0126
+            (Ty::Elem(a), Ty::Elem(b)) if same_size_bits(*a, *b).is_some() => {
+                let msg = format!(
+                    "operands of {what} mix {} and {}; IEC 61131-3 converts explicitly",
+                    a.name(),
+                    b.name()
+                );
+                let span = Span::new(l.span.start as usize, r.span.end as usize);
+                self.diag(codes::BIT_STRING_AS_NUMBER, msg, span, None);
+                Ty::Elem(same_size_bits(*a, *b).unwrap_or(*a))
+            }
             _ => {
                 let msg = format!(
                     "operands of {what} have incompatible types {} and {}",
@@ -4100,7 +4153,7 @@ impl<'a> Checker<'a> {
                         }
                         Some(s) => {
                             let val = self.expr(a.expr);
-                            let ir = self.adapt(&p.vars[s].ty, val);
+                            let ir = self.bind_param(&p.vars[s].ty, p.vars[s].alias, val);
                             self.check_in_out_arg(p.vars[s].section, &p.vars[s].name, &ir);
                             inputs.push((s, ir));
                         }
@@ -4120,7 +4173,7 @@ impl<'a> Checker<'a> {
                 None => {
                     let val = self.expr(a.expr);
                     if let Some(&s) = input_slots.get(pos) {
-                        let ir = self.adapt(&p.vars[s].ty, val);
+                        let ir = self.bind_param(&p.vars[s].ty, p.vars[s].alias, val);
                         self.check_in_out_arg(p.vars[s].section, &p.vars[s].name, &ir);
                         inputs.push((s, ir));
                     }
@@ -4345,6 +4398,25 @@ impl<'a> Checker<'a> {
             args: vals.into_iter().map(V::ir).collect(),
         };
         V::with(dint, span, ExprKind::Call(Box::new(call)))
+    }
+}
+
+/// The bit-string type when `a` and `b` are an unsigned integer and a bit
+/// string of the same size (UDINT and DWORD), else None.
+fn same_size_bits(a: Elem, b: Elem) -> Option<Elem> {
+    use Elem::*;
+    let pair = |u: Elem, w: Elem| {
+        matches!(
+            (u, w),
+            (Usint, Byte) | (Uint, Word) | (Udint, Dword) | (Ulint, Lword)
+        )
+    };
+    if pair(a, b) {
+        Some(b)
+    } else if pair(b, a) {
+        Some(a)
+    } else {
+        None
     }
 }
 

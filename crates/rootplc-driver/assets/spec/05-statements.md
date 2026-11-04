@@ -35,8 +35,11 @@ statement. Arguments are positional, or named with `:=` (input) and `=>`
 call_stmt    = variable '(' [ argument { ',' argument } ] ')' ';'
 argument     = [ name ( ':=' | '=>' ) ] expression
 ```
-An output binding may leave out the variable, `Done =>` (CODESYS and
-TwinCAT): the output is not read.
+An output binding may leave out the variable, `Done =>`, and an input
+binding its value, `bExecute :=` (CODESYS and TwinCAT): the output is not
+read, the input keeps its value. A comma may follow the last argument. A
+`REFERENCE TO T` parameter given a variable of type `T` refers to that
+variable.
 
 **[statements.if]** `IF c THEN … {ELSIF c THEN …} [ELSE …] END_IF`
 evaluates the conditions in order and runs the statements of the first branch
