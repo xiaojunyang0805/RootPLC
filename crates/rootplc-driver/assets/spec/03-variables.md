@@ -41,10 +41,15 @@ initializer or a structure initializer:
 
 ```
 initializer  = expression
-             | '[' initializer { ',' initializer } ']'                    (* array *)
+             | '[' element { ',' element } ']'                            (* array *)
              | '(' name ':=' initializer { ',' name ':=' initializer } ')' (* structure *)
              | '(' ')'                                                    (* defaults *)
+element      = initializer | integer '(' [ expression ] ')'               (* repeated *)
 ```
+
+In an array initializer `n(v)` stands for `n` elements of value `v`, and
+`n()` for `n` elements with their default: `[1, 3(7), 2]` is
+`[1, 7, 7, 7, 2]`.
 
 A structure initializer may also set the variables of a function-block
 instance, `t : TON := (PT := T#1S);` (CODESYS and TwinCAT), and `()` keeps

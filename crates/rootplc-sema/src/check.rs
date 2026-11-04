@@ -2519,11 +2519,25 @@ impl<'a> Checker<'a> {
                         return None;
                     }
                 };
-                let items = self
-                    .child_nodes(inner, N::Initializer)
-                    .into_iter()
-                    .filter_map(|c| self.initializer(&elem, c))
-                    .collect();
+                let mut items = Vec::new();
+                for c in self.child_nodes(inner, N::Initializer) {
+                    // [variables.initializer]: n(v) repeats v n times; n() the default
+                    if let Some((count, value)) = self.repeated_element(c) {
+                        let init = match value {
+                            Some(e) => {
+                                let v = self.expr_expecting(&elem, e);
+                                self.coerce(&elem, &v);
+                                Init::Expr(v.ir())
+                            }
+                            None => Init::Struct(Vec::new()),
+                        };
+                        items.extend(std::iter::repeat_n(init, count));
+                        continue;
+                    }
+                    if let Some(i) = self.initializer(&elem, c) {
+                        items.push(i);
+                    }
+                }
                 Some(Init::Array(items))
             }
             N::StructInit => {
@@ -2589,6 +2603,37 @@ impl<'a> Checker<'a> {
                 self.coerce(ty, &v);
                 Some(Init::Expr(v.ir()))
             }
+        }
+    }
+
+    /// An array initializer element `n(v)` / `n()`: the count and the value
+    /// expression ([variables.initializer]).
+    fn repeated_element(&self, c: &'a Node) -> Option<(usize, Option<&'a Node>)> {
+        let e = self.first_node(c)?;
+        if e.kind != N::CallExpr {
+            return None;
+        }
+        let its = self.items(e);
+        let (Some(Item::Node(callee)), Some(Item::Node(list))) =
+            (its.first().copied(), its.get(1).copied())
+        else {
+            return None;
+        };
+        if callee.kind != N::Literal {
+            return None;
+        }
+        let Some(Item::Tok(t)) = self.items(callee).first().copied() else {
+            return None;
+        };
+        if self.tkind(t) != T::Integer {
+            return None;
+        }
+        let count = usize::try_from(literal::parse_int(self.text(t))?).ok()?;
+        let args = self.args(list);
+        match args.as_slice() {
+            [] => Some((count, None)),
+            [a] if a.name.is_none() => Some((count, Some(a.expr))),
+            _ => None,
         }
     }
 
@@ -4386,12 +4431,16 @@ impl<'a> Checker<'a> {
     fn call_named(&mut self, i: usize, args: &[Arg<'a>], span: Span) -> V {
         let name = self.text(i);
         let cspan = self.tok_span(i);
+        // [types.reference.alias]: a REFERENCE TO an instance calls the instance
         if let Some((t, slot)) = self.lookup_var(name) {
-            return self.bind_call(V::with(t, cspan, ExprKind::Var(slot)), args, span, None);
+            let v = V::with(t, cspan, ExprKind::Var(slot));
+            let v = self.alias_var(v, self.is_alias(name, None));
+            return self.bind_call(v, args, span, None);
         }
         if let Some((t, slot, fb)) = self.lookup_owner_var(name) {
             let inst = self.this_ir(fb, cspan);
             let v = V::with(t, cspan, ExprKind::Member(Box::new(inst), slot));
+            let v = self.alias_var(v, self.is_alias(name, Some(fb)));
             return self.bind_call(v, args, span, None);
         }
         // a method of the current block, called without THIS^
