@@ -158,5 +158,13 @@
   "clean": 71,
   "basis": "core",
   "median_clean": 75
+ },
+ {
+  "date": "2026-11-04 20:00",
+  "units": 13372,
+  "parse": 96,
+  "clean": 72,
+  "basis": "core",
+  "median_clean": 75
  }
 ]
