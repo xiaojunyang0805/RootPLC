@@ -2898,6 +2898,155 @@ impl<'a> Checker<'a> {
         }
     }
 
+    /// [stdlib.functions.operators]: ADD, SUB, ..., GT, ... as functions:
+    /// the same IR as the operators. `None` when `up` is not one of them.
+    fn operator_function(&mut self, up: &str, args: &[Arg<'a>], span: Span) -> Option<V> {
+        let (op, cmp, variadic) = match up {
+            "ADD" => (BinOp::Add, false, true),
+            "MUL" => (BinOp::Mul, false, true),
+            "SUB" => (BinOp::Sub, false, false),
+            "DIV" => (BinOp::Div, false, false),
+            "MOD" => (BinOp::Mod, false, false),
+            "GT" => (BinOp::Gt, true, true),
+            "GE" => (BinOp::Ge, true, true),
+            "EQ" => (BinOp::Eq, true, true),
+            "LE" => (BinOp::Le, true, true),
+            "LT" => (BinOp::Lt, true, true),
+            "NE" => (BinOp::Ne, true, false),
+            _ => return None,
+        };
+        let vals: Vec<V> = args.iter().map(|a| self.expr(a.expr)).collect();
+        if vals.len() < 2 || (!variadic && vals.len() != 2) {
+            let want = if variadic { "two or more" } else { "two" };
+            let msg = format!("{up} takes {want} arguments, found {}", vals.len());
+            self.diag(codes::IMPLICIT_CONVERSION, msg, span, None);
+            return Some(V::unknown(span));
+        }
+        let what = format!("'{up}'");
+        let bin = |op: BinOp, opty: Ty, l: ir::Expr, r: ir::Expr| ExprKind::Binary {
+            op,
+            opty,
+            l: Box::new(l),
+            r: Box::new(r),
+        };
+        if cmp {
+            // a > b AND b > c ...
+            let mut acc: Option<ir::Expr> = None;
+            for w in vals.windows(2) {
+                let t = match self.unify(&w[0], &w[1], &what) {
+                    Ty::Unknown => return Some(V::unknown(span)),
+                    Ty::IntLit => Ty::Elem(Elem::Dint),
+                    Ty::RealLit => Ty::Elem(Elem::Lreal),
+                    t => t,
+                };
+                let e = ir::Expr {
+                    ty: Ty::Elem(Elem::Bool),
+                    kind: bin(op, t, w[0].clone().ir(), w[1].clone().ir()),
+                    span,
+                };
+                acc = Some(match acc {
+                    None => e,
+                    Some(a) => ir::Expr {
+                        ty: Ty::Elem(Elem::Bool),
+                        kind: bin(BinOp::And, Ty::Elem(Elem::Bool), a, e),
+                        span,
+                    },
+                });
+            }
+            let e = acc?;
+            return Some(V::with(Ty::Elem(Elem::Bool), span, e.kind));
+        }
+        let mut it = vals.into_iter();
+        let mut acc = it.next()?;
+        for v in it {
+            let t = self.unify(&acc, &v, &what);
+            let st = self.strip(&t);
+            let num = matches!(st, Ty::IntLit | Ty::RealLit)
+                || matches!(st, Ty::Elem(e) if e.is_num()
+                    || (e.is_duration() && matches!(op, BinOp::Add | BinOp::Sub)));
+            if !num {
+                if t != Ty::Unknown {
+                    let msg = format!("{up} is not defined for {}", self.ty_name(&t));
+                    self.diag(codes::IMPLICIT_CONVERSION, msg, span, None);
+                }
+                return Some(V::unknown(span));
+            }
+            // two constants fold to a constant, as with the operators
+            let folded = match (acc.k, v.k) {
+                (Some(K::Int(a)), Some(K::Int(b))) => match op {
+                    BinOp::Add => a.checked_add(b).map(K::Int),
+                    BinOp::Sub => a.checked_sub(b).map(K::Int),
+                    BinOp::Mul => a.checked_mul(b).map(K::Int),
+                    BinOp::Div if b != 0 => Some(K::Int(a / b)),
+                    BinOp::Mod if b != 0 => Some(K::Int(a % b)),
+                    _ => None,
+                },
+                (Some(K::Real(a)), Some(K::Real(b))) => match op {
+                    BinOp::Add => Some(K::Real(a + b)),
+                    BinOp::Sub => Some(K::Real(a - b)),
+                    BinOp::Mul => Some(K::Real(a * b)),
+                    BinOp::Div => Some(K::Real(a / b)),
+                    _ => None,
+                },
+                _ => None,
+            };
+            let st = match (folded.is_some(), st) {
+                (false, Ty::IntLit) => Ty::Elem(Elem::Dint),
+                (false, Ty::RealLit) => Ty::Elem(Elem::Lreal),
+                (_, t) => t,
+            };
+            let e = bin(op, st.clone(), acc.ir(), v.ir());
+            acc = V::with(st, span, e);
+            acc.k = folded;
+        }
+        Some(acc)
+    }
+
+    /// [types.time.arith]: `+` / `-` on a time of day, date or date-and-time
+    /// with a duration, or the difference of two of them. Lowered to the VM
+    /// function __ROOTPLC_TIME_ARITH(a, b, kind, sign), which scales units
+    /// (DATE / DT in s, TOD / TIME in ms, L types in ns).
+    fn time_arith(&mut self, minus: bool, l: &V, r: &V, span: Span) -> Option<V> {
+        use Elem::*;
+        let (Ty::Elem(a), Ty::Elem(b)) = (self.strip(&l.ty), self.strip(&r.ty)) else {
+            return None;
+        };
+        // (kind, result type); kind 1 TOD±TIME, 2 DT±TIME, 3 DATE-DATE,
+        // 4 TOD-TOD, 5 DT-DT, 6 LTOD±LTIME, 7 LDT±LTIME, 8 same-type
+        // difference of L types (ns)
+        let (kind, res) = match (a, b, minus) {
+            (Tod, Time, _) => (1, Tod),
+            (Dt, Time, _) => (2, Dt),
+            (Date, Date, true) => (3, Time),
+            (Tod, Tod, true) => (4, Time),
+            (Dt, Dt, true) => (5, Time),
+            (Ltod, Ltime, _) => (6, Ltod),
+            (Ldt, Ltime, _) => (7, Ldt),
+            (Ldate, Ldate, true) | (Ltod, Ltod, true) | (Ldt, Ldt, true) => (8, Ltime),
+            _ => return None,
+        };
+        let lit = |n: i128| ir::Expr {
+            ty: Ty::Elem(Dint),
+            kind: ExprKind::Const(Const::Int(n)),
+            span,
+        };
+        let call = ir::Call {
+            target: CallTarget::Builtin {
+                name: "__ROOTPLC_TIME_ARITH".into(),
+                ty: None,
+            },
+            inputs: Vec::new(),
+            outputs: Vec::new(),
+            args: vec![
+                l.clone().ir(),
+                r.clone().ir(),
+                lit(kind),
+                lit(if minus { -1 } else { 1 }),
+            ],
+        };
+        Some(V::with(Ty::Elem(res), span, ExprKind::Call(Box::new(call))))
+    }
+
     /// `n` evaluated where a value of type `ty` is expected: an unqualified
     /// enumeration value then resolves to that enumeration ([types.derived.enum]).
     fn expr_expecting(&mut self, ty: &Ty, n: &'a Node) -> V {
@@ -3840,6 +3989,12 @@ impl<'a> Checker<'a> {
             }
         }
         let what = format!("'{}'", self.text(op));
+        // [types.time.arith]: TOD + TIME, DT - DT, ...
+        if matches!(opk, T::Plus | T::Minus) {
+            if let Some(v) = self.time_arith(opk == T::Minus, &l, &r, span) {
+                return v;
+            }
+        }
         // [types.derived.enum.integer]: no arithmetic on a strict enumeration
         if cls != Cls::Cmp {
             let strict = [&l.ty, &r.ty]
@@ -4435,6 +4590,9 @@ impl<'a> Checker<'a> {
                 ExprKind::Ref(Box::new(v.ir())),
             );
         }
+        if let Some(v) = self.operator_function(&up, args, span) {
+            return v;
+        }
         if let Some(b) = builtin(&up) {
             return self.builtin_call(&up, b, args, span);
         }
@@ -4467,6 +4625,14 @@ impl<'a> Checker<'a> {
             _ => None,
         };
         let Some((id, pname, p)) = pou else {
+            // [pous.call.callee]
+            if callee.ty != Ty::Unknown {
+                let msg = format!(
+                    "a value of type {} cannot be called; only functions, function block instances, programs, methods and actions",
+                    self.ty_name(&callee.ty)
+                );
+                self.diag(codes::NOT_CALLABLE, msg, callee.span, None);
+            }
             for a in args {
                 self.expr(a.expr);
             }

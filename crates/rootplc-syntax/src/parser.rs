@@ -1588,6 +1588,10 @@ impl<'a> Parser<'a> {
                 self.nth_kind(1) == Some(TokenKind::LParen)
                     && self.nth_kind(2) == Some(TokenKind::RParen)
             }
+            // MOD(a, b): the standard function ([stdlib.functions.operators])
+            Some(TokenKind::Keyword) if self.at_kw("MOD") => {
+                self.nth_kind(1) == Some(TokenKind::LParen)
+            }
             Some(TokenKind::Keyword) => self.at_any_kw(&[
                 "NOT", "TRUE", "FALSE", "NULL", "REF", "THIS", "SUPER", "TEST",
             ]),
@@ -1776,8 +1780,12 @@ impl<'a> Parser<'a> {
                 self.b.finish();
                 true
             }
-            // [pous.oop.this]: THIS and SUPER, dereferenced with ^; TEST(...) is a call
-            Some(TokenKind::Keyword) if self.at_any_kw(&["THIS", "SUPER", "TEST"]) => {
+            // [pous.oop.this]: THIS and SUPER, dereferenced with ^; TEST(...) is a
+            // call; MOD(a, b) the standard function ([stdlib.functions.operators])
+            Some(TokenKind::Keyword)
+                if self.at_any_kw(&["THIS", "SUPER", "TEST"])
+                    || (self.at_kw("MOD") && self.nth_kind(1) == Some(TokenKind::LParen)) =>
+            {
                 self.b.start(N::NameRef);
                 self.bump();
                 self.b.finish();

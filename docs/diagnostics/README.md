@@ -26,6 +26,7 @@ Codes RP00xx are lexical, RP01xx types, RP02xx names and structure, RP03xx synta
 | [RP0016](#rp0016) | error | malformed directly represented variable |
 | [RP0201](#rp0201) | error | syntax error: unexpected token |
 | [RP0202](#rp0202) | error | block is never closed: missing END keyword |
+| [RP0132](#rp0132) | error | called value is not a function, function block instance, program, method or action |
 | [RP0301](#rp0301) | error | missing ';' at end of statement or declaration |
 | [RP0101](#rp0101) | error | overflow or division by zero in constant expression |
 | [RP0102](#rp0102) | error | literal out of range for its type |
@@ -315,6 +316,17 @@ its text exports (one POU per file) leave out `END_PROGRAM`,
 `FUNCTION` that reaches the end of its file without its closing keyword, with
 no syntax error inside it, is therefore closed there with warning RP0131
 instead.
+
+## RP0132
+
+error: called value is not a function, function block instance, program, method or action
+
+Rule `pous.call.callee` in `spec/04-pous.md`:
+
+**[pous.call.callee]** Only a function, a function block instance, a
+program, a method or an action can be called. Calling anything else, for
+example a variable of an elementary type (`b(1)` with `b : BOOL`), is error
+RP0132.
 
 ## RP0301
 

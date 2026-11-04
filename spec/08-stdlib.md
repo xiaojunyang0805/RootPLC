@@ -43,6 +43,13 @@ type is error RP0103.
 | `LEN(s)`, `FIND(s1, s2)` | strings | `INT` |
 | `LEFT`, `RIGHT`, `MID`, `CONCAT`, `INSERT`, `DELETE`, `REPLACE` | strings, `INT` | `STRING` (or `WSTRING` for `WSTRING` arguments) |
 
+**[stdlib.functions.operators]** The arithmetic and comparison operators
+also exist as standard functions with the same meaning: `ADD`, `MUL` (two
+or more arguments, `ADD(a, b, c)` is `a + b + c`), `SUB`, `DIV`, `MOD` (two
+arguments), and `GT`, `GE`, `EQ`, `LE`, `LT`, `NE` (`GT(a, b, c)` is
+`a > b AND b > c`; `NE` takes two). Arguments are positional or `IN1`,
+`IN2`, ... in order. A user POU with the same name takes precedence.
+
 **[stdlib.string.length]** The string these functions return is long
 enough for any result of its arguments, so nothing is cut before it is
 assigned: `CONCAT` returns the sum of the argument lengths, `INSERT` and

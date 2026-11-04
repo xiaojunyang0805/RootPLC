@@ -510,6 +510,7 @@ Codes RP00xx are lexical, RP01xx types, RP02xx names and structure, RP03xx synta
 | [RP0016](#rp0016) | error | malformed directly represented variable |
 | [RP0201](#rp0201) | error | syntax error: unexpected token |
 | [RP0202](#rp0202) | error | block is never closed: missing END keyword |
+| [RP0132](#rp0132) | error | called value is not a function, function block instance, program, method or action |
 | [RP0301](#rp0301) | error | missing ';' at end of statement or declaration |
 | [RP0101](#rp0101) | error | overflow or division by zero in constant expression |
 | [RP0102](#rp0102) | error | literal out of range for its type |
@@ -799,6 +800,17 @@ its text exports (one POU per file) leave out `END_PROGRAM`,
 `FUNCTION` that reaches the end of its file without its closing keyword, with
 no syntax error inside it, is therefore closed there with warning RP0131
 instead.
+
+## RP0132
+
+error: called value is not a function, function block instance, program, method or action
+
+Rule `pous.call.callee` in `spec/04-pous.md`:
+
+**[pous.call.callee]** Only a function, a function block instance, a
+program, a method or an action can be called. Calling anything else, for
+example a variable of an elementary type (`b(1)` with `b : BOOL`), is error
+RP0132.
 
 ## RP0301
 
@@ -1588,6 +1600,14 @@ default of their own type, unless the type declaration gives one.
 
 ## 2. Arithmetic semantics
 
+**[types.time.arith]** `+` and `-` combine times and durations as IEC 61131-3
+ed.3 defines them: `TOD ± TIME` gives `TOD`, `DT ± TIME` gives `DT`, and
+`TOD - TOD`, `DT - DT` and `DATE - DATE` give `TIME`; with the 64-bit types
+`LTOD ± LTIME`, `LDT ± LTIME` and `LTOD - LTOD`, `LDT - LDT`, `LDATE - LDATE`
+(the result `LTIME`). A time of day wraps around midnight. `DT ± TIME` keeps
+whole seconds (the milliseconds of the duration are dropped, towards zero).
+Other combinations of time types are RP0103.
+
 **[types.int.overflow]** Integer arithmetic at run time wraps around in two's
 complement (for example, `SINT#127 + 1` gives `-128`). Overflow while
 evaluating a constant expression at compile time is error RP0101.
@@ -2043,6 +2063,11 @@ assigned value. GET and SET behave like methods: they are inherited, may be
 overridden (dynamic dispatch) and may be required by an interface. An
 interface property without GET or SET requires a GET part.
 
+**[pous.call.callee]** Only a function, a function block instance, a
+program, a method or an action can be called. Calling anything else, for
+example a variable of an elementary type (`b(1)` with `b : BOOL`), is error
+RP0132.
+
 **[pous.call.in-out]** A `VAR_IN_OUT` parameter refers to the caller's
 variable: changes made by the called function or function block are visible
 in that variable after the call. RootPLC copies the value in before the call
@@ -2386,6 +2411,13 @@ type is error RP0103.
 | `SHL`, `SHR`, `ROL`, `ROR` `(in, n)` | `ANY_BIT`, `ANY_INT` | type of `in` |
 | `LEN(s)`, `FIND(s1, s2)` | strings | `INT` |
 | `LEFT`, `RIGHT`, `MID`, `CONCAT`, `INSERT`, `DELETE`, `REPLACE` | strings, `INT` | `STRING` (or `WSTRING` for `WSTRING` arguments) |
+
+**[stdlib.functions.operators]** The arithmetic and comparison operators
+also exist as standard functions with the same meaning: `ADD`, `MUL` (two
+or more arguments, `ADD(a, b, c)` is `a + b + c`), `SUB`, `DIV`, `MOD` (two
+arguments), and `GT`, `GE`, `EQ`, `LE`, `LT`, `NE` (`GT(a, b, c)` is
+`a > b AND b > c`; `NE` takes two). Arguments are positional or `IN1`,
+`IN2`, ... in order. A user POU with the same name takes precedence.
 
 **[stdlib.string.length]** The string these functions return is long
 enough for any result of its arguments, so nothing is cut before it is

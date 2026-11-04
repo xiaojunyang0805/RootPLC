@@ -219,6 +219,7 @@ pub mod codes {
         ENUM_AS_INTEGER = 129, Warning;
         BLOCK_LOCAL_READ = 130, Warning;
         POU_CLOSED_BY_EOF = 131, Warning;
+        NOT_CALLABLE = 132, Error;
     }
 
     /// Severity of a code, if the code exists.

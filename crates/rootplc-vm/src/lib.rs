@@ -1380,6 +1380,23 @@ impl<'p> Vm<'p> {
                 .map_err(|k| vm.fault(k, e.span, "result outside the subrange"))
         };
         match name {
+            // [types.time.arith]: a time of day, date or date-and-time with a
+            // duration, or a difference; units: DATE / DT s, TOD / TIME ms,
+            // L types ns
+            "__ROOTPLC_TIME_ARITH" => {
+                let (a, b, kind, sign) = (int(&arg(0)), int(&arg(1)), int(&arg(2)), int(&arg(3)));
+                const DAY_MS: i128 = 86_400_000;
+                const DAY_NS: i128 = 86_400_000_000_000;
+                let n = match kind {
+                    1 => (a + sign * b).rem_euclid(DAY_MS),
+                    2 => a + sign * (b / 1000),
+                    3 | 5 => (a - b) * 1000,
+                    4 | 8 => a - b,
+                    6 => (a + sign * b).rem_euclid(DAY_NS),
+                    _ => a + sign * b,
+                };
+                out(self, Value::Int(n))
+            }
             // [stdlib.compat.any]: (type class, reference, size); a value
             // that is not a variable gets a variable of its own
             "__ROOTPLC_ANY" => {

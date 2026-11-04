@@ -172,6 +172,11 @@ assigned value. GET and SET behave like methods: they are inherited, may be
 overridden (dynamic dispatch) and may be required by an interface. An
 interface property without GET or SET requires a GET part.
 
+**[pous.call.callee]** Only a function, a function block instance, a
+program, a method or an action can be called. Calling anything else, for
+example a variable of an elementary type (`b(1)` with `b : BOOL`), is error
+RP0132.
+
 **[pous.call.in-out]** A `VAR_IN_OUT` parameter refers to the caller's
 variable: changes made by the called function or function block are visible
 in that variable after the call. RootPLC copies the value in before the call

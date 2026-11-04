@@ -39,6 +39,14 @@ default of their own type, unless the type declaration gives one.
 
 ## 2. Arithmetic semantics
 
+**[types.time.arith]** `+` and `-` combine times and durations as IEC 61131-3
+ed.3 defines them: `TOD ± TIME` gives `TOD`, `DT ± TIME` gives `DT`, and
+`TOD - TOD`, `DT - DT` and `DATE - DATE` give `TIME`; with the 64-bit types
+`LTOD ± LTIME`, `LDT ± LTIME` and `LTOD - LTOD`, `LDT - LDT`, `LDATE - LDATE`
+(the result `LTIME`). A time of day wraps around midnight. `DT ± TIME` keeps
+whole seconds (the milliseconds of the duration are dropped, towards zero).
+Other combinations of time types are RP0103.
+
 **[types.int.overflow]** Integer arithmetic at run time wraps around in two's
 complement (for example, `SINT#127 + 1` gives `-128`). Overflow while
 evaluating a constant expression at compile time is error RP0101.
