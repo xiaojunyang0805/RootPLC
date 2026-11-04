@@ -1115,7 +1115,7 @@ impl<'a> Parser<'a> {
                 self.arg_list();
                 self.error(
                     codes::INIT_ARGUMENTS_IGNORED,
-                    "FB_init arguments are accepted but not passed yet; FB_init runs with its defaults".into(),
+                    "FB_init arguments in a declaration are a CODESYS / TwinCAT form; IEC 61131-3 has none".into(),
                     span,
                 );
             }

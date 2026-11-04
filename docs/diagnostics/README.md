@@ -44,7 +44,7 @@ Codes RP00xx are lexical, RP01xx types, RP02xx names and structure, RP03xx synta
 | [RP0116](#rp0116) | warning | POINTER TO is read as REF_TO (not portable; no pointer arithmetic) |
 | [RP0117](#rp0117) | warning | ADR(x) is read as REF(x) (not portable; no pointer arithmetic) |
 | [RP0118](#rp0118) | warning | REFERENCE TO declares an alias (not portable) |
-| [RP0119](#rp0119) | warning | FB_init arguments in a declaration are accepted but not passed (FB_init runs with its defaults) |
+| [RP0119](#rp0119) | warning | FB_init arguments in a declaration (CODESYS / TwinCAT form, not IEC 61131-3) |
 | [RP0120](#rp0120) | warning | call of a library function that RootPLC declares but does not implement |
 | [RP0121](#rp0121) | error | SIZEOF of a value whose size is not known (function-block instance, open array) |
 | [RP0122](#rp0122) | warning | enumeration value written E.V (not portable); write E#V |
@@ -599,14 +599,19 @@ where it can and reports the rest.
 
 ## RP0119
 
-warning: FB_init arguments in a declaration are accepted but not passed (FB_init runs with its defaults)
+warning: FB_init arguments in a declaration (CODESYS / TwinCAT form, not IEC 61131-3)
 
 Rule `variables.init-arguments` in `spec/03-variables.md`:
 
 **[variables.init-arguments]** A function-block instance may be declared
 with arguments, `fb : FB_Buffer(size := 10);`, which CODESYS and TwinCAT
-pass to the block's `FB_init` method. RootPLC accepts the form with warning
-RP0119: `FB_init` runs ([pous.oop.fb-init]), but without these arguments.
+pass to the block's `FB_init` method ([pous.oop.fb-init]); the form is
+warning RP0119 ([scope.vendor-forms]). Named arguments bind to the inputs of
+that name, positional ones to the inputs after `bInitRetains` and
+`bInCopyCode`, in order. The arguments are expressions of the declaring POU,
+evaluated when its instance is created, just before the FB_init of the
+declared instance runs (so `THIS^` is the declaring instance). A block without
+`FB_init` takes no arguments (RP0203).
 
 `type_spec` is defined in spec/04-pous.md [pous.type-spec].
 

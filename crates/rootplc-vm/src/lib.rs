@@ -228,6 +228,9 @@ pub struct Vm<'p> {
     /// A fault raised by FB_init while instances were created; the next
     /// cycle reports it, [pous.oop.fb-init].
     startup_fault: Option<Fault>,
+    /// [variables.static]: for each block with VAR_STAT variables, the root
+    /// holding the one copy all its instances share.
+    statics: std::collections::HashMap<usize, usize>,
     /// Virtual clock in nanoseconds; timers read it.
     pub now_ns: i128,
     /// Failed assertions so far.
@@ -458,6 +461,7 @@ impl<'p> Vm<'p> {
             roots: Vec::new(),
             root_defs: Vec::new(),
             startup_fault: None,
+            statics: std::collections::HashMap::new(),
             now_ns: 0,
             failures: Vec::new(),
             unit_results: Vec::new(),
@@ -467,10 +471,53 @@ impl<'p> Vm<'p> {
             aliases: Vec::new(),
             heap: Vec::new(),
         };
+        // [variables.static]: one copy of the VAR_STAT variables per block
+        for d in 0..prog.defs.len() {
+            if prog
+                .pou(d)
+                .is_some_and(|p| !p.builtin && p.vars.iter().any(|v| v.stat))
+            {
+                let v = vm.default_named(d);
+                vm.roots.push(v);
+                vm.root_defs.push(d);
+                vm.statics.insert(d, vm.roots.len() - 1);
+            }
+        }
         if let Some(g) = prog.globals {
             vm.globals = Some(vm.instantiate(g));
         }
         vm
+    }
+
+    /// Slot `i` of the instance at `parent`: the shared copy for a VAR_STAT
+    /// variable of the block that declares it, [variables.static].
+    fn slot(&self, parent: &Loc, i: usize) -> Loc {
+        if !self.statics.is_empty() && !self.statics.values().any(|&r| r == parent.root) {
+            if let Some(mut d) = self.block_at(parent) {
+                if self
+                    .prog
+                    .pou(d)
+                    .and_then(|p| p.vars.get(i))
+                    .is_some_and(|v| v.stat)
+                {
+                    // an inherited variable belongs to the base block
+                    while let Some(b) = self.prog.pou(d).and_then(|p| p.base) {
+                        if self.prog.pou(b).is_some_and(|p| i < p.vars.len()) {
+                            d = b;
+                        } else {
+                            break;
+                        }
+                    }
+                    if let Some(&r) = self.statics.get(&d) {
+                        return Loc {
+                            root: r,
+                            path: vec![i as u32],
+                        };
+                    }
+                }
+            }
+        }
+        parent.child(i)
     }
 
     fn fault(&self, kind: FaultKind, span: Span, message: impl Into<String>) -> Fault {
@@ -706,6 +753,7 @@ impl<'p> Vm<'p> {
                 path: Vec::new(),
             },
             &Ty::Named(def),
+            &[],
         ) {
             self.startup_fault.get_or_insert(f);
         }
@@ -714,8 +762,10 @@ impl<'p> Vm<'p> {
 
     /// Run FB_init (bInitRetains TRUE, bInCopyCode FALSE) on each function
     /// block instance inside the place `at` of type `ty`, inner instances
-    /// before the one containing them, in declaration order.
-    fn fb_init_tree(&mut self, at: &Loc, ty: &Ty) -> R<()> {
+    /// before the one containing them, in declaration order. `given` are the
+    /// declaration's arguments for this instance's FB_init
+    /// ([variables.init-arguments]).
+    fn fb_init_tree(&mut self, at: &Loc, ty: &Ty, given: &[(usize, Value)]) -> R<()> {
         let prog = self.prog;
         match self.strip(ty) {
             Ty::Array { elem, dims } => {
@@ -724,19 +774,28 @@ impl<'p> Vm<'p> {
                     .map(|d| d.map_or(0, |(a, b)| (b - a + 1) as usize))
                     .product();
                 for k in 0..n {
-                    self.fb_init_tree(&at.child(k), &elem)?;
+                    self.fb_init_tree(&at.child(k), &elem, &[])?;
                 }
             }
             Ty::Named(d) => match &prog.defs[d].kind {
                 DefKind::Struct(fields) => {
                     for (k, f) in fields.iter().enumerate() {
-                        self.fb_init_tree(&at.child(k), &f.ty)?;
+                        self.fb_init_tree(&at.child(k), &f.ty, &[])?;
                     }
                 }
                 DefKind::Pou(p) if !p.builtin && p.kind != rootplc_sema::ir::PouKind::Interface => {
                     for (k, v) in p.vars.iter().enumerate() {
                         if v.section != Section::InOut && !matches!(v.ty, Ty::Ref(_)) {
-                            self.fb_init_tree(&at.child(k), &v.ty)?;
+                            // [variables.init-arguments]: evaluated in this instance
+                            let cx = Ctx {
+                                this: at.clone(),
+                                inst: Some((at.clone(), d)),
+                            };
+                            let mut args = Vec::with_capacity(v.init_args.len());
+                            for (slot, e) in &v.init_args {
+                                args.push((*slot, self.eval(e, &cx)?));
+                            }
+                            self.fb_init_tree(&at.child(k), &v.ty, &args)?;
                         }
                     }
                     if let Some(&(_, m)) = p
@@ -760,6 +819,8 @@ impl<'p> Vm<'p> {
                                 })
                                 .collect()
                         });
+                        let mut args: Vec<(usize, Value)> = args;
+                        args.extend(given.iter().cloned());
                         self.call_method_direct(m, at.clone(), d, &args)?;
                     }
                 }
@@ -909,6 +970,51 @@ impl<'p> Vm<'p> {
     /// Advance the virtual clock.
     pub fn advance(&mut self, ns: i128) {
         self.now_ns += ns;
+    }
+
+    /// [stdlib.compat.taskinfo]: before cycle `n` (from 0) of a task with
+    /// period `cycle_ns`, fill the TwinCAT task information of task 1 when
+    /// the project declares it (`_TaskInfo`, TwinCAT_BuiltIns): CycleTime in
+    /// 100 ns units, CycleCount and FirstCycle.
+    pub fn begin_cycle(&mut self, cycle_ns: i128, n: u64) {
+        let prog = self.prog;
+        let (Some(g), Some(groot)) = (prog.globals, self.globals) else {
+            return;
+        };
+        let Some(gp) = prog.pou(g) else { return };
+        let Some(slot) = gp.vars.iter().position(|v| {
+            let name = v.name.rsplit('.').next().unwrap_or(&v.name);
+            name.eq_ignore_ascii_case("_TaskInfo")
+        }) else {
+            return;
+        };
+        let Ty::Array { elem, .. } = self.strip(&gp.vars[slot].ty) else {
+            return;
+        };
+        let Ty::Named(sd) = self.strip(&elem) else {
+            return;
+        };
+        let DefKind::Struct(fields) = &prog.defs[sd].kind else {
+            return;
+        };
+        let set = [
+            ("CycleTime", Value::Int(cycle_ns / 100)),
+            ("CycleCount", Value::Int(i128::from(n))),
+            ("FirstCycle", Value::Bool(n == 0)),
+        ];
+        for (name, v) in set {
+            if let Some(k) = fields
+                .iter()
+                .position(|f| f.name.eq_ignore_ascii_case(name))
+            {
+                let loc = Loc {
+                    root: groot,
+                    path: vec![slot as u32, 0, k as u32],
+                };
+                let ty = fields[k].ty.clone();
+                let _ = self.store(&loc, v, &ty, Span::new(0, 0));
+            }
+        }
     }
 
     /// Current value of a variable of the instance at `root`.
@@ -1133,7 +1239,7 @@ impl<'p> Vm<'p> {
 
     fn place(&mut self, e: &Expr, cx: &Ctx) -> R<Loc> {
         match &e.kind {
-            ExprKind::Var(i) => Ok(cx.this.child(*i)),
+            ExprKind::Var(i) => Ok(self.slot(&cx.this, *i)),
             ExprKind::This => match &cx.inst {
                 Some((l, _)) => Ok(l.clone()),
                 None => Err(self.fault(FaultKind::Unsupported, e.span, "THIS outside an instance")),
@@ -1154,7 +1260,8 @@ impl<'p> Vm<'p> {
                         ));
                     }
                 }
-                Ok(self.place(b, cx)?.child(*i))
+                let base = self.place(b, cx)?;
+                Ok(self.slot(&base, *i))
             }
             ExprKind::Index(b, idx) => {
                 let static_ty = self.strip(&b.ty);
@@ -1603,6 +1710,25 @@ impl<'p> Vm<'p> {
         for (slot, v, span, aty) in vals {
             let v = open_wrap(&pou.vars[slot].ty, &aty, v);
             self.store(&floc.child(slot), v, &pou.vars[slot].ty, span)?;
+        }
+        // [pous.oop.fb-init]: block instances among the local variables of a
+        // function or method are created by each call, so FB_init runs on
+        // each call, with the declaration's arguments evaluated in the frame
+        for (k, v) in pou.vars.iter().enumerate() {
+            if v.section != Section::Local
+                || !matches!(self.strip(&v.ty), Ty::Named(_) | Ty::Array { .. })
+            {
+                continue;
+            }
+            let fcx = Ctx {
+                this: floc.clone(),
+                inst: inst.clone(),
+            };
+            let mut args = Vec::with_capacity(v.init_args.len());
+            for (slot, ex) in &v.init_args {
+                args.push((*slot, self.eval(ex, &fcx)?));
+            }
+            self.fb_init_tree(&floc.child(k), &v.ty, &args)?;
         }
         let mark = self.aliases.len();
         let al = self.in_out_aliases(c, pou, &floc, cx)?;

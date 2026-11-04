@@ -117,6 +117,12 @@ pub struct Var {
     pub section: Section,
     /// Initial value; `None` means the default of the type.
     pub init: Option<Init>,
+    /// Declared in VAR_STAT: one variable shared by every instance of the
+    /// block, [variables.static].
+    pub stat: bool,
+    /// `fb : FB_X(arg := v)`: values for inputs of FB_X's FB_init (slot in
+    /// FB_init, expression in the declaring POU), [variables.init-arguments].
+    pub init_args: Vec<(usize, Expr)>,
 }
 
 /// A program organisation unit.

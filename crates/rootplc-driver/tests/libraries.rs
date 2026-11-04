@@ -101,3 +101,40 @@ END_PROGRAM
         ]
     );
 }
+
+/// [stdlib.compat.taskinfo]: `rootplc run` fills task 1's TwinCAT task
+/// information before each cycle.
+#[test]
+fn task_info_follows_the_run() {
+    let src = "PROGRAM P
+VAR
+    ct : UDINT;
+    n : UDINT;
+    first : BOOL;
+    seen_first : BOOL;
+END_VAR
+ct := _TaskInfo[GETCURTASKINDEXEX()].CycleTime;
+n := _TaskInfo[GETCURTASKINDEXEX()].CycleCount;
+first := _TaskInfo[GETCURTASKINDEXEX()].FirstCycle;
+seen_first := seen_first OR first;
+END_PROGRAM
+";
+    let check = rootplc_driver::check_sources_with(
+        vec![("p.st".into(), src.to_string())],
+        &["TwinCAT_BuiltIns".to_string(), "Tc2_System".to_string()],
+    )
+    .expect("libraries resolve");
+    assert!(check.ok(), "program checks");
+    let run = rootplc_driver::run_report(check, Some("P"), 3, 10_000_000).expect("runs");
+    let var = |name: &str| {
+        run.variables
+            .iter()
+            .find(|(n, _)| n == name)
+            .map(|(_, v)| v.clone())
+            .unwrap_or_default()
+    };
+    assert_eq!(var("ct"), "100000");
+    assert_eq!(var("n"), "2");
+    assert_eq!(var("first"), "FALSE");
+    assert_eq!(var("seen_first"), "TRUE");
+}

@@ -28,7 +28,9 @@ exactly the case's expected codes of that stage, and nothing else.
 ## Consistency rules (checked by `cargo test -p rootplc-conformance`)
 
 1. Every case header parses, and every rule ID it cites exists in the spec.
-2. Every expected code exists in `spec/diagnostics.toml` with the matching severity.
+2. Every expected code exists in `spec/diagnostics.toml` with the matching severity;
+   an `error` case lists at least one error and may also list the warnings it gives
+   (for example a vendor form next to the error).
 3. Every rule ID in the spec is cited by at least one case.
 4. Every diagnostic code in the registry is expected by at least one case.
 

@@ -885,7 +885,7 @@ def run_unit() -> None:
             row["clean_suites"] = len(suites)
             progs = [RUNNER] if suites else []
             if suites:
-                decl = "".join(f"    s{i} : {s};\n" for i, s in enumerate(suites))
+                decl = "".join(f"    test_{s} : {s};\n" for s in suites)
                 (work / "_rootplc_test_runner.st").write_text(
                     f"PROGRAM {RUNNER}\nVAR\n{decl}END_VAR\nTcUnit.RUN();\nEND_PROGRAM\n", encoding="utf-8")
             else:

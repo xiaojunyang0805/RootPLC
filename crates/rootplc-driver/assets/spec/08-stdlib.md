@@ -185,3 +185,11 @@ the current test and keeps the first failure's text; a test named
 reported by `rootplc run` (JSON field `tests`). The library enables the
 intrinsics `__ROOTPLC_UNIT_RESULT`, `__ROOTPLC_ANY_EQUAL` and
 `__ROOTPLC_ANY_TEXT` for this; they are not part of any vendor interface.
+
+**[stdlib.compat.taskinfo]** RootPLC runs one task, index 1. When the
+project declares TwinCAT's task information (`_TaskInfo`, library
+`TwinCAT_BuiltIns`), `rootplc run` fills task 1 before every cycle:
+`CycleTime` is the cycle time in 100 ns units (`--cycle-ms 10` gives
+100000), `CycleCount` the number of cycles run before this one and
+`FirstCycle` TRUE in the first cycle only. Other members keep their initial
+values. TEST blocks drive programs themselves and do not fill it.

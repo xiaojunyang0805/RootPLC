@@ -129,9 +129,11 @@ body of the instance's own block (TwinCAT).
 **[pous.oop.fb-init]** A method named `FB_init` (CODESYS and TwinCAT) runs
 once for every instance of its block when the instance is created, before
 the first cycle: instances inside a block before the block, in declaration
-order, global variables before program instances. Its inputs `bInitRetains`
-and `bInCopyCode` are TRUE and FALSE; arguments given in the declaration are
-not passed yet ([variables.init-arguments]). A fault in `FB_init` is reported
+order, global variables before program instances. Instances among the local
+variables of a function or method are created by every call, so their
+`FB_init` runs on every call. Its inputs `bInitRetains`
+and `bInCopyCode` are TRUE and FALSE; arguments given in the declaration
+fill its other inputs ([variables.init-arguments]). A fault in `FB_init` is reported
 by the first cycle. Because the call is implicit, declaring `FB_init` is
 warning RP0135 ([scope.vendor-forms]).
 

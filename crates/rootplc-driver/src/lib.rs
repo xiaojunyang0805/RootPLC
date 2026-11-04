@@ -379,7 +379,8 @@ pub fn run_report(
     let mut vm = rootplc_vm::Vm::new(prog);
     let root = vm.instantiate(def);
     let (mut done, mut fault) = (0, None);
-    for _ in 0..cycles {
+    for n in 0..cycles {
+        vm.begin_cycle(cycle_ns, n);
         if let Err(f) = vm.cycle(root, def) {
             fault = Some(f);
             break;

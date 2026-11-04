@@ -53,6 +53,12 @@ struct Var<'a> {
     alias: bool,
     /// Declared in VAR_IN_OUT CONSTANT: the argument may be a value.
     read_only: bool,
+    /// Declared in VAR_STAT: one variable shared by all instances.
+    stat: bool,
+    /// Declared in a CONSTANT section: its initial value is a constant.
+    constant: bool,
+    /// `fb : FB_X(arg := v)`: the FB_init arguments, [variables.init-arguments].
+    init_args: Option<&'a Node>,
 }
 
 #[derive(Clone)]
@@ -186,6 +192,7 @@ struct Arg<'a> {
 #[derive(Default)]
 struct DefIr {
     var_inits: Vec<Option<Init>>,
+    var_init_args: Vec<Vec<(usize, ir::Expr)>>,
     body: Vec<Stmt>,
 }
 
@@ -255,6 +262,16 @@ pub(crate) struct Checker<'a> {
     prop_info: HashMap<usize, (&'a Node, bool)>,
     /// Structure types declared as UNION ([types.derived.union]).
     unions: HashSet<usize>,
+    /// While a POU's variables are declared: its VAR CONSTANT names and their
+    /// initial-value expressions, so that array bounds can use them.
+    pou_consts: Vec<(String, &'a Node)>,
+    /// Every global constant (name, namespace, initial-value expression),
+    /// known before the global variables are resolved, so that a bound can
+    /// use a constant declared later, [variables.constant-names].
+    global_consts: Vec<(String, Option<String>, Option<i128>)>,
+    /// Values of VAR CONSTANT variables of a POU, by (definition, slot);
+    /// `None` while being computed or when not constant.
+    local_consts: HashMap<(usize, usize), Option<K>>,
     /// Diagnostics with the index of their file.
     pub(crate) diags: Vec<(usize, Diagnostic)>,
 }
@@ -332,6 +349,9 @@ impl<'a> Checker<'a> {
             enum_hint: None,
             prop_info: HashMap::new(),
             unions: HashSet::new(),
+            local_consts: HashMap::new(),
+            pou_consts: Vec::new(),
+            global_consts: Vec::new(),
             diags: Vec::new(),
         };
         // [stdlib.fbs]
@@ -528,6 +548,9 @@ impl<'a> Checker<'a> {
             init: None,
             alias: false,
             read_only: false,
+            stat: false,
+            constant: false,
+            init_args: None,
         };
         let mut vars: Vec<Var<'a>> = inputs.iter().map(|x| var(x, Section::Input)).collect();
         vars.extend(outputs.iter().map(|x| var(x, Section::Output)));
@@ -625,11 +648,14 @@ impl<'a> Checker<'a> {
             let mut irs = self.irs.remove(&id).unwrap_or_default();
             irs.var_inits = full[id].clone();
             let mut inits = std::mem::take(&mut irs.var_inits).into_iter();
+            let mut args = std::mem::take(&mut irs.var_init_args).into_iter();
             let mut var = |v: &Var<'a>| ir::Var {
                 name: v.name.clone(),
                 ty: v.ty.clone(),
                 section: v.section,
                 init: inits.next().flatten(),
+                stat: v.stat,
+                init_args: args.next().unwrap_or_default(),
             };
             let kind = match &d.kind {
                 Kind::Pending | Kind::Resolving => ir::DefKind::Unresolved,
@@ -649,6 +675,8 @@ impl<'a> Checker<'a> {
                             ty: t.clone(),
                             section: Section::Result,
                             init: None,
+                            stat: false,
+                            init_args: Vec::new(),
                         });
                     }
                     ir::DefKind::Pou(ir::Pou {
@@ -1681,6 +1709,40 @@ impl<'a> Checker<'a> {
     fn resolve_globals(&mut self, id: usize) {
         let saved = self.cur;
         let mut vars = Vec::new();
+        // [variables.constant-names]: the values of all global constants
+        // first, in rounds, so that one may use another declared after it
+        let mut pending = Vec::new();
+        for (file, sec, constant, ns) in self.global_sections.clone() {
+            if constant {
+                self.cur = file;
+                for (name, e) in self.constant_decls_of(sec) {
+                    pending.push((file, name, ns.clone(), e));
+                }
+            }
+        }
+        let saved_consts = std::mem::take(&mut self.pou_consts);
+        self.global_consts = pending
+            .iter()
+            .map(|(_, n, ns, _)| (n.clone(), ns.clone(), None))
+            .collect();
+        for _ in 0..8 {
+            let mut changed = false;
+            for (k, (file, _, _, e)) in pending.iter().enumerate() {
+                if self.global_consts[k].2.is_some() {
+                    continue;
+                }
+                self.cur = *file;
+                if let Some(v) = self.const_int(e) {
+                    self.global_consts[k].2 = Some(v);
+                    changed = true;
+                }
+            }
+            if !changed {
+                break;
+            }
+        }
+        self.pou_consts = saved_consts;
+        self.cur = saved;
         for (file, sec, constant, ns) in self.global_sections.clone() {
             self.cur = file;
             for d in self.child_nodes(sec, N::VarDecl) {
@@ -1860,6 +1922,9 @@ impl<'a> Checker<'a> {
                         init: None,
                         alias: false,
                         read_only: false,
+                        stat: false,
+                        constant: false,
+                        init_args: None,
                     });
                 }
             }
@@ -1936,6 +2001,9 @@ impl<'a> Checker<'a> {
             }
         }
         let inherited = vars.len();
+        // [types.derived.array]: the POU's own constants may size its arrays,
+        // declared before or after them
+        self.pou_consts = self.constant_decls(node);
         // [pous.oop.method]: VAR_INST variables of the block's methods keep their
         // value between calls: they are stored in the instance as "M#name"
         let mut inst_vars = Vec::new();
@@ -1993,12 +2061,22 @@ impl<'a> Checker<'a> {
                             .iter()
                             .take(5)
                             .any(|i| matches!(i, Item::Tok(t) if self.is_kw(*t, "CONSTANT")));
+                    // [variables.static]: VAR_STAT is shared by all instances
+                    let stat = matches!(self.items(n).first(), Some(Item::Tok(t)) if self.text(*t).eq_ignore_ascii_case("VAR_STAT"));
+                    let constant = section == Section::Local
+                        && self
+                            .items(n)
+                            .iter()
+                            .take(5)
+                            .any(|i| matches!(i, Item::Tok(t) if self.is_kw(*t, "CONSTANT")));
                     let start = vars.len();
                     for d in self.child_nodes(n, N::VarDecl) {
                         self.var_decl(d, section, &mut vars);
                     }
                     for v in &mut vars[start..] {
                         v.read_only = read_only;
+                        v.stat = stat;
+                        v.constant = constant;
                         // [pous.call.in-out]: a STRING parameter takes the
                         // caller's whole text; the caller's length applies
                         // when it is written back
@@ -2011,6 +2089,7 @@ impl<'a> Checker<'a> {
             }
         }
         vars.extend(inst_vars);
+        self.pou_consts.clear();
         self.defs[id].kind = Kind::Pou(Pou {
             kind,
             vars,
@@ -2025,6 +2104,7 @@ impl<'a> Checker<'a> {
         let mut names = Vec::new();
         let (mut spec, mut init) = (None, None);
         let mut before_colon = true;
+        let mut init_args = None;
         for it in &its {
             match *it {
                 Item::Tok(t) if self.tkind(t) == T::Colon => before_colon = false,
@@ -2048,6 +2128,7 @@ impl<'a> Checker<'a> {
                 }
                 Item::Node(n) if n.kind == N::TypeSpec => spec = Some(n),
                 Item::Node(n) if n.kind == N::Initializer => init = Some(n),
+                Item::Node(n) if n.kind == N::ArgList => init_args = Some(n),
                 _ => {}
             }
         }
@@ -2067,6 +2148,9 @@ impl<'a> Checker<'a> {
                 init,
                 alias,
                 read_only: false,
+                stat: false,
+                constant: false,
+                init_args,
             });
         }
     }
@@ -2352,8 +2436,21 @@ impl<'a> Checker<'a> {
                                 self.diag(codes::INVALID_BOUNDS, msg, sp, None);
                                 None
                             }
-                            (Some(a), Some(b)) => Some((a, b)),
-                            _ => None,
+                            (Some(a), Some(b)) => {
+                                // [variables.constant-names]: E.V as a bound (CODESYS / TwinCAT)
+                                if [*l, *h].iter().any(|x| self.is_enum_value(x)) {
+                                    let sp = self.span(n);
+                                    let msg = "an enumeration value as array bound is a CODESYS / TwinCAT form; IEC 61131-3 writes an integer constant".to_string();
+                                    self.diag(codes::VENDOR_MEANING, msg, sp, None);
+                                }
+                                Some((a, b))
+                            }
+                            _ => {
+                                let sp = self.span(n);
+                                let msg = "array bound is not a constant expression RootPLC can evaluate (a literal, a constant, or + - * / of them)".to_string();
+                                self.diag(codes::INVALID_BOUNDS, msg, sp, None);
+                                None
+                            }
                         },
                         _ => None,
                     };
@@ -2370,7 +2467,75 @@ impl<'a> Checker<'a> {
     }
 
     /// Constant integer value of a simple expression (literals, sign, + - * /).
+    /// The VAR CONSTANT declarations of a POU: (name, initial-value expression).
+    fn constant_decls(&self, node: &'a Node) -> Vec<(String, &'a Node)> {
+        let mut out = Vec::new();
+        for s in self.child_nodes(node, N::VarSection) {
+            let constant = self
+                .items(s)
+                .iter()
+                .take(5)
+                .any(|i| matches!(i, Item::Tok(t) if self.is_kw(*t, "CONSTANT")));
+            if constant {
+                out.extend(self.constant_decls_of(s));
+            }
+        }
+        out
+    }
+
+    /// (name, initial-value expression) of each declaration in a section.
+    fn constant_decls_of(&self, s: &'a Node) -> Vec<(String, &'a Node)> {
+        let mut out = Vec::new();
+        {
+            for d in self.child_nodes(s, N::VarDecl) {
+                let Some(init) = self
+                    .child_nodes(d, N::Initializer)
+                    .first()
+                    .and_then(|i| self.first_node(i))
+                else {
+                    continue;
+                };
+                for it in self.items(d) {
+                    match it {
+                        Item::Tok(t) if self.tkind(t) == T::Ident => {
+                            out.push((self.text(t).to_string(), init))
+                        }
+                        Item::Tok(t) if self.tkind(t) == T::Colon => break,
+                        _ => {}
+                    }
+                }
+            }
+        }
+        out
+    }
+
+    /// `E.V` naming a value of an enumeration type.
+    fn is_enum_value(&self, n: &'a Node) -> bool {
+        if n.kind != N::MemberExpr {
+            return false;
+        }
+        let first = match self.items(n).first() {
+            Some(Item::Node(x)) if x.kind == N::NameRef => match self.items(x).first() {
+                Some(Item::Tok(t)) => self.text(*t).to_ascii_lowercase(),
+                _ => return false,
+            },
+            Some(Item::Tok(t)) => self.text(*t).to_ascii_lowercase(),
+            _ => return false,
+        };
+        self.types
+            .get(&first)
+            .is_some_and(|&id| matches!(self.defs[id].kind, Kind::Enum(_)))
+    }
+
     fn const_int(&self, n: &'a Node) -> Option<i128> {
+        self.const_int_at(n, 0)
+    }
+
+    fn const_int_at(&self, n: &'a Node, depth: u32) -> Option<i128> {
+        if depth > 16 {
+            return None;
+        }
+        let const_int = |x: &'a Node| self.const_int_at(x, depth + 1);
         let its = self.items(n);
         match n.kind {
             N::Literal => match its.first().copied() {
@@ -2381,21 +2546,87 @@ impl<'a> Checker<'a> {
                 },
                 _ => None,
             },
-            N::ParenExpr => self.const_int(self.first_node(n)?),
+            N::ParenExpr => const_int(self.first_node(n)?),
             N::NameRef => match its.first().copied() {
-                Some(Item::Tok(i)) if self.lookup_var(self.text(i)).is_none() => {
+                Some(Item::Tok(i)) => {
                     let name = self.text(i);
+                    // a constant of the POU being declared
+                    if let Some((_, e)) = self
+                        .pou_consts
+                        .iter()
+                        .find(|(c, _)| c.eq_ignore_ascii_case(name))
+                    {
+                        return const_int(e);
+                    }
+                    if self.lookup_var(name).is_some() {
+                        return None;
+                    }
                     self.globals
                         .iter()
                         .find(|g| g.name.eq_ignore_ascii_case(name))
                         .and_then(|g| g.value)
+                        .or_else(|| {
+                            self.global_consts
+                                .iter()
+                                .find(|(c, _, v)| v.is_some() && c.eq_ignore_ascii_case(name))
+                                .and_then(|g| g.2)
+                        })
                 }
                 _ => None,
             },
+            // a qualified global constant: GVL_Param.MAX_AXIS
+            N::MemberExpr => {
+                let toks: Vec<&str> = its
+                    .iter()
+                    .filter_map(|i| match i {
+                        Item::Tok(t) if self.tkind(*t) == T::Ident => Some(self.text(*t)),
+                        Item::Node(x) if x.kind == N::NameRef => match self.items(x).first() {
+                            Some(Item::Tok(t)) => Some(self.text(*t)),
+                            _ => None,
+                        },
+                        _ => None,
+                    })
+                    .collect();
+                let [.., q, name] = toks.as_slice() else {
+                    return None;
+                };
+                // an enumeration value: E_Lane.Nr1
+                if let Some(&id) = self.types.get(&q.to_ascii_lowercase()) {
+                    if let Kind::Enum(vals) = &self.defs[id].kind {
+                        return vals
+                            .iter()
+                            .find(|(n, _)| n.eq_ignore_ascii_case(name))
+                            .map(|v| v.1);
+                    }
+                }
+                self.globals
+                    .iter()
+                    .find(|g| {
+                        g.name.eq_ignore_ascii_case(name)
+                            && g.ns.as_deref().is_none_or(|ns| {
+                                ns.eq_ignore_ascii_case(q)
+                                    || ns.ends_with(&format!(".{}", q.to_ascii_lowercase()))
+                            })
+                    })
+                    .and_then(|g| g.value)
+                    .or_else(|| {
+                        self.global_consts
+                            .iter()
+                            .find(|(c, ns, v)| {
+                                v.is_some()
+                                    && c.eq_ignore_ascii_case(name)
+                                    && ns.as_deref().is_none_or(|ns| {
+                                        ns.eq_ignore_ascii_case(q)
+                                            || ns.ends_with(&format!(".{}", q.to_ascii_lowercase()))
+                                    })
+                            })
+                            .and_then(|g| g.2)
+                    })
+            }
             N::UnaryExpr => match (its.first().copied(), its.get(1).copied()) {
                 (Some(Item::Tok(op)), Some(Item::Node(x))) => match self.tkind(op) {
-                    T::Minus => self.const_int(x).map(|v| -v),
-                    T::Plus => self.const_int(x),
+                    T::Minus => const_int(x).map(|v| -v),
+                    T::Plus => const_int(x),
                     _ => None,
                 },
                 _ => None,
@@ -2406,7 +2637,7 @@ impl<'a> Checker<'a> {
                 its.get(2).copied(),
             ) {
                 (Some(Item::Node(l)), Some(Item::Tok(op)), Some(Item::Node(r))) => {
-                    let (a, b) = (self.const_int(l)?, self.const_int(r)?);
+                    let (a, b) = (const_int(l)?, const_int(r)?);
                     match self.tkind(op) {
                         T::Plus => a.checked_add(b),
                         T::Minus => a.checked_sub(b),
@@ -2503,6 +2734,11 @@ impl<'a> Checker<'a> {
                         v.init.and_then(|i| self.initializer(&v.ty, i))
                     };
                     out.var_inits.push(init);
+                    let args = match v.init_args {
+                        Some(list) if k >= p.inherited => self.fb_init_args(&v.ty, list),
+                        _ => Vec::new(),
+                    };
+                    out.var_init_args.push(args);
                 }
                 for s in self.child_nodes(node, N::StmtList) {
                     out.body = self.stmt_list(s);
@@ -2615,6 +2851,103 @@ impl<'a> Checker<'a> {
                 Some(Init::Expr(v.ir()))
             }
         }
+    }
+
+    /// [variables.initializer]: the value of variable `slot` of POU `def` when
+    /// it is a VAR CONSTANT whose initial value is a constant expression
+    /// (other constants of the POU included). Diagnostics of this evaluation
+    /// are dropped: the declaration reports them itself.
+    fn local_const(&mut self, def: usize, slot: usize) -> Option<K> {
+        if let Some(k) = self.local_consts.get(&(def, slot)) {
+            return *k;
+        }
+        let (init, ty) = match &self.defs[def].kind {
+            Kind::Pou(p) => {
+                let v = p.vars.get(slot)?;
+                if !v.constant {
+                    return None;
+                }
+                (v.init?, v.ty.clone())
+            }
+            _ => return None,
+        };
+        self.local_consts.insert((def, slot), None);
+        let mark = self.diags.len();
+        let k = match self.initializer(&ty, init) {
+            Some(Init::Expr(e)) => match e.kind {
+                ExprKind::Const(Const::Int(n)) => Some(K::Int(n)),
+                ExprKind::Const(Const::Real(x)) => Some(K::Real(x)),
+                ExprKind::Const(Const::Bool(b)) => Some(K::Bool(b)),
+                _ => None,
+            },
+            _ => None,
+        };
+        self.diags.truncate(mark);
+        self.local_consts.insert((def, slot), k);
+        k
+    }
+
+    /// [variables.init-arguments]: the arguments of `fb : FB_X(...)` bound to
+    /// the inputs of FB_X's FB_init: named, or in order after bInitRetains
+    /// and bInCopyCode. Checked in the declaring POU.
+    fn fb_init_args(&mut self, ty: &Ty, list: &'a Node) -> Vec<(usize, ir::Expr)> {
+        let Ty::Named(fb) = self.strip(ty) else {
+            return Vec::new();
+        };
+        // `fb : FB_X();` passes nothing and needs no FB_init
+        if self.args(list).is_empty() {
+            return Vec::new();
+        }
+        let Some(m) = self.method_lookup(fb, "FB_init") else {
+            let msg = format!(
+                "{} has no FB_init method to take these arguments",
+                self.ty_name(ty)
+            );
+            let sp = self.span(list);
+            self.diag(codes::UNKNOWN_NAME, msg, sp, None);
+            return Vec::new();
+        };
+        let inputs: Vec<(usize, String, Ty)> = match &self.defs[m].kind {
+            Kind::Pou(p) => p
+                .vars
+                .iter()
+                .enumerate()
+                .filter(|(_, v)| v.section == Section::Input)
+                .map(|(k, v)| (k, v.name.clone(), v.ty.clone()))
+                .collect(),
+            _ => Vec::new(),
+        };
+        let user: Vec<&(usize, String, Ty)> = inputs
+            .iter()
+            .filter(|(_, n, _)| {
+                !n.eq_ignore_ascii_case("bInitRetains") && !n.eq_ignore_ascii_case("bInCopyCode")
+            })
+            .collect();
+        let mut out = Vec::new();
+        for (pos, a) in self.args(list).into_iter().enumerate() {
+            let target = match a.name {
+                Some((t, _)) => {
+                    let name = self.text(t).to_string();
+                    let found = inputs
+                        .iter()
+                        .find(|(_, n, _)| n.eq_ignore_ascii_case(&name));
+                    if found.is_none() {
+                        let msg = format!("FB_init of {} has no input '{name}'", self.ty_name(ty));
+                        let sp = self.tok_span(t);
+                        self.diag(codes::UNKNOWN_NAME, msg, sp, None);
+                    }
+                    found.cloned()
+                }
+                None => user.get(pos).map(|x| (*x).clone()),
+            };
+            let Some((slot, _, pty)) = target else {
+                continue;
+            };
+            let v = self.expr_expecting(&pty, a.expr);
+            // as for a call: conversions, an instance to an interface
+            out.push((slot, self.bind_param(&pty, false, v)));
+        }
+        out
     }
 
     /// An array initializer element `n(v)` / `n()`: the count and the value
@@ -3615,12 +3948,17 @@ impl<'a> Checker<'a> {
         }
         let name = self.text(i);
         if let Some((t, slot)) = self.lookup_var(name) {
-            let v = V::with(t, span, ExprKind::Var(slot));
+            let mut v = V::with(t, span, ExprKind::Var(slot));
+            // [variables.initializer]: a VAR CONSTANT with a known value is a constant
+            if let Some(id) = self.scope {
+                v.k = self.local_const(id, slot);
+            }
             return self.alias_var(v, self.is_alias(name, None));
         }
         if let Some((t, slot, fb)) = self.lookup_owner_var(name) {
             let inst = self.this_ir(fb, span);
-            let v = V::with(t, span, ExprKind::Member(Box::new(inst), slot));
+            let mut v = V::with(t, span, ExprKind::Member(Box::new(inst), slot));
+            v.k = self.local_const(fb, slot);
             return self.alias_var(v, self.is_alias(name, Some(fb)));
         }
         if let Some(fb) = self.current_fb() {

@@ -23,6 +23,14 @@ Variables of a `VAR PUBLIC` section can be read and written from outside the
 block, like inputs; other access checks and persistence follow in a later
 revision.
 
+**[variables.static]** Variables of a `VAR_STAT` section (CODESYS and
+TwinCAT) exist once per function block, program or method, not once per
+instance: every instance reads and writes the same variable, and its initial
+value is set once, before any instance's FB_init. A variable a block
+inherits belongs to the block that declares it. Whether IEC 61131-3 defines
+`VAR_STAT` is not yet checked against the standard's text, so it carries no
+portability warning for now ([scope.iec]).
+
 **[variables.declaration]** A declaration names one or more variables of one
 type, with an optional initial value, and ends with `;`:
 
@@ -32,6 +40,16 @@ var_decl     = name { ',' name } [ 'AT' direct_variable ] ':' type_spec [ ':=' i
 
 A keyword or elementary type name used as `name` is error RP0004
 ([lexical.keyword]). A missing `;` is error RP0301 ([statements.terminator]).
+
+**[variables.constant-names]** A variable of a `VAR CONSTANT` section whose
+initial value is a constant expression is itself a constant: initial values
+and array bounds of the same POU may name it, declared before or after them
+(`current : INT := EMPTY;`, `ARRAY[0..LAST] OF INT`). An array bound must be
+a constant expression RootPLC can evaluate: a literal, such a constant, a
+global constant (also qualified, `GVL_Param.MAX_AXIS`), or `+ - * /` of
+them; any other bound is error RP0108. An enumeration value as a bound
+(`ARRAY[E_Lane.Nr1..E_Lane.Nr10]`, CODESYS and TwinCAT) is its integer value,
+with warning RP0135 ([scope.vendor-forms]).
 
 **[variables.located]** `AT` binds a variable to a directly represented
 address (`%IX0.0`, `%QW4`, `%I*`, see [lexical.direct-variable]):
@@ -61,8 +79,13 @@ initializer).
 
 **[variables.init-arguments]** A function-block instance may be declared
 with arguments, `fb : FB_Buffer(size := 10);`, which CODESYS and TwinCAT
-pass to the block's `FB_init` method. RootPLC accepts the form with warning
-RP0119: `FB_init` runs ([pous.oop.fb-init]), but without these arguments.
+pass to the block's `FB_init` method ([pous.oop.fb-init]); the form is
+warning RP0119 ([scope.vendor-forms]). Named arguments bind to the inputs of
+that name, positional ones to the inputs after `bInitRetains` and
+`bInCopyCode`, in order. The arguments are expressions of the declaring POU,
+evaluated when its instance is created, just before the FB_init of the
+declared instance runs (so `THIS^` is the declaring instance). A block without
+`FB_init` takes no arguments (RP0203).
 
 `type_spec` is defined in spec/04-pous.md [pous.type-spec].
 

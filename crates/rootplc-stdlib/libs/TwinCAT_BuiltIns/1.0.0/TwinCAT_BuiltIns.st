@@ -93,8 +93,9 @@ END_NAMESPACE
 
 (* System information (namespace TwinCAT_SystemInfoVarList): _TaskInfo per
    task and _AppInfo for the application. RootPLC runs one task, index 1
-   (see GETCURTASKINDEXEX in Tc2_System); it declares these variables but
-   does not fill them at run time, so they keep their initial values.
+   (see GETCURTASKINDEXEX in Tc2_System). `rootplc run` fills CycleTime,
+   CycleCount and FirstCycle of task 1 before every cycle
+   ([stdlib.compat.taskinfo]); the other members keep their initial values.
    EPlcPersistentStatus and ITComObjectServer are not published: the two
    members that use them are declared INT and PVOID. *)
 TYPE

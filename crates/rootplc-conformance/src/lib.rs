@@ -278,10 +278,20 @@ pub fn check_consistency(root: &Path) -> Result<Vec<String>, String> {
             Expect::Error(l) => ("error", l),
             Expect::Warning(l) => ("warning", l),
         };
+        // an error case may also list the warnings it gives (a vendor form
+        // next to the error), as long as one listed code is an error
+        if severity == "error"
+            && !list
+                .iter()
+                .any(|c| codes.get(c.as_str()).is_some_and(|e| e.severity == "error"))
+        {
+            problems.push(format!("{name}: expects error but lists no error code"));
+        }
         for code in list {
             expected_codes.insert(code.clone());
             match codes.get(code.as_str()) {
                 None => problems.push(format!("{name}: unknown code {code}")),
+                Some(e) if e.severity == "warning" && severity == "error" => {}
                 Some(e) if e.severity != severity => problems.push(format!(
                     "{name}: expects {severity} {code}, registry says {}",
                     e.severity
