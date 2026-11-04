@@ -9,18 +9,18 @@ confirmed that the code is valid, so it measures acceptance, not correctness. *I
 clean with no portability warning either ([scope.vendor-forms]): the unit uses no CODESYS or
 TwinCAT form RootPLC knows of, so it is IEC 61131-3 Structured Text as far as RootPLC can tell.
 
-**Headline (applications, libraries and samples; 200 projects, 13372 units): syntax OK 96.4% · clean 71.8% · median project clean 75.0% · IEC clean 21.3%.**
+**Headline (applications, libraries and samples; 200 projects, 13372 units): syntax OK 96.4% · clean 73.1% · median project clean 75.0% · IEC clean 21.3%.**
 
 | Figure | Projects | Units | Syntax OK | Clean | IEC clean |
 |---|---|---|---|---|---|
-| Headline (core set) | 200 | 13372 | 96.4% | 71.8% | 21.3% |
+| Headline (core set) | 200 | 13372 | 96.4% | 73.1% | 21.3% |
 | Holdout part of the core set (never used to choose fixes) | 32 | 901 | 95.2% | 66.4% | 23.0% |
-| Everything analysed, tool inputs included | 226 | 15470 | 94.7% | 69.7% | 23.4% |
+| Everything analysed, tool inputs included | 226 | 15470 | 94.7% | 70.8% | 23.4% |
 
 | Category | Units | Syntax OK | Clean | IEC clean |
 |---|---|---|---|---|
-| application | 2455 | 95.2% | 80.7% | 35.3% |
-| library | 9594 | 96.6% | 71.2% | 17.5% |
+| application | 2455 | 95.2% | 81.7% | 35.3% |
+| library | 9594 | 96.6% | 72.7% | 17.5% |
 | sample | 1323 | 97.2% | 59.6% | 22.5% |
 | tool-input | 2098 | 84.0% | 56.3% | 36.9% |
 
@@ -39,18 +39,18 @@ as empty, duplicated, not Structured Text or too small are listed at the end of 
 | [tomookay-toast](https://github.com/tomookay/TOAST) | application | MIT License | 861 | 27,631 | 100% | 97% | 79% |
 | [lorenz-software-tc3unittest](https://github.com/Lorenz-Software/Tc3UnitTest) | library | MIT License | 792 | 122,715 | 99% | 93% | 3% |
 | [br-oscat](https://github.com/tkucic/brOscatLib) | library | MIT | 729 | 45,030 | 93% | 76% | 28% |
-| [haud-ba-plc-motion-layer](https://github.com/haud-ba/PLC_MOTION_LAYER) | library | other (see repository) | 709 | 74,821 | 99% | 58% | 3% |
+| [haud-ba-plc-motion-layer](https://github.com/haud-ba/PLC_MOTION_LAYER) | library | other (see repository) | 709 | 74,821 | 99% | 76% | 3% |
 | [trofimich-twincat-openframework](https://github.com/trofimich/TwinCAT.OpenFramework) | library | MIT License | 574 | 45,173 | 88% | 44% | 15% |
 | [thorstenbrach-thorbot-software-plc](https://github.com/ThorstenBrach/ThorBot_Software_PLC) | application | MIT License | 550 | 31,685 | 98% | 85% | 1% |
 | [tkucic-unitest](https://github.com/tkucic/UniTest) | library | MIT License | 351 | 10,016 | 95% | 33% | 0% |
 | [tchaxx-protobuf](https://github.com/TcHaxx/protobuf) | library | MIT License | 260 | 10,719 | 93% | 65% | 21% |
 | [inxton-axsharp](https://github.com/Inxton/axsharp) | tool-input | MIT License | 257 | 6,209 | 93% | 68% | 68% |
 | [babe-kimr-tc1200-plc-sample-oop-design-patterns-plc](https://github.com/BABE-KimR/TC1200-PLC.sample.OOP_Design_Patterns.plc) | sample | BSD 2-Clause "Simplified" License | 239 | 7,413 | 100% | 78% | 32% |
-| [e13740e-codesys-adaptive-traffic-control](https://github.com/e13740e/CODESYS-Adaptive-Traffic-Control) | application | MIT License | 225 | 10,217 | 75% | 59% | 14% |
+| [e13740e-codesys-adaptive-traffic-control](https://github.com/e13740e/CODESYS-Adaptive-Traffic-Control) | application | MIT License | 225 | 10,217 | 75% | 70% | 14% |
 | [pcdshub-lcls-twincat-vacuum](https://github.com/pcdshub/lcls-twincat-vacuum) | library | other (see repository) | 184 | 18,463 | 97% | 72% | 14% |
 | [ptw-tuda-eta-factory-building-automation](https://github.com/PTW-TUDa/eta-factory-building-automation) | application | BSD 2-Clause "Simplified" License | 183 | 10,799 | 96% | 52% | 12% |
 | [pcdshub-lcls-twincat-motion](https://github.com/pcdshub/lcls-twincat-motion) | library | other (see repository) | 169 | 22,093 | 99% | 58% | 21% |
-| [haud-ba-xts-transport-layer](https://github.com/haud-ba/XTS_TRANSPORT_LAYER) | library | other (see repository) | 157 | 24,048 | 96% | 59% | 4% |
+| [haud-ba-xts-transport-layer](https://github.com/haud-ba/XTS_TRANSPORT_LAYER) | library | other (see repository) | 157 | 24,048 | 96% | 68% | 4% |
 | [fisothemes-fisothemes-common-library-for-twincat](https://github.com/fisothemes/FisoThemes-Common-Library-for-TwinCAT) | library | MIT License | 154 | 2,065 | 98% | 82% | 53% |
 | [eponce00-tcforge](https://github.com/eponce00/TcForge) | library (holdout) | MIT License | 152 | 17,634 | 97% | 88% | 17% |
 | [beckhoff-tf6310-samples](https://github.com/Beckhoff/TF6310_Samples) | sample | other (see repository) | 146 | 9,761 | 99% | 27% | 8% |
@@ -59,7 +59,7 @@ as empty, duplicated, not Structured Text or too small are listed at the end of 
 | [gracesrm-openplc-sample-programs](https://github.com/gracesrm/OpenPLC_Sample_Programs) | sample (holdout) | GNU General Public License v3.0 | 115 | 42,123 | 90% | 30% | 30% |
 | [twincat-dynamic-collections](https://github.com/fisothemes/TwinCat-Dynamic-Collections) | library (holdout) | MIT | 108 | 10,216 | 96% | 67% | 18% |
 | [ironplc-ironplc](https://github.com/ironplc/ironplc) | tool-input | MIT License | 107 | 3,114 | 78% | 48% | 40% |
-| [mbc-engineering-log4tc](https://github.com/mbc-engineering/log4TC) | library | Apache License 2.0 | 103 | 4,754 | 99% | 55% | 5% |
+| [mbc-engineering-log4tc](https://github.com/mbc-engineering/log4TC) | library | Apache License 2.0 | 103 | 4,754 | 99% | 57% | 6% |
 | [tcunit](https://github.com/tcunit/TcUnit) | library | MIT (custom text) | 97 | 13,889 | 100% | 75% | 20% |
 | [qubernetic-flowforge](https://github.com/qubernetic/FlowForge) | tool-input | GNU Affero General Public License v3.0 | 97 | 13,688 | 100% | 75% | 20% |
 | [ahuca-tcbase](https://github.com/ahuca/TcBase) | library | MIT License | 93 | 5,657 | 97% | 60% | 14% |
@@ -346,9 +346,9 @@ Most frequent error codes:
 | RP0201 | 3603 |
 | RP0301 | 1339 |
 | RP0005 | 1178 |
-| RP0108 | 735 |
-| RP0121 | 584 |
+| RP0108 | 531 |
 | RP0204 | 473 |
+| RP0121 | 377 |
 | RP0008 | 258 |
 | RP0004 | 243 |
 | RP0007 | 101 |
@@ -364,7 +364,7 @@ Portability warnings: units with each vendor form (why clean units are not IEC c
 | RP0118 | 931 |
 | RP0117 | 833 |
 | RP0116 | 581 |
-| RP0135 | 550 |
+| RP0135 | 572 |
 | RP0127 | 494 |
 | RP0120 | 492 |
 | RP0129 | 484 |

@@ -1937,8 +1937,10 @@ initial value is a constant expression is itself a constant: initial values
 and array bounds of the same POU may name it, declared before or after them
 (`current : INT := EMPTY;`, `ARRAY[0..LAST] OF INT`). An array bound must be
 a constant expression RootPLC can evaluate: a literal, such a constant, a
-global constant (also qualified, `GVL_Param.MAX_AXIS`), or `+ - * /` of
-them; any other bound is error RP0108. An enumeration value as a bound
+global constant (also qualified, `GVL_Param.MAX_AXIS`), `SIZEOF(x)` /
+`XSIZEOF(x)` where a library enables them ([stdlib.compat.sizeof]; `x` a
+variable declared before it in the same POU, a global or a type), or
+`+ - * /` of them; any other bound is error RP0108. An enumeration value as a bound
 (`ARRAY[E_Lane.Nr1..E_Lane.Nr10]`, CODESYS and TwinCAT) is its integer value,
 with warning RP0135 ([scope.vendor-forms]).
 

@@ -265,6 +265,12 @@ pub(crate) struct Checker<'a> {
     /// While a POU's variables are declared: its VAR CONSTANT names and their
     /// initial-value expressions, so that array bounds can use them.
     pou_consts: Vec<(String, &'a Node)>,
+    /// While a POU's variables are declared: those declared so far and their
+    /// types, so that SIZEOF in an array bound can name them.
+    decl_types: Vec<(String, Ty)>,
+    /// While a method's variables are declared: the block it belongs to,
+    /// whose variables SIZEOF in a bound may name.
+    decl_owner: Option<usize>,
     /// Every global constant (name, namespace, initial-value expression),
     /// known before the global variables are resolved, so that a bound can
     /// use a constant declared later, [variables.constant-names].
@@ -351,6 +357,8 @@ impl<'a> Checker<'a> {
             unions: HashSet::new(),
             local_consts: HashMap::new(),
             pou_consts: Vec::new(),
+            decl_types: Vec::new(),
+            decl_owner: None,
             global_consts: Vec::new(),
             diags: Vec::new(),
         };
@@ -2004,6 +2012,14 @@ impl<'a> Checker<'a> {
         // [types.derived.array]: the POU's own constants may size its arrays,
         // declared before or after them
         self.pou_consts = self.constant_decls(node);
+        self.decl_types.clear();
+        // a method's bounds may use its block's variables: declare those first
+        self.decl_owner = self.owner.get(&id).copied();
+        if let Some(o) = self.decl_owner {
+            if matches!(self.defs[o].kind, Kind::Pending) {
+                self.resolve(o);
+            }
+        }
         // [pous.oop.method]: VAR_INST variables of the block's methods keep their
         // value between calls: they are stored in the instance as "M#name"
         let mut inst_vars = Vec::new();
@@ -2090,6 +2106,8 @@ impl<'a> Checker<'a> {
         }
         vars.extend(inst_vars);
         self.pou_consts.clear();
+        self.decl_types.clear();
+        self.decl_owner = None;
         self.defs[id].kind = Kind::Pou(Pou {
             kind,
             vars,
@@ -2133,6 +2151,9 @@ impl<'a> Checker<'a> {
             }
         }
         let ty = spec.map_or(Ty::Unknown, |s| self.type_spec(s, None));
+        for &t in &names {
+            self.decl_types.push((self.text(t).to_string(), ty.clone()));
+        }
         if init.is_none() {
             init = spec.and_then(|s| self.type_default(s));
         }
@@ -2426,6 +2447,10 @@ impl<'a> Checker<'a> {
                             Item::Tok(_) => None,
                         })
                         .collect();
+                    // types named in a bound (E.V, SIZEOF(T)) are declared first
+                    for p in &parts {
+                        self.resolve_named_types(p);
+                    }
                     let dim = match parts.as_slice() {
                         [l, h] => match (self.const_int(l), self.const_int(h)) {
                             (Some(a), Some(b)) if a > b => {
@@ -2527,6 +2552,72 @@ impl<'a> Checker<'a> {
             .is_some_and(|&id| matches!(self.defs[id].kind, Kind::Enum(_)))
     }
 
+    /// The type SIZEOF measures in an array bound: a variable of the POU
+    /// being declared (declared before), of the POU, a global (also
+    /// qualified), an elementary type or a declared type.
+    fn sizeof_type(&self, arg: &'a Node) -> Option<Ty> {
+        let last_ident = |n: &'a Node| -> Option<&str> {
+            self.items(n).iter().rev().find_map(|i| match i {
+                Item::Tok(t) if !self.tkind(*t).is_trivia() && self.tkind(*t) != T::Dot => {
+                    Some(self.text(*t))
+                }
+                _ => None,
+            })
+        };
+        match arg.kind {
+            N::NameRef => {
+                let name = last_ident(arg)?;
+                if let Some((_, t)) = self
+                    .decl_types
+                    .iter()
+                    .rev()
+                    .find(|(n, _)| n.eq_ignore_ascii_case(name))
+                {
+                    return Some(t.clone());
+                }
+                if let Some((t, _)) = self.lookup_var(name) {
+                    return Some(t);
+                }
+                if let Some(Kind::Pou(p)) = self.decl_owner.map(|o| &self.defs[o].kind) {
+                    if let Some(v) = p.vars.iter().find(|v| v.name.eq_ignore_ascii_case(name)) {
+                        return Some(v.ty.clone());
+                    }
+                }
+                if let Some((t, _)) = self.lookup_global(name) {
+                    return Some(t);
+                }
+                if let Some(t) = elem_or_str(name) {
+                    return Some(t);
+                }
+                self.types
+                    .get(&name.to_ascii_lowercase())
+                    .map(|&id| Ty::Named(id))
+            }
+            // GVL.x: the global of that name
+            N::MemberExpr => self.lookup_global(last_ident(arg)?).map(|(t, _)| t),
+            _ => None,
+        }
+    }
+
+    /// Resolve every declared type a name in `n` refers to, so that a
+    /// constant expression can read enumeration values and sizes.
+    fn resolve_named_types(&mut self, n: &'a Node) {
+        for it in self.items(n) {
+            match it {
+                Item::Tok(t) if self.tkind(t) == T::Ident => {
+                    let key = self.text(t).to_ascii_lowercase();
+                    if let Some(&id) = self.types.get(&key) {
+                        if matches!(self.defs[id].kind, Kind::Pending) {
+                            self.resolve(id);
+                        }
+                    }
+                }
+                Item::Node(x) => self.resolve_named_types(x),
+                Item::Tok(_) => {}
+            }
+        }
+    }
+
     fn const_int(&self, n: &'a Node) -> Option<i128> {
         self.const_int_at(n, 0)
     }
@@ -2574,6 +2665,29 @@ impl<'a> Checker<'a> {
                 }
                 _ => None,
             },
+            // [stdlib.compat.sizeof]: SIZEOF(x) / XSIZEOF(x) of a variable or type
+            N::CallExpr => {
+                let (Some(Item::Node(callee)), Some(Item::Node(list))) =
+                    (its.first().copied(), its.get(1).copied())
+                else {
+                    return None;
+                };
+                let Some(Item::Tok(f)) = self.items(callee).first().copied() else {
+                    return None;
+                };
+                let up = self.text(f).to_ascii_uppercase();
+                if callee.kind != N::NameRef
+                    || !(up == "SIZEOF" || up == "XSIZEOF")
+                    || !self.intrinsics.contains(&up)
+                {
+                    return None;
+                }
+                let args = self.args(list);
+                let [a] = args.as_slice() else { return None };
+                let ty = self.sizeof_type(a.expr)?;
+                let (size, _) = self.layout(&ty, 0)?;
+                i128::try_from(size).ok()
+            }
             // a qualified global constant: GVL_Param.MAX_AXIS
             N::MemberExpr => {
                 let toks: Vec<&str> = its
