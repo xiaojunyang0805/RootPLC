@@ -6,7 +6,7 @@ TYPE Valve : (Closed, Auto); END_TYPE
 
 PROGRAM PRG_Main
 VAR
-    m : Mode;
+    i : INT;
 END_VAR
-m := Auto;
+i := TO_INT(Auto);   (* no expected enumeration: Mode#Auto or Valve#Auto? *)
 END_PROGRAM

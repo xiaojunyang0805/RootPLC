@@ -248,6 +248,9 @@ pub(crate) struct Checker<'a> {
     /// Span of the place an assignment writes, while it is checked
     /// ([pous.call.local-read]: internal variables are read-only from outside).
     write_target: Option<Span>,
+    /// The enumeration an expression is expected to have ([types.derived.enum]:
+    /// an unqualified value of several enumerations resolves to it).
+    enum_hint: Option<usize>,
     /// Property accessor definition -> (its PROPERTY node, is the getter).
     prop_info: HashMap<usize, (&'a Node, bool)>,
     /// Structure types declared as UNION ([types.derived.union]).
@@ -326,6 +329,7 @@ impl<'a> Checker<'a> {
             enum_base: HashMap::new(),
             strict_enums: HashSet::new(),
             write_target: None,
+            enum_hint: None,
             prop_info: HashMap::new(),
             unions: HashSet::new(),
             diags: Vec::new(),
@@ -2581,7 +2585,7 @@ impl<'a> Checker<'a> {
                 Some(Init::Struct(fields))
             }
             _ => {
-                let v = self.expr(inner);
+                let v = self.expr_expecting(ty, inner);
                 self.coerce(ty, &v);
                 Some(Init::Expr(v.ir()))
             }
@@ -2703,7 +2707,7 @@ impl<'a> Checker<'a> {
                 let saved = self.write_target.replace(self.span(t));
                 let target = self.expr(t);
                 self.write_target = saved;
-                let value = self.expr(e);
+                let value = self.expr_expecting(&target.ty, e);
                 let value = if self.tkind(op) == T::Assign {
                     self.adapt(&target.ty, value)
                 } else {
@@ -2877,7 +2881,13 @@ impl<'a> Checker<'a> {
     }
 
     fn label(&mut self, e: &'a Node, sel: Option<&V>) -> Option<i128> {
-        let v = self.expr(e);
+        let v = match sel {
+            Some(s) => {
+                let st = s.ty.clone();
+                self.expr_expecting(&st, e)
+            }
+            None => self.expr(e),
+        };
         if let Some(s) = sel {
             let st = s.ty.clone();
             self.coerce(&st, &v);
@@ -2886,6 +2896,20 @@ impl<'a> Checker<'a> {
             Some(K::Int(n)) => Some(n),
             _ => None,
         }
+    }
+
+    /// `n` evaluated where a value of type `ty` is expected: an unqualified
+    /// enumeration value then resolves to that enumeration ([types.derived.enum]).
+    fn expr_expecting(&mut self, ty: &Ty, n: &'a Node) -> V {
+        let st = self.strip(ty);
+        let hint = match st {
+            Ty::Named(i) if self.is_enum(&st) => Some(i),
+            _ => None,
+        };
+        let saved = std::mem::replace(&mut self.enum_hint, hint);
+        let v = self.expr(n);
+        self.enum_hint = saved;
+        v
     }
 
     /// Conditions are `BOOL`, with no implicit conversion, [statements.if].
@@ -3013,6 +3037,19 @@ impl<'a> Checker<'a> {
                 span,
                 e: ExprKind::Invalid,
             }),
+            many if many.iter().any(|(id, _)| Some(*id) == self.enum_hint) => {
+                let &(id, v) = many
+                    .iter()
+                    .find(|(id, _)| Some(*id) == self.enum_hint)
+                    .unwrap_or(&many[0]);
+                Some(V {
+                    ty: Ty::Named(id),
+                    k: Some(K::Int(v)),
+                    leaf: true,
+                    span,
+                    e: ExprKind::Invalid,
+                })
+            }
             many => {
                 let names: Vec<String> = many
                     .iter()
@@ -3724,7 +3761,8 @@ impl<'a> Checker<'a> {
             return V::unknown(span);
         };
         let l = self.expr(ln);
-        let r = self.expr(rn);
+        let lt = l.ty.clone();
+        let r = self.expr_expecting(&lt, rn);
         let opk = self.tkind(op);
         let opt = self.text(op).to_ascii_uppercase();
         let (cls, bop) = match opk {
@@ -4461,7 +4499,7 @@ impl<'a> Checker<'a> {
                             outputs.push((s, target.ir()));
                         }
                         Some(s) => {
-                            let val = self.expr(a.expr);
+                            let val = self.expr_expecting(&p.vars[s].ty, a.expr);
                             let ir = self.bind_param(&p.vars[s].ty, p.vars[s].alias, val);
                             self.check_in_out_arg(&p.vars[s], &ir);
                             inputs.push((s, ir));
@@ -4480,7 +4518,10 @@ impl<'a> Checker<'a> {
                     }
                 }
                 None => {
-                    let val = self.expr(a.expr);
+                    let want = input_slots
+                        .get(pos)
+                        .map_or(Ty::Unknown, |&s| p.vars[s].ty.clone());
+                    let val = self.expr_expecting(&want, a.expr);
                     if let Some(&s) = input_slots.get(pos) {
                         let ir = self.bind_param(&p.vars[s].ty, p.vars[s].alias, val);
                         self.check_in_out_arg(&p.vars[s], &ir);

@@ -429,7 +429,11 @@ Without explicit values the base type is `INT` and the values are 0, 1, 2...
 in order. The CODESYS and TwinCAT spelling with the base type after the
 values, `(Off := 0, Auto := 10) UINT`, means the same and is accepted with
 warning RP0115. The default is the first value. `Mode#Auto` names a value; plain `Auto` is
-allowed when exactly one enumeration in scope has it, otherwise error RP0106.
+allowed when exactly one enumeration in scope has it. When several have it,
+the enumeration the context expects decides, as in CODESYS and TwinCAT: the
+target of an assignment, the other operand of a comparison, the CASE
+selector, the parameter of a call or the variable being initialised;
+without such a context it is error RP0106.
 The CODESYS and TwinCAT spelling `Mode.Auto` (also qualified by a namespace,
 `NS.Mode.Auto`) means `Mode#Auto` and is accepted with warning RP0122 when
 `Mode` is not the name of a variable, also as a CASE label.
@@ -589,7 +593,11 @@ Without explicit values the base type is `INT` and the values are 0, 1, 2...
 in order. The CODESYS and TwinCAT spelling with the base type after the
 values, `(Off := 0, Auto := 10) UINT`, means the same and is accepted with
 warning RP0115. The default is the first value. `Mode#Auto` names a value; plain `Auto` is
-allowed when exactly one enumeration in scope has it, otherwise error RP0106.
+allowed when exactly one enumeration in scope has it. When several have it,
+the enumeration the context expects decides, as in CODESYS and TwinCAT: the
+target of an assignment, the other operand of a comparison, the CASE
+selector, the parameter of a call or the variable being initialised;
+without such a context it is error RP0106.
 The CODESYS and TwinCAT spelling `Mode.Auto` (also qualified by a namespace,
 `NS.Mode.Auto`) means `Mode#Auto` and is accepted with warning RP0122 when
 `Mode` is not the name of a variable, also as a CASE label.
@@ -634,7 +642,11 @@ Without explicit values the base type is `INT` and the values are 0, 1, 2...
 in order. The CODESYS and TwinCAT spelling with the base type after the
 values, `(Off := 0, Auto := 10) UINT`, means the same and is accepted with
 warning RP0115. The default is the first value. `Mode#Auto` names a value; plain `Auto` is
-allowed when exactly one enumeration in scope has it, otherwise error RP0106.
+allowed when exactly one enumeration in scope has it. When several have it,
+the enumeration the context expects decides, as in CODESYS and TwinCAT: the
+target of an assignment, the other operand of a comparison, the CASE
+selector, the parameter of a call or the variable being initialised;
+without such a context it is error RP0106.
 The CODESYS and TwinCAT spelling `Mode.Auto` (also qualified by a namespace,
 `NS.Mode.Auto`) means `Mode#Auto` and is accepted with warning RP0122 when
 `Mode` is not the name of a variable, also as a CASE label.
