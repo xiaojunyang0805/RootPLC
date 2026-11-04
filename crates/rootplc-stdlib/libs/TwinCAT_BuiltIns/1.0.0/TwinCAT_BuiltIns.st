@@ -21,6 +21,17 @@ TYPE
     HRESULT : DINT;
 END_TYPE
 
+(* GUID: a globally unique ID, as the Tc2_Utilities manual gives it; event
+   classes and source information use it. *)
+TYPE GUID :
+STRUCT
+    Data1 : DWORD;
+    Data2 : WORD;
+    Data3 : WORD;
+    Data4 : ARRAY[0..7] OF BYTE;
+END_STRUCT
+END_TYPE
+
 NAMESPACE __SYSTEM
 INTERFACE IQueryInterface
 END_INTERFACE

@@ -1,0 +1,35 @@
+# Compatibility library: the PLC interface of Beckhoff's Tc3_EventLogger.
+# Clean-room: written only from the public references below. RootPLC is an
+# independent project, not affiliated with or endorsed by Beckhoff Automation.
+name = "Tc3_EventLogger"
+vendor = "Beckhoff Automation GmbH"
+version = "1.0.0"
+description = "TwinCAT Tc3_EventLogger: TcEventSeverity, TcEventEntry, FB_TcMessage, FB_TcAlarm, FB_TcEventLogger, FB_ListenerBase2, text requests and their interfaces (declared only: RootPLC has no EventLogger service); FB_TcSourceInfo implemented"
+requires = ["TwinCAT_BuiltIns", "Tc2_System"]
+declare_only = [
+  "FB_AsyncStrResult",
+  "FB_TcCauseRemedy",
+  "FB_TcDetail",
+  "FB_RequestCauseRemedy",
+  "FB_RequestEventClassDetails",
+  "FB_RequestEventClassName",
+  "FB_RequestEventDetails",
+  "FB_RequestEventText",
+  "FB_RequestTranslation",
+  "FB_TcEventBase",
+  "FB_TcEvent",
+  "FB_TcMessage",
+  "FB_TcAlarm",
+  "FB_TcArguments",
+  "FB_TcEventLogger",
+  "FB_ListenerBase2",
+  "FB_TcEventFilter",
+  "FB_TcClearLoggedEventsSettings",
+  "F_GetEventClassName",
+  "F_GetEventText",
+  "FB_TcSourceInfo.ResetToDefault",
+]
+references = [
+  "https://download.beckhoff.com/download/Document/automation/twincat3/TwinCAT_3_PLC_Lib_Tc3_EventLogger_EN.pdf (TE1000 PLC Library Tc3_EventLogger manual, version 1.6.2: declarations of all blocks, methods, properties, interfaces, data types and global lists)",
+  "https://infosys.beckhoff.com/content/1033/tcplclib_tc3_eventlogger/index.html (online edition of the same manual)",
+]

@@ -148,7 +148,8 @@ interface is RP0111. A block also provides the interfaces of its base.
 reference to a function-block instance, or NULL (the initial value).
 Assigning or passing an instance of a block that provides the interface
 stores a reference to it; an instance of another block is RP0103. `NULL` and
-the TwinCAT idiom `0` clear the reference; `=` and `<>` compare references
+the TwinCAT idiom `0` clear the reference, also as an initial value or a
+parameter default; `=` and `<>` compare references
 with each other, with `NULL` and with `0`. `itf.M(args)` calls the method of
 the referenced instance's own block (dynamic dispatch); through a NULL
 reference it is the fault `NULL_REF`. Passing `THIS^` hands out a reference
@@ -175,9 +176,18 @@ interface property without GET or SET requires a GET part.
 variable: changes made by the called function or function block are visible
 in that variable after the call. RootPLC copies the value in before the call
 and back after it. The argument must be a variable, an element or a member
-(RP0114); a constant or an expression is an error. While the call runs,
+(RP0114); a constant or an expression is an error. A `STRING` or `WSTRING`
+parameter holds the caller's whole text, whatever the declared lengths; the
+caller's own length applies when the value is written back. While the call runs,
 `REF` or `ADR` of the parameter (or of an element or member of it) is the
 address of the caller's variable, so it stays valid after the call.
+
+**[pous.call.in-out-constant]** Parameters declared in a `VAR_IN_OUT CONSTANT`
+section (CODESYS / TwinCAT) are passed like `VAR_IN_OUT` parameters, but the
+argument may also be a constant or an expression of any length: RP0114 does
+not apply. The
+called POU is meant only to read such a parameter; RootPLC does not yet reject
+writes to it, and a value argument is not written back.
 
 **[pous.test]** A TEST block is a POU that only the test runner executes
 (semantics: spec/07-test-blocks.md):

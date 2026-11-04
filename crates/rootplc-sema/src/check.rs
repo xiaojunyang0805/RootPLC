@@ -51,6 +51,8 @@ struct Var<'a> {
     init: Option<&'a Node>,
     /// Declared REFERENCE TO: uses go to the target, [types.reference.alias].
     alias: bool,
+    /// Declared in VAR_IN_OUT CONSTANT: the argument may be a value.
+    read_only: bool,
 }
 
 #[derive(Clone)]
@@ -514,6 +516,7 @@ impl<'a> Checker<'a> {
             span: Span::new(0, 0),
             init: None,
             alias: false,
+            read_only: false,
         };
         let mut vars: Vec<Var<'a>> = inputs.iter().map(|x| var(x, Section::Input)).collect();
         vars.extend(outputs.iter().map(|x| var(x, Section::Output)));
@@ -644,8 +647,7 @@ impl<'a> Checker<'a> {
                         body: std::mem::take(&mut irs.body),
                         builtin: d.node.is_none(),
                         owner: self.owner.get(&id).copied(),
-                        declare_only: matches!(p.kind, PouKind::Function | PouKind::FunctionBlock)
-                            && self.declare_only.contains(&d.name.to_ascii_lowercase()),
+                        declare_only: self.is_declare_only(id),
                         base: p.base,
                         methods: tables[id].clone(),
                         interfaces: itfs[id].clone(),
@@ -1127,6 +1129,35 @@ impl<'a> Checker<'a> {
         }
     }
 
+    /// Whether definition `id` is declared by a compatibility library but not
+    /// implemented: a listed function or block, a listed method ("FB.M"), or
+    /// a method or property accessor of a listed block.
+    fn is_declare_only(&self, id: usize) -> bool {
+        let listed = |i: usize| {
+            self.declare_only
+                .contains(&self.defs[i].name.to_ascii_lowercase())
+        };
+        match &self.defs[id].kind {
+            Kind::Pou(p) => match p.kind {
+                PouKind::Function | PouKind::FunctionBlock => listed(id),
+                PouKind::Method => listed(id) || self.owner.get(&id).is_some_and(|&o| listed(o)),
+                _ => false,
+            },
+            _ => false,
+        }
+    }
+
+    /// Warning RP0120 for a call of a declare-only definition.
+    fn note_declare_only(&mut self, id: usize, span: Span) {
+        if self.is_declare_only(id) {
+            let name = self.defs[id].name.replace("#get", "").replace("#set", "");
+            let msg = format!(
+                "'{name}' is declared by a compatibility library but not implemented by RootPLC; running it stops with UNSUPPORTED"
+            );
+            self.diag(codes::DECLARE_ONLY_CALL, msg, span, None);
+        }
+    }
+
     /// A call of a property accessor (or any method) as an expression.
     #[allow(clippy::too_many_arguments)]
     fn accessor_call(
@@ -1226,6 +1257,7 @@ impl<'a> Checker<'a> {
         let value = self.expr(e);
         let value = self.adapt(&ty, value);
         let dispatch = !self.is_super_ir(&inst);
+        self.note_declare_only(setter, span);
         let call = self.accessor_call(
             inst,
             fb,
@@ -1805,6 +1837,7 @@ impl<'a> Checker<'a> {
                         span: self.tok_span(pt),
                         init: None,
                         alias: false,
+                        read_only: false,
                     });
                 }
             }
@@ -1931,8 +1964,25 @@ impl<'a> Checker<'a> {
                         },
                         _ => Section::Local,
                     };
+                    // [pous.vendor.in-out-constant]: VAR_IN_OUT CONSTANT takes values too
+                    let read_only = section == Section::InOut
+                        && self
+                            .items(n)
+                            .iter()
+                            .take(5)
+                            .any(|i| matches!(i, Item::Tok(t) if self.is_kw(*t, "CONSTANT")));
+                    let start = vars.len();
                     for d in self.child_nodes(n, N::VarDecl) {
                         self.var_decl(d, section, &mut vars);
+                    }
+                    for v in &mut vars[start..] {
+                        v.read_only = read_only;
+                        // [pous.call.in-out]: a STRING parameter takes the
+                        // caller's whole text; the caller's length applies
+                        // when it is written back
+                        if let (Section::InOut, Ty::Str { len, .. }) = (section, &mut v.ty) {
+                            *len = 65_535;
+                        }
                     }
                 }
                 _ => {}
@@ -1994,6 +2044,7 @@ impl<'a> Checker<'a> {
                 span: self.tok_span(t),
                 init,
                 alias,
+                read_only: false,
             });
         }
     }
@@ -2853,7 +2904,11 @@ impl<'a> Checker<'a> {
     }
 
     /// [pous.call.in-out]: the argument of a VAR_IN_OUT parameter must be a variable.
-    fn check_in_out_arg(&mut self, section: Section, name: &str, arg: &ir::Expr) {
+    fn check_in_out_arg(&mut self, param: &Var<'a>, arg: &ir::Expr) {
+        let (section, name) = (param.section, param.name.as_str());
+        if param.read_only {
+            return;
+        }
         use ir::ExprKind as K;
         let is_var = matches!(
             arg.kind,
@@ -3049,6 +3104,8 @@ impl<'a> Checker<'a> {
                         self.diag(codes::INTEGER_AS_BOOL_OR_NULL, msg.into(), v.span, None);
                         true
                     }
+                    // the TwinCAT idiom 0 for an empty interface reference
+                    Ty::Named(_) if self.is_itf(&tb) && v.k == Some(K::Int(0)) => true,
                     Ty::Ref(_) if v.k == Some(K::Int(0)) => {
                         let msg = "0 used as a reference; IEC 61131-3 writes NULL";
                         self.diag(codes::INTEGER_AS_BOOL_OR_NULL, msg.into(), v.span, None);
@@ -3068,7 +3125,7 @@ impl<'a> Checker<'a> {
                 return ok;
             }
             Ty::Null => {
-                let ok = matches!(tb, Ty::Ref(_));
+                let ok = matches!(tb, Ty::Ref(_)) || self.is_itf(&tb);
                 if !ok {
                     self.mismatch(to, v);
                 }
@@ -3201,6 +3258,7 @@ impl<'a> Checker<'a> {
                     _ => Ty::Unknown,
                 };
                 let inst = self.this_ir(fb, span);
+                self.note_declare_only(getter, span);
                 let call = self.accessor_call(inst, fb, getter, true, Vec::new(), ty.clone(), span);
                 return V::with(ty, span, call.kind);
             }
@@ -3821,6 +3879,7 @@ impl<'a> Checker<'a> {
                 };
                 let inst = base.ir();
                 let dispatch = !self.is_super_ir(&inst);
+                self.note_declare_only(getter, span);
                 let call =
                     self.accessor_call(inst, id, getter, dispatch, Vec::new(), ty.clone(), span);
                 return V::with(ty, span, call.kind);
@@ -4230,7 +4289,7 @@ impl<'a> Checker<'a> {
                         Some(s) => {
                             let val = self.expr(a.expr);
                             let ir = self.bind_param(&p.vars[s].ty, p.vars[s].alias, val);
-                            self.check_in_out_arg(p.vars[s].section, &p.vars[s].name, &ir);
+                            self.check_in_out_arg(&p.vars[s], &ir);
                             inputs.push((s, ir));
                         }
                         None => {
@@ -4250,20 +4309,13 @@ impl<'a> Checker<'a> {
                     let val = self.expr(a.expr);
                     if let Some(&s) = input_slots.get(pos) {
                         let ir = self.bind_param(&p.vars[s].ty, p.vars[s].alias, val);
-                        self.check_in_out_arg(p.vars[s].section, &p.vars[s].name, &ir);
+                        self.check_in_out_arg(&p.vars[s], &ir);
                         inputs.push((s, ir));
                     }
                 }
             }
         }
-        if matches!(p.kind, PouKind::Function | PouKind::FunctionBlock)
-            && self.declare_only.contains(&pname.to_ascii_lowercase())
-        {
-            let msg = format!(
-                "'{pname}' is declared by a compatibility library but not implemented by RootPLC; running it stops with UNSUPPORTED"
-            );
-            self.diag(codes::DECLARE_ONLY_CALL, msg, span, None);
-        }
+        self.note_declare_only(id, span);
         let (target, ty) = if let Some((inst, fb, dispatch)) = recv {
             (
                 CallTarget::Method {
@@ -4402,10 +4454,26 @@ impl<'a> Checker<'a> {
                     vals.first().map(|v| self.strip(&v.ty)),
                     Some(Ty::Str { wide: true, .. })
                 );
+                // [stdlib.string.length]: long enough for any result, so
+                // nothing is cut before the assignment
+                let lens: Vec<u32> = vals
+                    .iter()
+                    .map(|v| match (&v.k, self.strip(&v.ty)) {
+                        (Some(K::Str(n)), _) => u32::try_from(*n).unwrap_or(u32::MAX),
+                        (_, Ty::Str { len, .. }) => len,
+                        _ => DEFAULT_STRING_LEN,
+                    })
+                    .collect();
+                let at = |i: usize| lens.get(i).copied().unwrap_or(0);
+                let len = match up {
+                    "CONCAT" => lens.iter().fold(0u32, |a, &b| a.saturating_add(b)),
+                    "INSERT" | "REPLACE" => at(0).saturating_add(at(1)),
+                    _ => at(0),
+                };
                 (
                     Ty::Str {
                         wide,
-                        len: DEFAULT_STRING_LEN,
+                        len: len.clamp(1, 65_535),
                     },
                     None,
                 )

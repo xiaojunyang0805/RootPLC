@@ -5,7 +5,7 @@
 name = "TwinCAT_BuiltIns"
 vendor = "RootPLC"
 version = "1.0.0"
-description = "TwinCAT built-in names: the BIT type, the __SYSTEM.IQueryInterface base interface, SIZEOF / XSIZEOF, XINT/UXINT/XWORD, PVOID (untyped reference), HRESULT, TwinCAT_SystemInfoVarList (_TaskInfo, _AppInfo), __SYSTEM.TYPE_CLASS"
+description = "TwinCAT built-in names: the BIT type, the __SYSTEM.IQueryInterface base interface, SIZEOF / XSIZEOF, XINT/UXINT/XWORD, PVOID (untyped reference), HRESULT, GUID, TwinCAT_SystemInfoVarList (_TaskInfo, _AppInfo), __SYSTEM.TYPE_CLASS"
 declare_only = []
 # operators this library enables, with TwinCAT's 64-bit memory layout
 intrinsics = ["SIZEOF", "XSIZEOF", "PVOID", "__POUNAME", "TIME", "__NEW", "__DELETE", "ANY", "__QUERYINTERFACE", "__QUERYPOINTER"]
@@ -20,4 +20,5 @@ references = [
   "https://content.helpme-codesys.com/en/LibDevSummary/type_class.html (__SYSTEM.TYPE_CLASS: member names and values)",
   "https://infosys.beckhoff.com/content/1033/tc3_plc_intro/12049349259.html (error codes: hrErrorCode of type HRESULT, negative = error)",
   "https://content.helpme-codesys.com/en/CODESYS%20Development%20System/_cds_datatype_any.html (ANY inputs: __SYSTEM.AnyType with type class, pvalue, diSize)",
+  "https://download.beckhoff.com/download/Document/automation/twincat3/TwinCAT_3_PLC_Lib_Tc2_Utilities_EN.pdf (data type GUID)",
 ]

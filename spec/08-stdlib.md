@@ -43,6 +43,14 @@ type is error RP0103.
 | `LEN(s)`, `FIND(s1, s2)` | strings | `INT` |
 | `LEFT`, `RIGHT`, `MID`, `CONCAT`, `INSERT`, `DELETE`, `REPLACE` | strings, `INT` | `STRING` (or `WSTRING` for `WSTRING` arguments) |
 
+**[stdlib.string.length]** The string these functions return is long
+enough for any result of its arguments, so nothing is cut before it is
+assigned: `CONCAT` returns the sum of the argument lengths, `INSERT` and
+`REPLACE` the sum of the lengths of the two strings, and `LEFT`, `RIGHT`,
+`MID` and `DELETE` the length of their string, at most 65535 (a string
+literal counts with its own length). The target of the assignment keeps
+its declared length.
+
 **[stdlib.functions.bounds]** `LOWER_BOUND(arr, n)` and `UPPER_BOUND(arr, n)`
 return, as DINT, the lower and upper bound of dimension n (a constant, from
 1) of an array. For an array with known bounds they are constants. For an
@@ -85,7 +93,14 @@ and `WORD` counts, the `LTIME` timers `LTON`, `LTOF`, `LTP`, and the
 types; the PLCopen motion blocks `MC_Power`, `MC_MoveAbsolute`, ... are
 declared only, since motion needs the NC) and `Tc3_Module`
 (`S_OK` and the other HRESULT constants, `SUCCEEDED`, `FAILED`; `HRESULT`
-itself, a `DINT`, is in `TwinCAT_BuiltIns`). A library may replace a
+itself, a `DINT`, and `GUID` are in `TwinCAT_BuiltIns`), `Tc3_EventLogger`
+(`TcEventSeverity`, `TcEventEntry` and the message, alarm, listener, logger
+and text-request blocks with their interfaces, declared only since RootPLC
+has no event logger; `FB_TcSourceInfo` is implemented) and `Tc3_JsonXml`
+(`FB_JsonSaxWriter` is implemented for objects, arrays, keys, strings,
+integers, booleans, null, raw JSON and `DATE_AND_TIME`; its floating-point
+and binary methods, the DOM and SAX parsers, the pretty writer, the XML
+parser and the symbol-based blocks are declared only). A library may replace a
 standard function block of [stdlib.fbs]; while it is active its declaration
 is the one used.
 Library functions are implemented in ST where their documented behaviour
@@ -144,4 +159,8 @@ not modelled yet).
 not reproduce faithfully (for example one that writes to the vendor's event
 log) is declared only. A call is warning RP0120; executing it stops with the
 fault `UNSUPPORTED`, so a run never continues with behaviour RootPLC cannot
-guarantee.
+guarantee. For a declared-only function block this holds for a call of the
+block itself, for its methods (also those a derived block inherits and
+does not override) and for reading or writing its properties; a library can
+also mark a single method as declared only. Declaring instances, passing
+them and assigning them to interfaces needs no implementation.

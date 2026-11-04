@@ -1,0 +1,29 @@
+# Compatibility library: the PLC interface of Beckhoff's Tc3_JsonXml.
+# Clean-room: written only from the public references below. RootPLC is an
+# independent project, not affiliated with or endorsed by Beckhoff Automation.
+name = "Tc3_JsonXml"
+vendor = "Beckhoff Automation GmbH"
+version = "1.0.0"
+description = "TwinCAT Tc3_JsonXml: FB_JsonSaxWriter implemented (objects, arrays, keys, strings, integers, booleans, null, raw JSON, DATE_AND_TIME); FB_JsonDomParser, FB_JsonDynDomParser, FB_JsonSaxReader, FB_JsonSaxPrettyWriter, FB_JsonReadWriteDataType, FB_XmlDomParser, FB_JwtEncode and the SAX interfaces declared only"
+requires = ["TwinCAT_BuiltIns"]
+declare_only = [
+  "FB_JsonDomParser",
+  "FB_JsonDynDomParser",
+  "FB_JsonSaxReader",
+  "FB_JsonSaxPrettyWriter",
+  "FB_JsonReadWriteDataType",
+  "FB_XmlDomParser",
+  "FB_JwtEncode",
+  "FB_JsonSaxWriter.AddBase64",
+  "FB_JsonSaxWriter.AddHexBinary",
+  "FB_JsonSaxWriter.AddLreal",
+  "FB_JsonSaxWriter.AddReal",
+  "FB_JsonSaxWriter.AddKeyLreal",
+  "FB_JsonSaxWriter.GetMaxDecimalPlaces",
+  "FB_JsonSaxWriter.SetMaxDecimalPlaces",
+]
+references = [
+  "https://download.beckhoff.com/download/Document/automation/twincat3/TwinCAT_3_PLC_Lib_Tc3_JsonXml_EN.pdf (TE1000 PLC Lib Tc3_JsonXml manual, version 1.15.0: declarations of all blocks, methods, interfaces and data types; the DATE_AND_TIME form in the samples)",
+  "https://infosys.beckhoff.com/content/1033/tcplclib_tc3_jsonxml/index.html (online edition of the same manual)",
+  "https://www.rfc-editor.org/rfc/rfc8259 (JSON text: structure, string escaping)",
+]

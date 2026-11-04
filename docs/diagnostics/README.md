@@ -540,7 +540,11 @@ Rule `stdlib.compat.declare-only` in `spec/08-stdlib.md`:
 not reproduce faithfully (for example one that writes to the vendor's event
 log) is declared only. A call is warning RP0120; executing it stops with the
 fault `UNSUPPORTED`, so a run never continues with behaviour RootPLC cannot
-guarantee.
+guarantee. For a declared-only function block this holds for a call of the
+block itself, for its methods (also those a derived block inherits and
+does not override) and for reading or writing its properties; a library can
+also mark a single method as declared only. Declaring instances, passing
+them and assigning them to interfaces needs no implementation.
 
 ## RP0121
 
@@ -635,7 +639,9 @@ Rule `pous.call.in-out` in `spec/04-pous.md`:
 variable: changes made by the called function or function block are visible
 in that variable after the call. RootPLC copies the value in before the call
 and back after it. The argument must be a variable, an element or a member
-(RP0114); a constant or an expression is an error. While the call runs,
+(RP0114); a constant or an expression is an error. A `STRING` or `WSTRING`
+parameter holds the caller's whole text, whatever the declared lengths; the
+caller's own length applies when the value is written back. While the call runs,
 `REF` or `ADR` of the parameter (or of an element or member of it) is the
 address of the caller's variable, so it stays valid after the call.
 

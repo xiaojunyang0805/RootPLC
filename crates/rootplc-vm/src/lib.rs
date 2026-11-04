@@ -317,6 +317,35 @@ fn conv_elem(v: Value, e: Elem) -> Value {
     }
 }
 
+/// `yyyy-mm-dd` of a day count since 1970-01-01 (proleptic Gregorian).
+fn civil_date(days: i128) -> String {
+    // Howard Hinnant's days_from_civil inverse
+    let z = days + 719_468;
+    let era = z.div_euclid(146_097);
+    let doe = z - era * 146_097;
+    let yoe = (doe - doe / 1_460 + doe / 36_524 - doe / 146_096) / 365;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 };
+    let y = yoe + era * 400 + i128::from(m <= 2);
+    format!("{y:04}-{m:02}-{d:02}")
+}
+
+/// `hh:mm:ss[.f]` of a time of day given in units of 1/`per_s` second.
+fn clock(t: i128, per_s: i128) -> String {
+    let t = t.rem_euclid(86_400 * per_s);
+    let (secs, frac) = (t / per_s, t % per_s);
+    let mut s = format!("{:02}:{:02}:{:02}", secs / 3600, secs / 60 % 60, secs % 60);
+    if frac != 0 {
+        let width = per_s.to_string().len() - 1;
+        let f = format!("{frac:0width$}");
+        s.push('.');
+        s.push_str(f.trim_end_matches('0'));
+    }
+    s
+}
+
 fn to_text(v: &Value) -> String {
     match v {
         Value::Bool(b) => if *b { "TRUE" } else { "FALSE" }.to_string(),
@@ -432,6 +461,13 @@ impl<'p> Vm<'p> {
                     }
                 }
                 DefKind::Alias(t) => self.convert(v, t),
+                // 0 or NULL stored in an interface clears it
+                DefKind::Pou(p)
+                    if p.kind == rootplc_sema::ir::PouKind::Interface
+                        && matches!(v, Value::Int(0) | Value::Ref(None)) =>
+                {
+                    Ok(Value::Obj(None))
+                }
                 _ => Ok(v),
             },
             _ => Ok(v),
@@ -665,6 +701,28 @@ impl<'p> Vm<'p> {
         match (v, self.strip(ty)) {
             (Value::Int(n), Ty::Elem(Elem::Time)) => format!("T#{n}ms"),
             (Value::Int(n), Ty::Elem(Elem::Ltime)) => format!("LT#{n}ns"),
+            // [types.elementary]: DATE / DT in seconds, TOD in ms, L types in ns
+            (Value::Int(n), Ty::Elem(Elem::Date)) => {
+                format!("D#{}", civil_date(n.div_euclid(86_400)))
+            }
+            (Value::Int(n), Ty::Elem(Elem::Ldate)) => {
+                format!("LD#{}", civil_date(n.div_euclid(86_400 * 1_000_000_000)))
+            }
+            (Value::Int(n), Ty::Elem(Elem::Tod)) => format!("TOD#{}", clock(*n, 1_000)),
+            (Value::Int(n), Ty::Elem(Elem::Ltod)) => format!("LTOD#{}", clock(*n, 1_000_000_000)),
+            (Value::Int(n), Ty::Elem(Elem::Dt)) => format!(
+                "DT#{}-{}",
+                civil_date(n.div_euclid(86_400)),
+                clock(n.rem_euclid(86_400), 1)
+            ),
+            (Value::Int(n), Ty::Elem(Elem::Ldt)) => {
+                let day = 86_400 * 1_000_000_000;
+                format!(
+                    "LDT#{}-{}",
+                    civil_date(n.div_euclid(day)),
+                    clock(n.rem_euclid(day), 1_000_000_000)
+                )
+            }
             (Value::Int(n), Ty::Named(i)) => match &self.prog.defs[i].kind {
                 DefKind::Enum(vals) => match vals.iter().find(|(_, x)| x == n) {
                     Some((name, _)) => format!("{}#{name}", self.prog.defs[i].name),
@@ -1143,6 +1201,16 @@ impl<'p> Vm<'p> {
                 let Some(pou) = prog.pou(*id) else {
                     return Ok(Value::Int(0));
                 };
+                if pou.declare_only {
+                    return Err(self.fault(
+                        FaultKind::Unsupported,
+                        e.span,
+                        format!(
+                            "{} is declared by a compatibility library but not implemented by RootPLC",
+                            prog.defs[*id].name
+                        ),
+                    ));
+                }
                 for (slot, ex) in &c.inputs {
                     let v = self.eval(ex, cx)?;
                     let v = open_wrap(&pou.vars[*slot].ty, &self.strip(&ex.ty), v);

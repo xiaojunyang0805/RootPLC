@@ -59,6 +59,20 @@ const BUNDLED: &[(&str, &[(&str, &str)])] = &[
         )],
     ),
     (
+        include_str!("../libs/Tc3_EventLogger/library.toml"),
+        &[(
+            "Tc3_EventLogger.st",
+            include_str!("../libs/Tc3_EventLogger/1.0.0/Tc3_EventLogger.st"),
+        )],
+    ),
+    (
+        include_str!("../libs/Tc3_JsonXml/library.toml"),
+        &[(
+            "Tc3_JsonXml.st",
+            include_str!("../libs/Tc3_JsonXml/1.0.0/Tc3_JsonXml.st"),
+        )],
+    ),
+    (
         include_str!("../libs/Tc3_Module/library.toml"),
         &[(
             "Tc3_Module.st",
@@ -203,11 +217,32 @@ mod tests {
             assert!(!l.references.is_empty(), "{}: no public references", l.name);
             assert!(!l.files.is_empty(), "{}: no files", l.name);
             for d in &l.declare_only {
+                if let Some((fb, m)) = d.split_once('.') {
+                    let src: String = l.files.iter().map(|(_, s)| &s[..]).collect();
+                    let at = src
+                        .lines()
+                        .position(|x| x.trim().starts_with(&format!("FUNCTION_BLOCK {fb}")))
+                        .unwrap_or_else(|| panic!("{}: declare_only {d}: no block", l.name));
+                    assert!(
+                        src.lines()
+                            .skip(at)
+                            .take_while(|x| x.trim() != "END_FUNCTION_BLOCK")
+                            .any(|x| x.trim() == format!("METHOD {m}")
+                                || x.trim().starts_with(&format!("METHOD {m} "))),
+                        "{}: declare_only {d}: no method",
+                        l.name
+                    );
+                    continue;
+                }
                 assert!(
                     l.files
                         .iter()
                         .any(|(_, s)| s.contains(&format!("FUNCTION {d} "))
-                            || s.lines().any(|x| x.trim() == format!("FUNCTION_BLOCK {d}"))),
+                            || s.lines().any(|x| {
+                                let x = x.trim();
+                                x == format!("FUNCTION_BLOCK {d}")
+                                    || x.starts_with(&format!("FUNCTION_BLOCK {d} "))
+                            })),
                     "{}: declare_only {d} is not declared",
                     l.name
                 );
