@@ -1,0 +1,41 @@
+id = "filling-station"
+version = 1
+category = "sequence"
+difficulty = "hard"
+languages = ["ST"]
+split = "public"
+source = "original (RootPLC)"
+licence = "Apache-2.0"
+
+equivalent_mutants = [
+    "'5' -> '6' on state <= 5: state 6 does not exist",
+    "was_paused := TRUE -> FALSE: later paused calls add tmr.ET = 0 again",
+    "'T#1h' -> 'T#2h' (three timer calls): the timer is a stopwatch, never reaches PT in a test",
+    "'T#1h' -> 'T#2h'",
+    "'T#1h' -> 'T#2h'",
+    "stop_edge.Q AND state >= 2 -> OR (paused): in state 1 pausing ignores stop; the pending flag is cleared on the way to 0",
+    "line 46 IN conditions (4 mutants): the stopwatch running in states 0 / 9 is never read",
+    "line 46",
+    "line 46",
+    "line 46",
+    "'<=' -> '<' / '5' -> '6' on state <= 5 for a stop request: a stop in state 5 still ends in 0 in the next state change",
+    "'5' -> '6'",
+    "stored := T#0ms (unchanged mutant)",
+    "line 104 restart conditions (6 mutants): the next call starts the stopwatch with the same time in the tested states",
+    "line 104",
+    "line 104",
+    "line 104",
+    "line 104",
+    "state = 0 OR state = 9 pending-stop clearing (4 mutants): start clears it again before it matters",
+    "line 105",
+    "line 105",
+    "line 106",
+]
+
+[grading]
+iec_clean = true
+
+[scoring]
+compile = 0.1
+visible_tests = 0.2
+hidden_tests = 0.7

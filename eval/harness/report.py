@@ -90,7 +90,35 @@ def main() -> int:
             w, wo = metrics(by[(h, "with")]), metrics(by[(h, "without")])
             out.append(f"| {h} | {100 * (w['compile'] - wo['compile']):+.0f} pts | "
                        f"**{100 * (w['verified'] - wo['verified']):+.0f} pts** | {w['score'] - wo['score']:+.2f} |")
-    out += ["", "## By task", "", "OK = verified-correct, c = compiles only, - = does not compile.", ""]
+    # by difficulty: the hard tasks are where a feedback loop matters
+    out += ["", "## By difficulty", "", "| Host | Mode | easy | medium | hard |", "|---|---|---|---|---|"]
+    for h in hosts:
+        for mode in ("without", "with"):
+            if (h, mode) not in by:
+                continue
+            cells = []
+            for d in ("easy", "medium", "hard"):
+                rs = [r for r in by[(h, mode)] if tasks.get(r["task"]) and tasks[r["task"]].meta.get("difficulty") == d]
+                cells.append(f"{sum(r['verified_correct'] for r in rs)}/{len(rs)}" if rs else "-")
+            out.append(f"| {h} | {mode} | " + " | ".join(cells) + " |")
+    # [grading] iec_clean: tasks that ask for strict IEC 61131-3
+    strict = [r for r in rows if r.get("iec_clean") is not None]
+    if strict:
+        out += ["", "## Strict IEC 61131-3", "",
+                "Tasks that ask for strict IEC 61131-3 count a solution with a CODESYS / TwinCAT form "
+                "(a RootPLC portability warning) as not verified-correct.", "",
+                "| Host | Mode | Runs | IEC clean | Correct behaviour but a vendor form |", "|---|---|---|---|---|"]
+        for h in hosts:
+            for mode in ("without", "with"):
+                rs = [r for r in strict if r["host"] == h and r["mode"] == mode]
+                if not rs:
+                    continue
+                clean = sum(1 for r in rs if r.get("iec_clean"))
+                vendor_only = sum(1 for r in rs if not r.get("iec_clean") and r.get("compiled") and r.get("visible_passed")
+                                  and r.get("hidden_total") and r.get("hidden_passed") == r.get("hidden_total"))
+                out.append(f"| {h} | {mode} | {len(rs)} | {pct(clean / len(rs))} | {vendor_only} |")
+    out += ["", "## By task", "", "OK = verified-correct, v = correct behaviour but not strict IEC, "
+            "c = compiles only, - = does not compile.", ""]
     cols = [(h, m) for h in hosts for m in ("without", "with") if (h, m) in by]
     out.append("| Task | Category | Difficulty | " + " | ".join(f"{h} {m}" for h, m in cols) + " |")
     out.append("|---|---|---|" + "---|" * len(cols))
@@ -99,7 +127,9 @@ def main() -> int:
         for h, m in cols:
             rs = [r for r in by[(h, m)] if r["task"] == tid]
             ok = sum(r["verified_correct"] for r in rs)
-            cells.append(f"{ok}/{len(rs)} OK" if ok else ("c" if any(r["compiled"] for r in rs) else "-"))
+            vendor = any(r.get("iec_clean") is False and r.get("hidden_total") and r.get("hidden_passed") == r.get("hidden_total")
+                         for r in rs)
+            cells.append(f"{ok}/{len(rs)} OK" if ok else ("v" if vendor else ("c" if any(r["compiled"] for r in rs) else "-")))
         t = tasks.get(tid)
         cat, diff = (t.meta.get("category", ""), t.meta.get("difficulty", "")) if t else ("", "")
         out.append(f"| {tid} | {cat} | {diff} | " + " | ".join(cells) + " |")

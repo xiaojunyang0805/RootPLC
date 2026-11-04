@@ -1,0 +1,16 @@
+id = "recipe-parser"
+version = 1
+category = "logic"
+difficulty = "hard"
+languages = ["ST"]
+split = "public"
+source = "original (RootPLC)"
+licence = "Apache-2.0"
+
+[grading]
+iec_clean = true
+
+[scoring]
+compile = 0.1
+visible_tests = 0.2
+hidden_tests = 0.7

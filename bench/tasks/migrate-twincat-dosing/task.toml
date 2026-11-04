@@ -1,0 +1,24 @@
+id = "migrate-twincat-dosing"
+version = 1
+category = "migration"
+difficulty = "hard"
+languages = ["ST"]
+split = "public"
+source = "original (RootPLC)"
+licence = "Apache-2.0"
+
+equivalent_mutants = [
+    "valve_fast := FALSE in Idle: no path reaches Idle with a valve open",
+    "valve_fine := FALSE in Idle: as above",
+    "'<' -> '<=' on scale_g < target_g: at scale_g = target_g the dose ends in the same call and the valves are closed",
+    "valve_fast := FALSE on reaching the target: scale_g >= target_g already made it FALSE",
+    "tmr(IN := FALSE) on reaching the target: the timer is reset again in Fault and restarts from a rising edge",
+]
+
+[grading]
+iec_clean = true
+
+[scoring]
+compile = 0.1
+visible_tests = 0.2
+hidden_tests = 0.7

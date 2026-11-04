@@ -10,6 +10,12 @@
     "difficulty": { "enum": ["easy", "medium", "hard"] },
     "languages": { "type": "array", "items": { "enum": ["ST", "SFC", "LD", "FBD"] } },
     "split": { "enum": ["public", "held-out"] },
+    "grading": {
+      "type": "object",
+      "properties": {
+        "iec_clean": { "type": "boolean", "description": "the solution must check without portability warnings (strict IEC 61131-3)" }
+      }
+    },
     "scoring": {
       "type": "object",
       "properties": {

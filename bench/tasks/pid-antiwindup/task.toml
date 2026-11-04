@@ -1,0 +1,26 @@
+id = "pid-antiwindup"
+version = 1
+category = "process"
+difficulty = "hard"
+languages = ["ST"]
+split = "public"
+source = "original (RootPLC)"
+licence = "Apache-2.0"
+
+equivalent_mutants = [
+    "'>' -> '>=' on ti_s > 0: with ti_s = 0 the integral is set to 0 afterwards anyway",
+    "'>' -> '>=' on cycle_s > 0: with cycle_s = 0 the increment is 0, I_new = I",
+    "'<=' -> '<' on ti_s <= 0: with ti_s = 0, I_new is already 0",
+    "'>' -> '>=' on u > out_max: u equal to the limit in REAL arithmetic is not reachable in a test",
+    "'>' -> '>=' on e > 0: with e = 0, I_new = I",
+    "'<' -> '<=' on u < out_min: as for out_max",
+    "'<' -> '<=' on e < 0: with e = 0, I_new = I",
+]
+
+[grading]
+iec_clean = true
+
+[scoring]
+compile = 0.1
+visible_tests = 0.2
+hidden_tests = 0.7
