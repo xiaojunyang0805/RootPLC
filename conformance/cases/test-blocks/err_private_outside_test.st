@@ -1,4 +1,4 @@
-(* spec: [tests.whitebox] [variables.resolution]
+(* spec: [tests.whitebox] [pous.call.local-read]
    expect: error RP0203 *)
 FUNCTION_BLOCK FB_Count
 VAR
@@ -11,5 +11,5 @@ VAR
     c : FB_Count;
     n : INT;
 END_VAR
-n := c.hidden;
+c.hidden := n;   (* outside a TEST block internal variables are read-only *)
 END_PROGRAM

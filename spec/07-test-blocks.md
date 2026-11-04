@@ -20,8 +20,9 @@ An argument of the wrong type is error RP0103 ([types.conversion.implicit]).
 
 **[tests.whitebox]** Inside a TEST block, every variable of an instance can
 be read and written through `instance.name`, not only its inputs and
-outputs. Tests can therefore check internal state. Outside TEST blocks the
-rule of [variables.resolution] applies.
+outputs. Tests can therefore check internal state. Outside TEST blocks
+internal variables can only be read, with warning RP0130
+([pous.call.local-read]).
 
 **[tests.runner]** `rootplc test` runs every TEST block once, on a fresh
 machine: variables start with their initial values, the virtual clock starts

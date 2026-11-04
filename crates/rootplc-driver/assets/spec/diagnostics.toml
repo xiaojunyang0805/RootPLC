@@ -365,3 +365,10 @@ severity = "warning"
 summary = "enumeration value used as an integer, or an integer stored in an enumeration (not portable)"
 spec = "types.derived.enum.integer"
 stage = "sema"
+
+[[code]]
+id = "RP0130"
+severity = "warning"
+summary = "internal variable of a function block or program read from outside (not portable)"
+spec = "pous.call.local-read"
+stage = "sema"

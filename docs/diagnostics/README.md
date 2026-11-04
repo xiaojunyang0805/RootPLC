@@ -58,6 +58,7 @@ Codes RP00xx are lexical, RP01xx types, RP02xx names and structure, RP03xx synta
 | [RP0127](#rp0127) | warning | integer literal 0 or 1 used as BOOL, or 0 as a reference (not portable) |
 | [RP0128](#rp0128) | warning | duration field after the first out of its range, T#1h90m (not portable) |
 | [RP0129](#rp0129) | warning | enumeration value used as an integer, or an integer stored in an enumeration (not portable) |
+| [RP0130](#rp0130) | warning | internal variable of a function block or program read from outside (not portable) |
 
 ## RP0001
 
@@ -794,3 +795,17 @@ enumeration) may also be assigned to an enumeration variable and arithmetic
 on enumeration values gives a result of the base type; with the attribute
 these stay RP0103, except that a constant equal to one of the type's values
 may be assigned. The value is not checked against the enumeration's values.
+
+## RP0130
+
+warning: internal variable of a function block or program read from outside (not portable)
+
+Rule `pous.call.local-read` in `spec/04-pous.md`:
+
+**[pous.call.local-read]** From outside a function block instance or a
+program, IEC 61131-3 gives access to its inputs and outputs only. TwinCAT and
+CODESYS also let code read its internal variables (`fbPlant.fbMfr.nCount`,
+`fbPlant.fbMfr.Receive(x)`); RootPLC accepts such a read with warning RP0130.
+Writing an internal variable from outside, also a member or element of it, is
+error RP0203, as in TwinCAT. TEST blocks read and write every variable
+([tests.whitebox]).

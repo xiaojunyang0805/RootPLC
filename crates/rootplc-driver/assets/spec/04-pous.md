@@ -182,6 +182,14 @@ caller's own length applies when the value is written back. While the call runs,
 `REF` or `ADR` of the parameter (or of an element or member of it) is the
 address of the caller's variable, so it stays valid after the call.
 
+**[pous.call.local-read]** From outside a function block instance or a
+program, IEC 61131-3 gives access to its inputs and outputs only. TwinCAT and
+CODESYS also let code read its internal variables (`fbPlant.fbMfr.nCount`,
+`fbPlant.fbMfr.Receive(x)`); RootPLC accepts such a read with warning RP0130.
+Writing an internal variable from outside, also a member or element of it, is
+error RP0203, as in TwinCAT. TEST blocks read and write every variable
+([tests.whitebox]).
+
 **[pous.call.in-out-constant]** Parameters declared in a `VAR_IN_OUT CONSTANT`
 section (CODESYS / TwinCAT) are passed like `VAR_IN_OUT` parameters, but the
 argument may also be a constant or an expression of any length: RP0114 does

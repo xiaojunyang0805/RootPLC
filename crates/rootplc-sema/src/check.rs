@@ -245,6 +245,9 @@ pub(crate) struct Checker<'a> {
     enum_base: HashMap<usize, Elem>,
     /// Enumerations declared with {attribute 'strict'}.
     strict_enums: HashSet<usize>,
+    /// Span of the place an assignment writes, while it is checked
+    /// ([pous.call.local-read]: internal variables are read-only from outside).
+    write_target: Option<Span>,
     /// Property accessor definition -> (its PROPERTY node, is the getter).
     prop_info: HashMap<usize, (&'a Node, bool)>,
     /// Structure types declared as UNION ([types.derived.union]).
@@ -322,6 +325,7 @@ impl<'a> Checker<'a> {
             intrinsics: HashSet::new(),
             enum_base: HashMap::new(),
             strict_enums: HashSet::new(),
+            write_target: None,
             prop_info: HashMap::new(),
             unions: HashSet::new(),
             diags: Vec::new(),
@@ -2696,7 +2700,9 @@ impl<'a> Checker<'a> {
                         return Some(st);
                     }
                 }
+                let saved = self.write_target.replace(self.span(t));
                 let target = self.expr(t);
+                self.write_target = saved;
                 let value = self.expr(e);
                 let value = if self.tkind(op) == T::Assign {
                     self.adapt(&target.ty, value)
@@ -3922,8 +3928,14 @@ impl<'a> Checker<'a> {
             }
             return v;
         }
+        let writing = self.write_target == Some(span);
+        let saved = self.write_target;
+        if writing {
+            self.write_target = Some(self.span(b));
+        }
         let base = self.expr(b);
-        self.member_on(base, m, span)
+        self.write_target = saved;
+        self.member_on_rw(base, m, span, writing)
     }
 
     /// `b` names an enumeration type (`E`, `NS.E`) rather than a variable.
@@ -3958,6 +3970,10 @@ impl<'a> Checker<'a> {
     }
 
     fn member_on(&mut self, base: V, m: usize, span: Span) -> V {
+        self.member_on_rw(base, m, span, false)
+    }
+
+    fn member_on_rw(&mut self, base: V, m: usize, span: Span, writing: bool) -> V {
         let bt = self.strip(&base.ty);
         if self.tkind(m) == T::Integer {
             // bit access x.3
@@ -4013,6 +4029,27 @@ impl<'a> Checker<'a> {
                 return V::with(ty, span, call.kind);
             }
         }
+        // [pous.call.local-read]: TwinCAT / CODESYS read internal variables
+        // of an instance from outside; writing them stays an error
+        let local = match (&found, &self.defs[id].kind) {
+            (Some(None), Kind::Pou(p)) if !writing => p
+                .vars
+                .iter()
+                .position(|v| v.name.eq_ignore_ascii_case(name))
+                .filter(|&i| p.vars[i].section == Section::Local)
+                .map(|i| (i, p.vars[i].ty.clone())),
+            _ => None,
+        };
+        let found = match local {
+            Some(hit) => {
+                let msg = format!(
+                    "internal variable '{name}' of '{tname}' read from outside; IEC 61131-3 allows only inputs and outputs"
+                );
+                self.diag(codes::BLOCK_LOCAL_READ, msg, self.tok_span(m), None);
+                Some(Some(hit))
+            }
+            None => found,
+        };
         match found {
             Some(Some((i, t))) => V::with(t, span, ExprKind::Member(Box::new(base.ir()), i)),
             Some(None) => {
@@ -4021,13 +4058,18 @@ impl<'a> Checker<'a> {
                 } else {
                     "input or output"
                 };
+                let internal = writing
+                    && matches!(&self.defs[id].kind, Kind::Pou(p)
+                        if p.vars.iter().any(|v| v.name.eq_ignore_ascii_case(name)));
+                let msg = if internal {
+                    format!(
+                        "internal variable '{name}' of '{tname}' cannot be written from outside"
+                    )
+                } else {
+                    format!("'{tname}' has no {what} '{name}'")
+                };
                 let sp = self.tok_span(m);
-                self.diag(
-                    codes::UNKNOWN_NAME,
-                    format!("'{tname}' has no {what} '{name}'"),
-                    sp,
-                    None,
-                );
+                self.diag(codes::UNKNOWN_NAME, msg, sp, None);
                 V::unknown(span)
             }
             None => V::unknown(span),
@@ -4038,7 +4080,10 @@ impl<'a> Checker<'a> {
         let Some(Item::Node(b)) = its.first().copied() else {
             return V::unknown(span);
         };
+        let saved = self.write_target;
+        self.write_target = (saved == Some(span)).then(|| self.span(b));
         let base = self.expr(b);
+        self.write_target = None;
         let mut idx = Vec::new();
         for it in &its[1..] {
             if let Item::Node(e) = *it {
@@ -4065,6 +4110,7 @@ impl<'a> Checker<'a> {
                 idx.push(v);
             }
         }
+        self.write_target = saved;
         match self.strip(&base.ty) {
             Ty::Array { dims, elem } => {
                 for (k, v) in idx.iter().enumerate() {
