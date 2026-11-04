@@ -218,6 +218,7 @@ pub mod codes {
         DURATION_FIELD_OVERFLOW = 128, Warning;
         ENUM_AS_INTEGER = 129, Warning;
         BLOCK_LOCAL_READ = 130, Warning;
+        POU_CLOSED_BY_EOF = 131, Warning;
     }
 
     /// Severity of a code, if the code exists.

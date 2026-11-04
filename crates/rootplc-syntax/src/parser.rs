@@ -8,7 +8,7 @@
 use crate::lexer::lex;
 use crate::token::{Token, TokenKind, is_soft_keyword};
 use crate::tree::{Builder, Node, NodeKind as N};
-use rootplc_diag::{Code, Diagnostic, Span, codes};
+use rootplc_diag::{Code, Diagnostic, Severity, Span, codes};
 
 /// Output of [`parse`].
 #[derive(Debug, Clone)]
@@ -585,6 +585,7 @@ impl<'a> Parser<'a> {
     fn pou(&mut self, kind: N, open: &str, close: &str, has_type: bool) {
         self.b.start(kind);
         let open_span = self.span_here();
+        let mark = self.diags.len();
         self.bump();
         let oop = matches!(kind, N::FunctionBlock | N::Program);
         // [pous.oop.modifiers]: FUNCTION INTERNAL F (TwinCAT library access)
@@ -626,7 +627,18 @@ impl<'a> Parser<'a> {
             self.members(close);
         }
         if !self.eat_kw(close) {
-            if self.at_eof() {
+            // [pous.end]: a CODESYS object export ends the POU with the file
+            let clean = self.diags[mark..]
+                .iter()
+                .all(|d| d.severity != Severity::Error);
+            let exported = matches!(kind, N::Program | N::FunctionBlock | N::Function);
+            if self.at_eof() && clean && exported {
+                self.error(
+                    codes::POU_CLOSED_BY_EOF,
+                    format!("{open} is closed by the end of the file (CODESYS export); IEC 61131-3 writes {close}"),
+                    open_span,
+                );
+            } else if self.at_eof() {
                 self.error(
                     codes::MISSING_END,
                     format!("{open} is never closed: missing {close}"),
@@ -1829,11 +1841,24 @@ mod tests {
 
     #[test]
     fn missing_end_reported_at_open() {
-        let src = "PROGRAM p VAR x : INT; END_VAR x := 1;";
+        let src = "TYPE T : STRUCT a : INT; END_STRUCT";
         let p = parse(src);
         assert_eq!(p.diagnostics.len(), 1);
         assert_eq!(p.diagnostics[0].code.0, 202);
         assert_eq!(p.diagnostics[0].span.start, 0);
+    }
+
+    #[test]
+    fn pou_closed_by_end_of_file() {
+        // [pous.end]: a CODESYS object export without END_PROGRAM
+        let p = parse("PROGRAM p VAR x : INT; END_VAR x := 1;");
+        assert_eq!(p.diagnostics.len(), 1);
+        assert_eq!(p.diagnostics[0].code.0, 131);
+        // with a syntax error inside it stays "never closed"
+        assert_eq!(
+            codes_of("PROGRAM p VAR x : INT; END_VAR x := ;"),
+            [201, 202]
+        );
     }
 
     #[test]

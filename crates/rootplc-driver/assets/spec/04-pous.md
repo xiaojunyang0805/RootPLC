@@ -207,6 +207,12 @@ declares such a function).
 
 **[pous.end]** A POU or block whose closing keyword is missing before the end
 of the file is error RP0202. The error is reported at the opening keyword.
+CODESYS stores each POU as an object with a declaration part and a body, and
+its text exports (one POU per file) leave out `END_PROGRAM`,
+`END_FUNCTION_BLOCK` and `END_FUNCTION`. A `PROGRAM`, `FUNCTION_BLOCK` or
+`FUNCTION` that reaches the end of its file without its closing keyword, with
+no syntax error inside it, is therefore closed there with warning RP0131
+instead.
 
 ## 3. Types
 

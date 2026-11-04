@@ -59,6 +59,7 @@ Codes RP00xx are lexical, RP01xx types, RP02xx names and structure, RP03xx synta
 | [RP0128](#rp0128) | warning | duration field after the first out of its range, T#1h90m (not portable) |
 | [RP0129](#rp0129) | warning | enumeration value used as an integer, or an integer stored in an enumeration (not portable) |
 | [RP0130](#rp0130) | warning | internal variable of a function block or program read from outside (not portable) |
+| [RP0131](#rp0131) | warning | POU closed by the end of the file instead of its END keyword (CODESYS object export; not portable) |
 
 ## RP0001
 
@@ -308,6 +309,12 @@ Rule `pous.end` in `spec/04-pous.md`:
 
 **[pous.end]** A POU or block whose closing keyword is missing before the end
 of the file is error RP0202. The error is reported at the opening keyword.
+CODESYS stores each POU as an object with a declaration part and a body, and
+its text exports (one POU per file) leave out `END_PROGRAM`,
+`END_FUNCTION_BLOCK` and `END_FUNCTION`. A `PROGRAM`, `FUNCTION_BLOCK` or
+`FUNCTION` that reaches the end of its file without its closing keyword, with
+no syntax error inside it, is therefore closed there with warning RP0131
+instead.
 
 ## RP0301
 
@@ -809,3 +816,18 @@ CODESYS also let code read its internal variables (`fbPlant.fbMfr.nCount`,
 Writing an internal variable from outside, also a member or element of it, is
 error RP0203, as in TwinCAT. TEST blocks read and write every variable
 ([tests.whitebox]).
+
+## RP0131
+
+warning: POU closed by the end of the file instead of its END keyword (CODESYS object export; not portable)
+
+Rule `pous.end` in `spec/04-pous.md`:
+
+**[pous.end]** A POU or block whose closing keyword is missing before the end
+of the file is error RP0202. The error is reported at the opening keyword.
+CODESYS stores each POU as an object with a declaration part and a body, and
+its text exports (one POU per file) leave out `END_PROGRAM`,
+`END_FUNCTION_BLOCK` and `END_FUNCTION`. A `PROGRAM`, `FUNCTION_BLOCK` or
+`FUNCTION` that reaches the end of its file without its closing keyword, with
+no syntax error inside it, is therefore closed there with warning RP0131
+instead.

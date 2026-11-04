@@ -1,7 +1,7 @@
 (* spec: [pous.end]
    expect: error RP0202 *)
-PROGRAM PRG_Main
-VAR
+TYPE ST_Point :
+STRUCT
     x : INT;
-END_VAR
-x := 1;
+    y : INT;
+END_STRUCT

@@ -223,6 +223,21 @@ def brx_units(repo: Path) -> list[tuple[str, str]]:
     return out
 
 
+def plain_gvl(stem: str, text: str) -> str:
+    """A plain-ST file that holds only a global variable list (a CODESYS GVL
+    object exported on its own): code reads its variables as GVL_Name.x, and
+    the name is the file's, so it becomes a namespace around the list, as for
+    TwinCAT lists (see twincat_units)."""
+    bare = re.sub(r"\(\*.*?\*\)|//[^\n]*|\{[^}]*\}", " ", text, flags=re.S)
+    if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", stem) or "NAMESPACE" in text.upper():
+        return text
+    if not re.match(r"\s*VAR_GLOBAL\b", bare, re.I):
+        return text
+    if re.search(r"\b(PROGRAM|FUNCTION_BLOCK|FUNCTION|TYPE|CONFIGURATION|RESOURCE|INTERFACE|CLASS)\b", bare, re.I):
+        return text
+    return f"NAMESPACE {stem}\n{text.rstrip()}\nEND_NAMESPACE\n"
+
+
 def plcproj_libraries(project_dir: Path) -> list[str]:
     """Library names a TwinCAT project references (PlaceholderReference /
     LibraryReference in its .plcproj)."""
@@ -283,7 +298,7 @@ def extract(p: dict, repo: Path | None = None) -> Path:
         repeated = sum(1 for d in seen_in.values() if len(d) > 1)
         by_dir = repeated > 0 and repeated >= 0.05 * len(seen_in)
         for f, t in zip(st_files, texts):
-            units.append((f.stem, t))
+            units.append((f.stem, plain_gvl(f.stem, t)))
             groups.append(str(f.parent.relative_to(long_path(repo))) if by_dir else "")
     distinct = sorted(set(groups))
     split = len(distinct) > 1

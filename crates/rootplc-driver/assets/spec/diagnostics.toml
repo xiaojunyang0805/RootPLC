@@ -372,3 +372,10 @@ severity = "warning"
 summary = "internal variable of a function block or program read from outside (not portable)"
 spec = "pous.call.local-read"
 stage = "sema"
+
+[[code]]
+id = "RP0131"
+severity = "warning"
+summary = "POU closed by the end of the file instead of its END keyword (CODESYS object export; not portable)"
+spec = "pous.end"
+stage = "parse"
