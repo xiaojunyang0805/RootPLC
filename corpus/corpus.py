@@ -390,7 +390,7 @@ def analyse() -> None:
     shipped = shipped_libraries(exe)
     provided = corpus_libraries()
     results = []
-    all_codes, all_features = Counter(), Counter()
+    all_codes, all_features, all_vendor, all_forms = Counter(), Counter(), Counter(), Counter()
     for p in projects():
         if p["format"] in ("binary", "none"):
             continue
@@ -431,6 +431,8 @@ def analyse() -> None:
             siblings.setdefault(label, x)
             siblings.setdefault(label.rsplit("_", 1)[-1], x)
         per_file: dict[str, list] = {}
+        vendor_file: dict[str, set[str]] = {}
+        vendor_form: dict[str, set[str]] = {}
         for t, folder in targets:
             libs = libraries_for(folder, p["format"], shipped)
             extra = ["--library", ",".join(libs)] if libs else []
@@ -461,10 +463,14 @@ def analyse() -> None:
             mine = {str(Path(x).resolve()) for x in t if Path(x).is_file()}
             roots = [str(Path(x).resolve()) + os.sep for x in t if Path(x).is_dir()]
             for diag in rep.get("diagnostics", []):
+                key = str(Path(diag["file"]).resolve())
+                if not (key in mine or any(key.startswith(r) for r in roots)):
+                    continue
                 if diag["severity"] == "error":
-                    key = str(Path(diag["file"]).resolve())
-                    if key in mine or any(key.startswith(r) for r in roots):
-                        per_file.setdefault(key, []).append(diag)
+                    per_file.setdefault(key, []).append(diag)
+                elif diag["code"] in PORTABILITY_CODES:
+                    vendor_file.setdefault(key, set()).add(diag["code"])
+                    vendor_form.setdefault(key, set()).add(vendor_form_of(diag))
         key_of = {f: str(f.resolve()) for f in files}
         # diagnostics in provided libraries checked alongside are not this project's
         own = set(key_of.values())
@@ -472,6 +478,10 @@ def analyse() -> None:
         syntax_ok = sum(1 for f in files if not any(x["code"] in SYNTAX_CODES or x["code"] == "RP0004"
                                                     for x in per_file.get(key_of[f], [])))
         clean = sum(1 for f in files if key_of[f] not in per_file)
+        # IEC clean: no error and no portability warning ([scope.vendor-forms])
+        iec = sum(1 for f in files if key_of[f] not in per_file and key_of[f] not in vendor_file)
+        vendor = Counter(c for k2, cs in vendor_file.items() if k2 in own for c in cs)
+        forms = Counter(f for k2, fs in vendor_form.items() if k2 in own for f in fs)
         codes = Counter(x["code"] for xs in per_file.values() for x in xs)
         msgs = Counter(re.sub(r"'[^']*'", "'…'", x["message"]) for xs in per_file.values() for x in xs)
         # exact messages with one example place (cache only, never published)
@@ -490,19 +500,22 @@ def analyse() -> None:
         if not p.get("dialect") and not holdout and p.get("category") in CORE:
             all_codes.update(codes)
             all_features.update(feats)
+            all_vendor.update(vendor)
+            all_forms.update(forms)
         results.append({"name": p["name"], "url": p["url"], "licence": p["licence"], "redistribute": p["redistribute"],
                         "kind": p.get("kind", ""), "category": p.get("category", ""), "holdout": holdout,
-                        "units": len(files), "lines": lines, "syntax_ok": syntax_ok, "clean": clean,
+                        "units": len(files), "lines": lines, "syntax_ok": syntax_ok, "clean": clean, "iec": iec,
+                        "vendor": [] if holdout else vendor.most_common(),
                         "codes": [] if holdout else codes.most_common(8),
                         "messages": [] if holdout else msgs.most_common(6),
                         "features": {} if holdout else dict(feats),
                         "names": [] if holdout else names.most_common(60),
                         "dialect": p.get("dialect", ""),
                         "raw": [] if holdout else [(m, c, where[m]) for m, c in raw.most_common(300)]})
-        print(f"{p['name']:30} units {len(files):5}  syntax ok {syntax_ok:5}  clean {clean:5}")
+        print(f"{p['name']:30} units {len(files):5}  syntax ok {syntax_ok:5}  clean {clean:5}  iec {iec:5}")
     (CACHE / "analysis.json").write_text(json.dumps(results, indent=1), encoding="utf-8")
     record_history(results)
-    write_report(results, all_codes, all_features)
+    write_report(results, all_codes, all_features, all_vendor, all_forms)
 
 
 def pct(a, b):
@@ -511,6 +524,21 @@ def pct(a, b):
 
 def pct1(a, b):
     return f"{100 * a / b:.1f}%" if b else "n/a"
+
+
+# [scope.vendor-forms]: warnings that mark a construct IEC 61131-3 does not
+# define (CODESYS / TwinCAT forms, vendor library calls). Not in the list:
+# RP0003 (comment opener in a comment), RP0013 (unknown pragma: pragmas are
+# implementation-defined in IEC) and RP0110 (string literal truncated).
+PORTABILITY_CODES = {"RP0006", "RP0017", "RP0112", "RP0113"} | {f"RP{n:04d}" for n in range(115, 136)}
+
+
+def vendor_form_of(diag) -> str:
+    """A portability warning reduced to its form: names and block keywords
+    replaced, the IEC advice after ';' dropped."""
+    m = re.sub(r"'[^']*'", "'…'", diag["message"]).split(";")[0]
+    m = re.sub(r"this (IF|CASE|FOR|WHILE|REPEAT) statement", "a block statement (END_IF, ...)", m)
+    return f"{diag['code']} {m}"
 
 
 def metrics(results) -> dict:
@@ -525,7 +553,14 @@ def metrics(results) -> dict:
 
     rates = sorted(r["clean"] / r["units"] for r in core if r["units"])
     median = rates[len(rates) // 2] if rates else 0.0
+
+    def iec(rs):
+        return sum(r.get("iec", 0) for r in rs)
+
     return {"core": tot(core), "core_projects": len(core), "median_clean": median,
+            "iec": {"core": iec(core), "holdout": iec([r for r in core if r.get("holdout")]),
+                    "all": iec(every),
+                    **{c: iec([r for r in every if r.get("category") == c]) for c in CORE + ("tool-input",)}},
             "holdout": tot([r for r in core if r.get("holdout")]),
             "holdout_projects": sum(1 for r in core if r.get("holdout")),
             "all": tot(every), "all_projects": len(every),
@@ -533,7 +568,7 @@ def metrics(results) -> dict:
                             for c in CORE + ("tool-input",)}}
 
 
-def write_report(results, all_codes, all_features) -> None:
+def write_report(results, all_codes, all_features, all_vendor=None, all_forms=None) -> None:
     other = [r for r in results if r.get("dialect")]
     results = [r for r in results if not r.get("dialect")]
     U = sum(r["units"] for r in results)
@@ -551,23 +586,27 @@ def write_report(results, all_codes, all_features) -> None:
         "A unit is *syntax OK* when rootplc lexes and parses it; *clean* when it also passes the type",
         "checker with no errors. Units are checked per project, so references to other libraries that",
         "are not in the corpus count as errors. *Clean* is rootplc's own verdict: no vendor compiler has",
-        "confirmed that the code is valid, so it measures acceptance, not correctness.",
+        "confirmed that the code is valid, so it measures acceptance, not correctness. *IEC clean* is",
+        "clean with no portability warning either ([scope.vendor-forms]): the unit uses no CODESYS or",
+        "TwinCAT form RootPLC knows of, so it is IEC 61131-3 Structured Text as far as RootPLC can tell.",
         "",
         f"**Headline (applications, libraries and samples; {m['core_projects']} projects, {cu} units): "
-        f"syntax OK {pct1(cs, cu)} · clean {pct1(cc, cu)} · median project clean {100 * m['median_clean']:.1f}%.**",
+        f"syntax OK {pct1(cs, cu)} · clean {pct1(cc, cu)} · median project clean {100 * m['median_clean']:.1f}% · "
+        f"IEC clean {pct1(m['iec']['core'], cu)}.**",
         "",
-        "| Figure | Projects | Units | Syntax OK | Clean |",
-        "|---|---|---|---|---|",
-        f"| Headline (core set) | {m['core_projects']} | {cu} | {pct1(cs, cu)} | {pct1(cc, cu)} |",
+        "| Figure | Projects | Units | Syntax OK | Clean | IEC clean |",
+        "|---|---|---|---|---|---|",
+        f"| Headline (core set) | {m['core_projects']} | {cu} | {pct1(cs, cu)} | {pct1(cc, cu)} | {pct1(m['iec']['core'], cu)} |",
         f"| Holdout part of the core set (never used to choose fixes) | {m['holdout_projects']} | {hu} | "
-        f"{pct1(hs, hu)} | {pct1(hc, hu)} |",
-        f"| Everything analysed, tool inputs included | {m['all_projects']} | {au} | {pct1(as_, au)} | {pct1(ac, au)} |",
+        f"{pct1(hs, hu)} | {pct1(hc, hu)} | {pct1(m['iec']['holdout'], hu)} |",
+        f"| Everything analysed, tool inputs included | {m['all_projects']} | {au} | {pct1(as_, au)} | {pct1(ac, au)} | "
+        f"{pct1(m['iec']['all'], au)} |",
         "",
-        "| Category | Units | Syntax OK | Clean |",
-        "|---|---|---|---|",
+        "| Category | Units | Syntax OK | Clean | IEC clean |",
+        "|---|---|---|---|---|",
     ]
     for cat, (u, s, c) in m["by_category"].items():
-        out.append(f"| {cat} | {u} | {pct1(s, u)} | {pct1(c, u)} |")
+        out.append(f"| {cat} | {u} | {pct1(s, u)} | {pct1(c, u)} | {pct1(m['iec'][cat], u)} |")
     out += [
         "",
         "Categories (manifest `category`): *application* (a program for a machine or plant), *library*,",
@@ -576,13 +615,13 @@ def write_report(results, all_codes, all_features) -> None:
         "errors are never ranked or stored, so its figure shows whether fixes generalise. Projects removed",
         "as empty, duplicated, not Structured Text or too small are listed at the end of the manifest.",
         "",
-        "| Project | Category | Licence | Units | Lines | Syntax OK | Clean |",
-        "|---|---|---|---|---|---|---|",
+        "| Project | Category | Licence | Units | Lines | Syntax OK | Clean | IEC clean |",
+        "|---|---|---|---|---|---|---|---|",
     ]
     for r in sorted(results, key=lambda r: -r["units"]):
         cat = r.get("category", "") + (" (holdout)" if r.get("holdout") else "")
         out.append(f"| [{r['name']}]({r['url']}) | {cat} | {r['licence']} | {r['units']} | {r['lines']:,} | "
-                   f"{pct(r['syntax_ok'], r['units'])} | {pct(r['clean'], r['units'])} |")
+                   f"{pct(r['syntax_ok'], r['units'])} | {pct(r['clean'], r['units'])} | {pct(r.get('iec', 0), r['units'])} |")
     out += ["", "## What blocks the rest", "", "In the core set without the holdout projects.", "",
             "Units using each construct RootPLC does not support yet:", "",
             "| Construct | Units |", "|---|---|"]
@@ -591,6 +630,15 @@ def write_report(results, all_codes, all_features) -> None:
     out += ["", "Most frequent error codes:", "", "| Code | Count |", "|---|---|"]
     for k, v in all_codes.most_common(12):
         out.append(f"| {k} | {v} |")
+    if all_vendor:
+        out += ["", "Portability warnings: units with each vendor form (why clean units are not IEC clean):", "",
+                "| Code | Units |", "|---|---|"]
+        for k, v in all_vendor.most_common(15):
+            out.append(f"| {k} | {v} |")
+    if all_forms:
+        out += ["", "The same by form (a unit counts once per form):", "", "| Form | Units |", "|---|---|"]
+        for k, v in all_forms.most_common(20):
+            out.append(f"| {k.replace('|', '/')} | {v} |")
     if other:
         out += ["", "## Other dialects (analysed, not in the totals)", "",
                 "| Project | Dialect | Units | Syntax OK | Clean |", "|---|---|---|---|---|"]
