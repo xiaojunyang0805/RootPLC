@@ -3198,3 +3198,34 @@ Writes take effect at the next cycle start. Any other function code, or an
 address beyond the image, is answered with the Modbus exception "illegal
 function" (1) or "illegal data address" (2). Outputs are written only by the
 program, never over Modbus.
+
+**[runtime.deploy]** A running program changes only with a person's
+approval. With `--deploy DIR` the runtime accepts new programs through that
+directory:
+
+1. `rootplc deploy <files> --to DIR [--program NAME]` checks the project and
+   runs its TEST blocks, and writes a deploy request only when it compiles
+   and every test passes: the sources and a manifest with each file's
+   SHA-256, a SHA-256 over all of them, the program name and the test
+   result. The request's code is the first eight hex digits of that hash.
+   The command never changes the running program.
+2. A person approves the request at the runtime: `rootplc approve DIR`
+   shows each pending request (code, program, files, test result) and asks
+   for the code, typed at a terminal. It refuses when standard input is not
+   a terminal, so an agent cannot approve its own deployment.
+3. Within a second, at a cycle boundary, the runtime checks every file
+   against the manifest, compiles the program, binds its addresses
+   ([runtime.image]), carries over the value of each RETAIN variable that
+   has the same name and type in both programs, and runs the new program
+   from the next cycle; all other variables start from their initial values
+   (a warm start). A request that does not match its hashes, compile or
+   bind is rejected and the running program continues. Outputs keep their
+   values until the new program writes them.
+4. Every request, approval, swap and rejection is appended to
+   `DIR/audit.log` with the time, the code and, for an approval, the user
+   name of the account that approved it.
+
+The replaced program is kept; `rootplc approve DIR --rollback` turns it into
+a new request, approved in the same way. Version 0 relies on the SHA-256 and
+the local approval; signed artifacts and authenticated remote approval
+follow in runtime v1.
