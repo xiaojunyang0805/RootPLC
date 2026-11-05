@@ -20,11 +20,12 @@ block as `VAR_IN_OUT Axis`. The program sets its configuration before use:
 state, written only by RootMotion blocks: `State`, `Homed`, `Position`,
 `Velocity`, `ErrorID` and internal fields for the active command.
 
-**[motion.cycle]** The program calls `RP_VirtualAxis(Axis := axis)` once per
-cycle, after the motion blocks of that axis. It moves the setpoint by one
-`CycleTime`. On a virtual axis the actual position equals the setpoint. A
-block sees the effect of the axis cycle at its next call, so a goal reached in
-cycle *n* shows as `Done` in cycle *n + 1*.
+**[motion.cycle]** The program calls the function
+`RP_VirtualAxis(Axis := axis)` once per cycle, after the motion blocks of that
+axis. It moves the setpoint by one `CycleTime` and returns TRUE while the axis
+moves. On a virtual axis the actual position equals the setpoint. A block sees
+the effect of the axis cycle at its next call, so a goal reached in cycle *n*
+shows as `Done` in cycle *n + 1*.
 
 **[motion.state]** `Axis.State` is one of `MC_AXIS_STATE#Disabled`,
 `Standstill`, `Homing`, `DiscreteMotion`, `ContinuousMotion`, `Stopping` and
