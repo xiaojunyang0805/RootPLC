@@ -3168,3 +3168,297 @@ ELSE
 END_IF;
 Out := Cond OR Active;
 END_FUNCTION_BLOCK
+
+(* F09.SIGNAL: diagnosis of an analog signal: frozen (it has not moved by
+   more than StuckBand for StuckTime: a blocked impulse line, a transmitter
+   hanging on its last value) and changing too fast (more than MaxRate
+   units per second: a loose wire, a burst). *)
+FUNCTION_BLOCK RB_SignalMonitor
+VAR_INPUT
+    Value     : REAL;
+    Enable    : BOOL := TRUE;
+    StuckBand : REAL := 0.1;
+    StuckTime : TIME := T#60s;
+    MaxRate   : REAL;                 (* units/s; 0: no rate check *)
+END_VAR
+VAR_OUTPUT
+    Stuck    : BOOL;
+    RateHigh : BOOL;
+    Rate     : REAL;                  (* units/s since the previous call *)
+END_VAR
+VAR
+    cyc     : RB_CycleTime;
+    anchor     : REAL;
+    last    : REAL;
+    t       : TIME;
+    running : BOOL;
+END_VAR
+cyc();
+IF NOT Enable THEN
+    running := FALSE;
+    Stuck := FALSE;
+    RateHigh := FALSE;
+    Rate := 0.0;
+ELSIF NOT running THEN
+    running := TRUE;
+    anchor := Value;
+    last := Value;
+    t := T#0s;
+    Stuck := FALSE;
+    RateHigh := FALSE;
+    Rate := 0.0;
+ELSE
+    IF ABS(Value - anchor) > StuckBand THEN
+        anchor := Value;
+        t := T#0s;
+    ELSE
+        t := t + cyc.Elapsed;
+    END_IF;
+    Stuck := t >= StuckTime;
+    IF cyc.Seconds > 0.0 THEN
+        Rate := LREAL_TO_REAL(REAL_TO_LREAL(Value - last) / cyc.Seconds);
+    END_IF;
+    RateHigh := MaxRate > 0.0 AND ABS(Rate) > MaxRate;
+    last := Value;
+END_IF;
+END_FUNCTION_BLOCK
+
+(* F02.TRIPS: up to 16 trip conditions that stop a machine and stay latched
+   until reset (unlike RB_Permissives, which only block a start), with the
+   first-out. A rising edge of Reset clears the trips whose condition has
+   gone. *)
+FUNCTION_BLOCK RB_Trips
+VAR_INPUT
+    Trip  : ARRAY[1..16] OF BOOL;     (* TRUE: trip condition present *)
+    Used  : WORD := 16#FFFF;          (* bit k-1 set: trip k is used *)
+    Reset : BOOL;
+END_VAR
+VAR_OUTPUT
+    Ok       : BOOL;                  (* no trip latched *)
+    Latched  : WORD;                  (* bit k-1: trip k latched *)
+    Active   : INT;                   (* trips latched *)
+    FirstOut : INT;                   (* the first trip since all were clear; 0: none *)
+END_VAR
+VAR
+    resetEdge : R_TRIG;
+    k         : INT;
+    bit       : WORD;
+END_VAR
+resetEdge(CLK := Reset);
+Active := 0;
+FOR k := 1 TO 16 DO
+    bit := SHL(WORD#1, k - 1);
+    IF (Used AND bit) = WORD#0 THEN
+        Latched := Latched AND NOT bit;
+    ELSE
+        IF resetEdge.Q AND NOT Trip[k] THEN
+            Latched := Latched AND NOT bit;
+        END_IF;
+        IF Trip[k] THEN
+            IF Latched = WORD#0 THEN
+                FirstOut := k;
+            END_IF;
+            Latched := Latched OR bit;
+        END_IF;
+    END_IF;
+    IF (Latched AND bit) <> WORD#0 THEN
+        Active := Active + 1;
+    END_IF;
+END_FOR;
+Ok := Latched = WORD#0;
+IF Ok THEN
+    FirstOut := 0;
+END_IF;
+END_FUNCTION_BLOCK
+
+(* F09.SPEED: a zero-speed (shaft rotation) monitor: a proximity switch on
+   a shaft or tail pulley must pulse while the drive runs; no pulse within
+   Timeout (after StartDelay) means a broken coupling, a slipping belt or
+   a blocked conveyor. ErrorID 1 latched until Reset. *)
+FUNCTION_BLOCK RB_ZeroSpeed
+VAR_INPUT
+    Running    : BOOL;                (* the drive runs *)
+    Pulse      : BOOL;                (* proximity switch *)
+    StartDelay : TIME := T#5s;        (* no check while starting *)
+    Timeout    : TIME := T#2s;        (* longest gap between pulses *)
+    Reset      : BOOL;
+END_VAR
+VAR_OUTPUT
+    Monitoring : BOOL;
+    Error      : BOOL;
+    ErrorID    : UDINT;
+END_VAR
+VAR
+    edge      : R_TRIG;
+    resetEdge : R_TRIG;
+    tStart    : TON;
+    tGap      : TON;
+END_VAR
+edge(CLK := Pulse);
+resetEdge(CLK := Reset);
+IF resetEdge.Q THEN
+    Error := FALSE;
+    ErrorID := 0;
+END_IF;
+tStart(IN := Running, PT := StartDelay);
+Monitoring := tStart.Q;
+IF edge.Q THEN
+    tGap(IN := FALSE, PT := Timeout);
+END_IF;
+tGap(IN := Monitoring, PT := Timeout);
+IF tGap.Q AND NOT Error THEN
+    Error := TRUE;
+    ErrorID := UDINT#1;
+END_IF;
+END_FUNCTION_BLOCK
+
+(* F12.LEVEL: pump control from level switches (each TRUE when the liquid
+   is at or above it). Empty (a sump): start at High, stop when Low clears;
+   High-high forces the pump on and alarms; below Low-low the pump stops
+   (dry run). Fill: start when Low clears, stop at High; High-high stops
+   the pump and alarms; below Low-low alarms. ErrorID 1 the pump ran longer
+   than MaxRunTime, 2 switches contradict (High without Low); pump off
+   (safe state) until Reset. *)
+FUNCTION_BLOCK RB_LevelSwitches
+VAR_INPUT
+    Fill       : BOOL;                (* FALSE: empty (sump), TRUE: fill (tank) *)
+    LowLowSw   : BOOL;
+    LowSw      : BOOL;
+    HighSw     : BOOL;
+    HighHighSw : BOOL;
+    Enable     : BOOL := TRUE;
+    MaxRunTime : TIME := T#0s;        (* T#0s: no limit *)
+    Reset      : BOOL;
+END_VAR
+VAR_OUTPUT
+    Pump      : BOOL;                 (* the pump's AutoRun *)
+    AlarmHigh : BOOL;
+    AlarmLow  : BOOL;
+    Error     : BOOL;
+    ErrorID   : UDINT;
+END_VAR
+VAR
+    resetEdge : R_TRIG;
+    tRun      : TON;
+    demand    : BOOL;
+END_VAR
+resetEdge(CLK := Reset);
+IF resetEdge.Q THEN
+    Error := FALSE;
+    ErrorID := 0;
+END_IF;
+IF HighSw AND NOT LowSw AND NOT Error THEN
+    Error := TRUE;
+    ErrorID := UDINT#2;
+END_IF;
+AlarmHigh := HighHighSw;
+AlarmLow := NOT LowLowSw;
+IF Fill THEN
+    IF NOT LowSw THEN
+        demand := TRUE;
+    ELSIF HighSw THEN
+        demand := FALSE;
+    END_IF;
+    Pump := demand AND NOT HighHighSw;
+ELSE
+    IF HighSw THEN
+        demand := TRUE;
+    ELSIF NOT LowSw THEN
+        demand := FALSE;
+    END_IF;
+    Pump := (demand OR HighHighSw) AND LowLowSw;
+END_IF;
+IF NOT Enable THEN
+    demand := FALSE;
+    Pump := FALSE;
+END_IF;
+tRun(IN := Pump AND MaxRunTime > T#0s, PT := MaxRunTime);
+IF tRun.Q AND NOT Error THEN
+    Error := TRUE;
+    ErrorID := UDINT#1;
+END_IF;
+IF Error THEN
+    Pump := FALSE;
+END_IF;
+END_FUNCTION_BLOCK
+
+(* F08.EVENTS: a log of the last 32 events, each a code (an alarm number, a
+   state, an operator action) with its time stamp from the controller's
+   clock. Log logs Code on its rising edge; with OnChange every change of
+   Code to a non-zero value is logged as well. *)
+FUNCTION_BLOCK RB_EventLog
+VAR_INPUT
+    Code     : DINT;
+    Log      : BOOL;                  (* rising edge: log Code *)
+    OnChange : BOOL;                  (* TRUE: log every change to a non-zero Code *)
+    Now      : DT;                    (* from the controller's clock *)
+    Clear    : BOOL;                  (* rising edge: empty the log *)
+END_VAR
+VAR_OUTPUT
+    Codes   : ARRAY[1..32] OF DINT;
+    Stamps  : ARRAY[1..32] OF DT;
+    Newest  : INT;                    (* index of the newest event; 0: none *)
+    Count   : INT;
+    Total   : UDINT;                  (* events logged since the block started *)
+END_VAR
+VAR
+    logEdge   : R_TRIG;
+    clearEdge : R_TRIG;
+    lastCode  : DINT;
+END_VAR
+logEdge(CLK := Log);
+clearEdge(CLK := Clear);
+IF clearEdge.Q THEN
+    Count := 0;
+    Newest := 0;
+END_IF;
+IF logEdge.Q OR (OnChange AND Code <> lastCode AND Code <> 0) THEN
+    Newest := Newest MOD 32 + 1;
+    Codes[Newest] := Code;
+    Stamps[Newest] := Now;
+    Count := MIN(Count + 1, 32);
+    Total := Total + 1;
+END_IF;
+lastCode := Code;
+END_FUNCTION_BLOCK
+
+(* F01.PEAK: the minimum, maximum and average of a value since the last
+   reset (drag pointers on a test bench, peak loads, the range of a shift),
+   taken once per call while Enable. *)
+FUNCTION_BLOCK RB_PeakHold
+VAR_INPUT
+    Value  : REAL;
+    Enable : BOOL := TRUE;
+    Reset  : BOOL;                    (* rising edge: start again *)
+END_VAR
+VAR_OUTPUT
+    Minimum : REAL;
+    Maximum : REAL;
+    Average : REAL;
+    Samples : UDINT;
+END_VAR
+VAR
+    resetEdge : R_TRIG;
+    sum       : LREAL;
+END_VAR
+resetEdge(CLK := Reset);
+IF resetEdge.Q THEN
+    Samples := 0;
+    sum := 0.0;
+    Minimum := 0.0;
+    Maximum := 0.0;
+    Average := 0.0;
+END_IF;
+IF Enable THEN
+    IF Samples = 0 THEN
+        Minimum := Value;
+        Maximum := Value;
+    ELSE
+        Minimum := MIN(Minimum, Value);
+        Maximum := MAX(Maximum, Value);
+    END_IF;
+    Samples := Samples + 1;
+    sum := sum + REAL_TO_LREAL(Value);
+    Average := LREAL_TO_REAL(sum / UDINT_TO_LREAL(Samples));
+END_IF;
+END_FUNCTION_BLOCK

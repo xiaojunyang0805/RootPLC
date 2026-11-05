@@ -15,18 +15,18 @@ jobs and features exist, never copied. No block is a safety function.
 
 | ID | Family | Blocks |
 |---|---|---|
-| F01 | Signal conditioning | [`RB_Scale`](cards/F01.SCALE.md), [`RB_FilterPT1`](cards/F01.FILTER.PT1.md), [`RB_MovingAverage`](cards/F01.AVERAGE.md), [`RB_Ramp`](cards/F01.RAMP.md), [`RB_Deadband`](cards/F01.DEADBAND.md), [`RB_Debounce`](cards/F01.DEBOUNCE.md), [`RB_ScaleOut`](cards/F01.SCALE.OUT.md), [`RB_PulseRate`](cards/F01.PULSE.md), [`RB_Vote2oo3`](cards/F01.VOTE.md) |
-| F02 | Discrete logic and interlocks | [`RB_StartStop`](cards/F02.STARTSTOP.md), [`RB_Permissives`](cards/F02.PERMISSIVES.md), [`RB_Bypass`](cards/F02.BYPASS.md) |
+| F01 | Signal conditioning | [`RB_Scale`](cards/F01.SCALE.md), [`RB_FilterPT1`](cards/F01.FILTER.PT1.md), [`RB_MovingAverage`](cards/F01.AVERAGE.md), [`RB_Ramp`](cards/F01.RAMP.md), [`RB_Deadband`](cards/F01.DEADBAND.md), [`RB_Debounce`](cards/F01.DEBOUNCE.md), [`RB_ScaleOut`](cards/F01.SCALE.OUT.md), [`RB_PulseRate`](cards/F01.PULSE.md), [`RB_Vote2oo3`](cards/F01.VOTE.md), [`RB_PeakHold`](cards/F01.PEAK.md) |
+| F02 | Discrete logic and interlocks | [`RB_StartStop`](cards/F02.STARTSTOP.md), [`RB_Permissives`](cards/F02.PERMISSIVES.md), [`RB_Bypass`](cards/F02.BYPASS.md), [`RB_Trips`](cards/F02.TRIPS.md) |
 | F03 | Timing, counting, scheduling | [`RB_CycleTime`](cards/F03.CYCLETIME.md), [`RB_Counter`](cards/F03.COUNTER.md), [`RB_Schedule`](cards/F03.SCHEDULE.md), [`RB_Blink`](cards/F03.BLINK.md) |
 | F04 | Device modules | [`RB_ValveOnOff`](cards/F04.VALVE.ONOFF.md), [`RB_Motor`](cards/F04.MOTOR.DOL.md), [`RB_MotorReversing`](cards/F04.MOTOR.REV.md), [`RB_Cylinder`](cards/F04.CYLINDER.md), [`RB_Pump`](cards/F04.PUMP.md), [`RB_Drive`](cards/F04.DRIVE.md), [`RB_ValveAnalog`](cards/F04.VALVE.ANALOG.md), [`RB_MotorStarDelta`](cards/F04.MOTOR.STARDELTA.md), [`RB_MotorTwoSpeed`](cards/F04.MOTOR.2SPEED.md), [`RB_DutyStandby`](cards/F04.GROUP.md) |
 | F05 | Sequencing | [`RB_StepChain`](cards/F05.STEPS.md), [`RB_Phase`](cards/F05.PHASE.md), [`RB_Homing`](cards/F05.HOMING.md), [`RB_Drum`](cards/F05.DRUM.md) |
 | F06 | Closed-loop control | [`RB_PID`](cards/F06.PID.md), [`RB_OnOff`](cards/F06.ONOFF.md), [`RB_SplitRange`](cards/F06.SPLIT.md), [`RB_Ratio`](cards/F06.RATIO.md), [`RB_Cascade`](cards/F06.CASCADE.md), [`RB_SetpointProfile`](cards/F06.PROFILE.md), [`RB_PWM`](cards/F06.PWM.md) |
 | F07 | Motion | the RootMotion library (spec/13-motion.md) |
-| F08 | Alarms and events | [`RB_Alarm`](cards/F08.ALARM.md), [`RB_AlarmSummary`](cards/F08.ALARM.SUMMARY.md), [`RB_AnalogLimits`](cards/F08.LIMITS.md) |
-| F09 | Supervision and diagnostics | [`RB_RunHours`](cards/F09.RUNHOURS.md), [`RB_Heartbeat`](cards/F09.HEARTBEAT.md), [`RB_Totalizer`](cards/F09.TOTAL.md), [`RB_OEE`](cards/F09.OEE.md) |
+| F08 | Alarms and events | [`RB_Alarm`](cards/F08.ALARM.md), [`RB_AlarmSummary`](cards/F08.ALARM.SUMMARY.md), [`RB_AnalogLimits`](cards/F08.LIMITS.md), [`RB_EventLog`](cards/F08.EVENTS.md) |
+| F09 | Supervision and diagnostics | [`RB_RunHours`](cards/F09.RUNHOURS.md), [`RB_Heartbeat`](cards/F09.HEARTBEAT.md), [`RB_Totalizer`](cards/F09.TOTAL.md), [`RB_OEE`](cards/F09.OEE.md), [`RB_SignalMonitor`](cards/F09.SIGNAL.md), [`RB_ZeroSpeed`](cards/F09.SPEED.md) |
 | F10 | Machine modes and states | [`RB_ModeManager`](cards/F10.MODES.md), [`RB_MachineState`](cards/F10.STATE.md) |
 | F11 | Data handling and communication | [`RB_Fifo`](cards/F11.FIFO.md), [`RB_RecipeTable`](cards/F11.RECIPE.md), [`RB_Transfer`](cards/F11.TRANSFER.md), [`RB_DataLog`](cards/F11.LOG.md), [`RB_ShiftTrack`](cards/F11.TRACK.md) |
-| F12 | Material handling and process patterns | [`RB_ConveyorZone`](cards/F12.ZONE.md), [`RB_Diverter`](cards/F12.DIVERTER.md), [`RB_Merge`](cards/F12.MERGE.md) |
+| F12 | Material handling and process patterns | [`RB_ConveyorZone`](cards/F12.ZONE.md), [`RB_Diverter`](cards/F12.DIVERTER.md), [`RB_Merge`](cards/F12.MERGE.md), [`RB_LevelSwitches`](cards/F12.LEVEL.md) |
 
 How often each family occurs in real code (classifier v1, aggregate only):
 [corpus/BLOCKS_REPORT.md](../corpus/BLOCKS_REPORT.md).
