@@ -9,6 +9,7 @@ pub mod examples;
 pub mod explain;
 pub mod init;
 pub mod json;
+pub mod mutate;
 
 use std::path::PathBuf;
 

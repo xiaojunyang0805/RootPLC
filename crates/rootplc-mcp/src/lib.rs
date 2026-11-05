@@ -48,7 +48,7 @@ fn tools() -> String {
     format!(
         r#"{{"tools":[
 {{"name":"rootplc_check","title":"Check Structured Text","description":"Lex, parse and type-check IEC 61131-3 Structured Text. Returns diagnostics with stable codes (RPnnnn), 1-based positions and fix hints. ok is true when there are no errors.","inputSchema":{{"type":"object","properties":{{{src}}}}},{ro}}},
-{{"name":"rootplc_test","title":"Run TEST blocks","description":"Compile the project and run every TEST ... END_TEST block in the deterministic VM. Assertions: ASSERT_TRUE, ASSERT_FALSE, ASSERT_EQ, ASSERT_NE. Tests may read every variable of an instance (white-box). Returns pass/fail per test with failure locations and run-time faults.","inputSchema":{{"type":"object","properties":{{{src},"filter":{{"type":"string","description":"Only tests whose name contains this text."}}}}}},{ro}}},
+{{"name":"rootplc_test","title":"Run TEST blocks","description":"Compile the project and run every TEST ... END_TEST block in the deterministic VM. Assertions: ASSERT_TRUE, ASSERT_FALSE, ASSERT_EQ, ASSERT_NE. Tests may read every variable of an instance (white-box). Returns pass/fail per test with failure locations and run-time faults. With mutate: true, measures how good the tests are instead: every small change to the code (a flipped comparison, AND/OR, TRUE/FALSE, n to n+1, a doubled duration) must make a test fail; returns the mutation score and each surviving change, so you can add a test for it.","inputSchema":{{"type":"object","properties":{{{src},"filter":{{"type":"string","description":"Only tests whose name contains this text."}},"mutate":{{"type":"boolean","default":false,"description":"Run mutation testing (needs all tests passing first)."}},"mutate_limit":{{"type":"integer","minimum":1,"maximum":5000,"default":500}}}}}},{ro}}},
 {{"name":"rootplc_run","title":"Run a program","description":"Compile and run one PROGRAM for a number of PLC cycles in the VM (virtual clock), then return the value of every variable. Use it to inspect behaviour; use rootplc_test for pass/fail evidence.","inputSchema":{{"type":"object","properties":{{{src},"program":{{"type":"string","description":"PROGRAM to run; optional when there is only one."}},"cycles":{{"type":"integer","minimum":1,"maximum":1000000,"default":1}},"cycle_ms":{{"type":"integer","minimum":0,"default":10,"description":"Virtual time per cycle in milliseconds (timers use it)."}}}}}},{ro}}},
 {{"name":"rootplc_explain","title":"Explain a diagnostic","description":"Explain a diagnostic code such as RP0103: severity, summary and the text of the spec rule that defines it.","inputSchema":{{"type":"object","properties":{{"code":{{"type":"string","description":"Diagnostic code, e.g. RP0103 or 103."}}}},"required":["code"]}},{ro}}},
 {{"name":"rootplc_examples","title":"Find verified ST patterns","description":"Search a library of Structured Text patterns (edge detection, timers, counters, state machines, interlocks, arrays, structs, test blocks). Every example compiles and passes its TEST blocks in this toolchain version. Adapt them; do not copy names blindly.","inputSchema":{{"type":"object","properties":{{"query":{{"type":"string","description":"Keywords, e.g. 'timer' or 'state machine'. Empty lists every example."}},"id":{{"type":"string","description":"Return this one example, e.g. 'edge-detect'."}}}}}},{ro}}},
@@ -111,10 +111,9 @@ fn sources(args: &Json) -> Result<Vec<(PathBuf, String)>, String> {
     Ok(out)
 }
 
-/// Check sources with the `libraries` argument ([stdlib.compat]).
-fn checked(s: Vec<(PathBuf, String)>, args: &Json) -> Result<rootplc_driver::CheckReport, String> {
-    let libs: Vec<String> = args
-        .get("libraries")
+/// The `libraries` argument ([stdlib.compat]).
+fn libraries(args: &Json) -> Vec<String> {
+    args.get("libraries")
         .and_then(Json::as_array)
         .map(|v| {
             v.iter()
@@ -122,8 +121,12 @@ fn checked(s: Vec<(PathBuf, String)>, args: &Json) -> Result<rootplc_driver::Che
                 .map(str::to_string)
                 .collect()
         })
-        .unwrap_or_default();
-    rootplc_driver::check_sources_with(s, &libs)
+        .unwrap_or_default()
+}
+
+/// Check sources with the `libraries` argument ([stdlib.compat]).
+fn checked(s: Vec<(PathBuf, String)>, args: &Json) -> Result<rootplc_driver::CheckReport, String> {
+    rootplc_driver::check_sources_with(s, &libraries(args))
 }
 
 fn call_tool(name: &str, args: &Json) -> String {
@@ -133,6 +136,21 @@ fn call_tool(name: &str, args: &Json) -> String {
             Ok(c) => tool_result(&rootplc_driver::json::check(&c), false),
             Err(e) => fail("check", &e),
         },
+        "rootplc_test" if args.get("mutate").and_then(Json::as_bool) == Some(true) => {
+            let filter = args.get("filter").and_then(Json::as_str);
+            let limit = args
+                .get("mutate_limit")
+                .and_then(Json::as_f64)
+                .map_or(rootplc_driver::mutate::DEFAULT_LIMIT, |n| {
+                    n.clamp(1.0, 5000.0) as usize
+                });
+            match sources(args).and_then(|s| {
+                rootplc_driver::mutate::mutation_report(s, &libraries(args), filter, limit)
+            }) {
+                Ok(r) => tool_result(&rootplc_driver::json::mutation(&r, None), false),
+                Err(e) => fail("test", &e),
+            }
+        }
         "rootplc_test" => match sources(args).and_then(|s| checked(s, args)) {
             Ok(c) => {
                 let filter = args.get("filter").and_then(Json::as_str);
@@ -306,7 +324,8 @@ fn prompt_text(name: &str, arg: &str) -> Option<String> {
              3. Call rootplc_check until ok is true. For any code you do not understand, call rootplc_explain.\n\
              4. Write TEST blocks that state the required behaviour, including edge cases and timing (use ADVANCE for virtual time).\n\
              5. Call rootplc_test until every test passes. Do not weaken a test to make it pass.\n\
-             6. Report the final code and the test results. Never claim success while an error or a failing test remains."
+             6. Call rootplc_test with mutate: true. For each surviving change, add a test that fails on it, until the score is high.
+\n             7. Report the final code, the test results and the mutation score. Never claim success while an error or a failing test remains."
         ),
         "fix_diagnostics" => format!(
             "Project: {arg}\n\n\

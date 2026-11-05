@@ -10,6 +10,7 @@ const USAGE: &str = "usage:
   rootplc init  [dir] [--name NAME] [--agent claude|gemini|qwen|cursor|codex|all]
   rootplc check <file.st|dir>... [--json]
   rootplc test  <file.st|dir>... [--filter TEXT] [--json]
+  rootplc test  <file.st|dir>... --mutate [--mutate-limit N] [--min-score P] [--json]   (mutation score of the tests)
   rootplc run   <file.st|dir>... [--program NAME] [--cycles N] [--cycle-ms MS] [--json]
   rootplc explain <code> [--json]
   rootplc examples [words...] [--show ID] [--json]   (verified ST patterns)
@@ -39,8 +40,9 @@ impl Args {
         while let Some(x) = it.next() {
             match x.as_str() {
                 "--json" => a.json = true,
+                "--mutate" => a.options.push((x, String::new())),
                 "--program" | "--cycles" | "--cycle-ms" | "--filter" | "--name" | "--show"
-                | "--agent" | "--library" => {
+                | "--agent" | "--library" | "--mutate-limit" | "--min-score" => {
                     let v = it.next().unwrap_or_default();
                     a.options.push((x, v));
                 }
@@ -121,7 +123,76 @@ fn cmd_check(paths: &[PathBuf], args: &Args) -> ExitCode {
     exit(r.ok())
 }
 
+fn cmd_mutate(paths: &[PathBuf], filter: Option<&str>, args: &Args) -> ExitCode {
+    let json_out = args.json;
+    let sources = match rootplc_driver::read_sources(paths) {
+        Ok(s) => s,
+        Err(e) => return io_error("test", &e, json_out),
+    };
+    let limit = args
+        .opt("--mutate-limit")
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(rootplc_driver::mutate::DEFAULT_LIMIT);
+    let min_score: Option<f64> = args.opt("--min-score").and_then(|v| v.parse().ok());
+    let r = match rootplc_driver::mutate::mutation_report(
+        sources,
+        &args.all("--library"),
+        filter,
+        limit,
+    ) {
+        Ok(r) => r,
+        Err(e) => return io_error("test", &e, json_out),
+    };
+    let ok = json::mutation_ok(&r, min_score);
+    if json_out {
+        println!("{}", json::mutation(&r, min_score));
+        return exit(ok);
+    }
+    if let Some(e) = &r.error {
+        print_diagnostics(&r.baseline.check);
+        eprintln!("rootplc test --mutate: {e}");
+        return exit(false);
+    }
+    for m in r.survivors() {
+        let shown = if m.replacement.is_empty() {
+            "removed".to_string()
+        } else {
+            format!("'{}'", m.replacement)
+        };
+        println!(
+            "SURVIVED {}:{}:{}: '{}' -> {shown}",
+            m.path.display(),
+            m.line,
+            m.column,
+            m.original
+        );
+    }
+    let not_viable = r.mutants.len() - r.viable();
+    match r.score() {
+        Some(s) => eprintln!(
+            "mutation score {:.0}%: {} of {} viable mutants killed ({} not viable{})",
+            s * 100.0,
+            r.killed(),
+            r.viable(),
+            not_viable,
+            if r.candidates > r.mutants.len() {
+                format!("; {} of {} candidates run", r.mutants.len(), r.candidates)
+            } else {
+                String::new()
+            }
+        ),
+        None => eprintln!("no viable mutants ({not_viable} not viable)"),
+    }
+    if let (Some(m), false) = (min_score, ok) {
+        eprintln!("below the required score of {m}%");
+    }
+    exit(ok)
+}
+
 fn cmd_test(paths: &[PathBuf], filter: Option<&str>, args: &Args) -> ExitCode {
+    if args.opt("--mutate").is_some() {
+        return cmd_mutate(paths, filter, args);
+    }
     let json_out = args.json;
     let r = match load("test", paths, args) {
         Ok(c) => rootplc_driver::test_report(c, filter),

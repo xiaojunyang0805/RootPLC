@@ -4,6 +4,7 @@
 rootplc init  [dir] [--name NAME] [--agent claude|gemini|qwen|cursor|codex|all]
 rootplc check <file.st|dir>... [--json]
 rootplc test  <file.st|dir>... [--filter TEXT] [--json]
+rootplc test  <file.st|dir>... --mutate [--mutate-limit N] [--min-score P] [--json]
 rootplc run   <file.st|dir>... [--program NAME] [--cycles N] [--cycle-ms MS] [--json]
 rootplc explain <code> [--json]
 rootplc examples [words...] [--show ID] [--json]
@@ -67,6 +68,31 @@ execution continues after a failed assertion. A run-time fault ends the test.
 ```json
 {"command":"test","ok":true,"compiled":true,"passed":1,"failed":0,"diagnostics":[],
  "tests":[{"name":"start_latches","passed":true,"failures":[],"fault":null}]}
+```
+
+### test --mutate
+
+Measures whether the tests check the code ([tests.mutation]). Each mutant
+changes one token in a statement (a comparison, `+`/`-`, `AND`/`OR`/`XOR`,
+`TRUE`/`FALSE`, a removed `NOT`, an integer `n` → `n+1`, a doubled
+duration). A mutant is killed when a test fails on it. The score is killed ÷
+viable mutants (mutants that do not compile are not counted). Needs every test
+passing first. Each surviving mutant is listed so a test can be added for it.
+`--mutate-limit N` caps the mutants (default 500); `--min-score P` makes the
+command fail below `P` percent, for CI. The MCP tool `rootplc_test` takes
+`"mutate": true` for the same report.
+
+```
+$ rootplc test src tests --mutate
+SURVIVED src/latch.st:8:31: 'AND' -> 'OR'
+mutation score 67%: 2 of 3 viable mutants killed (0 not viable)
+```
+
+```json
+{"command":"test","mutate":true,"ok":true,"error":null,
+ "baseline":{"compiled":true,"passed":1,"failed":0},"score":0.6667,"min_score":null,
+ "viable":3,"killed":2,"not_viable":0,"candidates":3,"run":3,
+ "survivors":[{"file":"src/latch.st","line":8,"column":31,"original":"AND","replacement":"OR"}]}
 ```
 
 ## run

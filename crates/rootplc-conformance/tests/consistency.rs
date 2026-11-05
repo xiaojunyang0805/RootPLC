@@ -57,6 +57,55 @@ fn cases_execute_and_assertions_hold() {
     assert_clean("exec stage", rc::run_exec_stage(&rc::repo_root()));
 }
 
+/// Cases with a `mutate:` line: mutation testing gives exactly the stated
+/// counts ([tests.mutation]).
+#[test]
+fn mutation_counts_match() {
+    let root = rc::repo_root();
+    let mut problems = Vec::new();
+    let cases = rc::load_cases(&root).unwrap_or_default();
+    assert!(
+        cases.iter().any(|c| c.mutate.is_some()),
+        "no mutate: case found"
+    );
+    for c in cases {
+        let Some(want) = &c.mutate else { continue };
+        let r = rootplc_driver::mutate::mutation_report(
+            vec![(c.path.clone(), c.source.clone())],
+            &c.libraries,
+            None,
+            rootplc_driver::mutate::DEFAULT_LIMIT,
+        );
+        let got = match r {
+            Ok(r) => match &r.error {
+                Some(e) => format!("error: {e}"),
+                None => format!("killed={} viable={}", r.killed(), r.viable()),
+            },
+            Err(e) => format!("error: {e}"),
+        };
+        let matches = if let Some(w) = want.strip_prefix("error") {
+            got.starts_with("error") && got.contains(w.trim())
+        } else {
+            &got == want
+        };
+        if !matches {
+            problems.push(format!(
+                "{}: mutate: want '{want}', got '{got}'",
+                c.path.display()
+            ));
+        }
+    }
+    assert!(
+        problems.is_empty(),
+        "mutation stage:
+{}",
+        problems.join(
+            "
+"
+        )
+    );
+}
+
 #[test]
 fn example_tests_pass() {
     assert_clean("example tests", rc::test_examples(&rc::repo_root()));

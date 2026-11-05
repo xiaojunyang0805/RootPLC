@@ -7,6 +7,7 @@ use rootplc_diag::{json_string, line_col};
 use crate::coverage::{CoverageReport, Status};
 use crate::examples::Example;
 use crate::explain::Explanation;
+use crate::mutate::{MutationReport, Outcome};
 use crate::{CheckReport, RunReport, TestReport};
 
 /// File name and 1-based position of a location reported by the VM
@@ -255,4 +256,55 @@ pub fn error(command: &str, message: &str) -> String {
         "{{\"command\":\"{command}\",\"ok\":false,\"status\":\"error\",\"message\":{}}}",
         json_string(message)
     )
+}
+
+/// `rootplc test --mutate` ([tests.mutation]).
+pub fn mutation(r: &MutationReport, min_score: Option<f64>) -> String {
+    let survivors: Vec<String> = r
+        .survivors()
+        .map(|m| {
+            format!(
+                "{{\"file\":{},\"line\":{},\"column\":{},\"original\":{},\"replacement\":{}}}",
+                json_string(&m.path.display().to_string()),
+                m.line,
+                m.column,
+                json_string(&m.original),
+                json_string(&m.replacement)
+            )
+        })
+        .collect();
+    let not_viable = r
+        .mutants
+        .iter()
+        .filter(|(_, o)| *o == Outcome::NotViable)
+        .count();
+    let score = r
+        .score()
+        .map_or_else(|| "null".to_string(), |s| format!("{:.4}", s));
+    let passed = r.baseline.outcomes.iter().filter(|o| o.passed()).count();
+    format!(
+        "{{\"command\":\"test\",\"mutate\":true,\"ok\":{},\"error\":{},\"baseline\":{{\"compiled\":{},\"passed\":{passed},\"failed\":{}}},\"score\":{score},\"min_score\":{},\"viable\":{},\"killed\":{},\"not_viable\":{not_viable},\"candidates\":{},\"run\":{},\"survivors\":[{}]}}",
+        mutation_ok(r, min_score),
+        r.error
+            .as_deref()
+            .map_or_else(|| "null".to_string(), json_string),
+        r.baseline.check.ok(),
+        r.baseline.outcomes.len() - passed,
+        min_score.map_or_else(|| "null".to_string(), |m| format!("{m}")),
+        r.viable(),
+        r.killed(),
+        r.candidates,
+        r.mutants.len(),
+        survivors.join(",")
+    )
+}
+
+/// The mutation run succeeded: a green baseline and, if asked, a score of at
+/// least `min_score` percent.
+pub fn mutation_ok(r: &MutationReport, min_score: Option<f64>) -> bool {
+    r.error.is_none()
+        && match min_score {
+            Some(m) => r.score().is_some_and(|s| s * 100.0 + 1e-9 >= m),
+            None => true,
+        }
 }

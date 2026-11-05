@@ -31,6 +31,7 @@ release exists for the platform yet.
 rootplc init my-machine && cd my-machine
 rootplc check . --json     # diagnostics with stable codes, positions and fix hints
 rootplc test .             # runs TEST ... END_TEST blocks in a deterministic VM
+rootplc test . --mutate    # mutation score: do the tests catch small changes to the code?
 rootplc run . --cycles 100 --cycle-ms 10
 rootplc explain RP0103     # the spec rule behind a diagnostic
 ```
