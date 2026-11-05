@@ -510,3 +510,120 @@ Status := motor.Status;
 Status.Error := Error;
 Status.ErrorID := ErrorID;
 END_FUNCTION_BLOCK
+
+(* F04.DRIVE: command and status of a variable-speed drive (VFD), mapped by
+   the application to the drive's control and status word or its I/O. The
+   drive ramps; the block clamps the set point.
+   ErrorID 1 no running feedback after a start, 2 running without a
+   command, 3 the drive reports a fault, 4 speed deviation (when
+   SpeedTolerance > 0). Safe state: Run off, set point 0. *)
+FUNCTION_BLOCK RB_Drive
+VAR_INPUT
+    Mode           : RB_MODE := RB_MODE#Off;
+    AutoRun        : BOOL;
+    AutoSpeed      : REAL;            (* set point, e.g. % or Hz *)
+    AutoReverse    : BOOL;
+    ManRun         : BOOL;
+    ManSpeed       : REAL;
+    ManReverse     : BOOL;
+    Interlock      : BOOL;
+    Permissive     : BOOL := TRUE;
+    DriveReady     : BOOL;            (* drive status: ready to run *)
+    DriveRunning   : BOOL;            (* drive status: running *)
+    DriveFault     : BOOL;            (* drive status: fault *)
+    ActualSpeed    : REAL;
+    SpeedMin       : REAL := 0.0;
+    SpeedMax       : REAL := 100.0;
+    SpeedTolerance : REAL := 0.0;     (* 0: no speed supervision *)
+    FeedbackTime   : TIME := T#5s;    (* run feedback and speed deviation *)
+    Reset          : BOOL;
+END_VAR
+VAR_OUTPUT
+    Run           : BOOL;
+    Reverse       : BOOL;
+    SpeedSetpoint : REAL;
+    ResetDrive    : BOOL;             (* one-call pulse to reset the drive's fault *)
+    Running       : BOOL;
+    AtSpeed       : BOOL;
+    Error         : BOOL;
+    ErrorID       : UDINT;
+    Status        : RB_DEVICE_STATUS;
+END_VAR
+VAR
+    resetEdge : R_TRIG;
+    want      : BOOL;
+    speed     : REAL;
+    rev       : BOOL;
+    tMismatch : TON;
+    tSpeed    : TON;
+    deviation : BOOL;
+END_VAR
+resetEdge(CLK := Reset);
+ResetDrive := resetEdge.Q;
+IF resetEdge.Q THEN
+    Error := FALSE;
+    ErrorID := 0;
+END_IF;
+IF DriveFault AND NOT Error THEN
+    Error := TRUE;
+    ErrorID := UDINT#3;
+END_IF;
+IF Mode = RB_MODE#Auto THEN
+    want := AutoRun;
+    speed := AutoSpeed;
+    rev := AutoReverse;
+ELSIF Mode = RB_MODE#Manual THEN
+    want := ManRun;
+    speed := ManSpeed;
+    rev := ManReverse;
+ELSE
+    want := FALSE;
+    speed := 0.0;
+END_IF;
+IF want AND NOT Run AND (NOT Permissive OR NOT DriveReady) THEN
+    want := FALSE;
+END_IF;
+IF Interlock OR Error THEN
+    want := FALSE;
+END_IF;
+IF want AND NOT Run THEN
+    Status.Starts := Status.Starts + 1;
+END_IF;
+Run := want;
+IF Run THEN
+    SpeedSetpoint := LIMIT(SpeedMin, speed, SpeedMax);
+    Reverse := rev;
+ELSE
+    SpeedSetpoint := 0.0;
+    Reverse := FALSE;
+END_IF;
+tMismatch(IN := Run XOR DriveRunning, PT := FeedbackTime);
+deviation := SpeedTolerance > 0.0 AND Run AND DriveRunning
+             AND ABS(ActualSpeed - SpeedSetpoint) > SpeedTolerance;
+tSpeed(IN := deviation, PT := FeedbackTime);
+IF NOT Error THEN
+    IF tMismatch.Q THEN
+        Error := TRUE;
+        IF Run THEN
+            ErrorID := UDINT#1;
+        ELSE
+            ErrorID := UDINT#2;
+        END_IF;
+    ELSIF tSpeed.Q THEN
+        Error := TRUE;
+        ErrorID := UDINT#4;
+    END_IF;
+END_IF;
+IF Error THEN
+    Run := FALSE;
+    SpeedSetpoint := 0.0;
+    Reverse := FALSE;
+END_IF;
+Running := DriveRunning;
+AtSpeed := Run AND DriveRunning AND NOT deviation;
+Status.Mode := Mode;
+Status.Commanded := Run;
+Status.Active := Running;
+Status.Error := Error;
+Status.ErrorID := ErrorID;
+END_FUNCTION_BLOCK
