@@ -47,7 +47,8 @@ function     = 'FUNCTION' name ':' type_spec { var_section } statement_list 'END
 ``` A function without a
 result type (`FUNCTION F` followed directly by its variable sections or body)
 is accepted with warning RP0113, because CODESYS and TwinCAT code uses it; it
-is called as a statement and has no value.
+is called as a statement and has no value (RP0303 when used in an
+expression).
 
 **[pous.function-block]**
 ```
@@ -111,6 +112,9 @@ that method. Inside the method, the variables of its block
 (inherited ones included) are visible by name after the method's own. A
 method is called on an instance, `inst.M(args)`, or inside the block or one
 of its methods without a prefix, `M(args)`; arguments bind as for functions.
+A method without a result type has no value: its call is a statement, and
+using it in an expression (`x := inst.M()`) is error RP0303, as for a
+function without a result type ([pous.function]).
 
 **[pous.oop.extends]** `FUNCTION_BLOCK B EXTENDS A` makes B a function block
 with all variables and methods of A, followed by its own. The base must be a

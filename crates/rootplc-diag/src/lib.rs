@@ -188,6 +188,7 @@ pub mod codes {
         SYNTAX_ERROR = 201, Error;
         MISSING_END = 202, Error; UNKNOWN_NAME = 203, Error; DUPLICATE_NAME = 204, Error; LOCATED_TYPE_MISMATCH = 205, Error;
         MISSING_SEMICOLON = 301, Error; DUPLICATE_ARGUMENT = 302, Error;
+        NO_RESULT_VALUE = 303, Error;
         CONSTANT_OVERFLOW = 101, Error;
         LITERAL_OUT_OF_RANGE = 102, Error;
         IMPLICIT_CONVERSION = 103, Error;

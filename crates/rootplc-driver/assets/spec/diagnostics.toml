@@ -332,6 +332,13 @@ spec = "pous.call.in-out"
 stage = "sema"
 
 [[code]]
+id = "RP0303"
+severity = "error"
+summary = "a method or function without a result type used in an expression; call it as a statement"
+spec = "pous.oop.method"
+stage = "sema"
+
+[[code]]
 id = "RP0113"
 severity = "warning"
 summary = "FUNCTION without a result type (not portable); call it as a statement"
