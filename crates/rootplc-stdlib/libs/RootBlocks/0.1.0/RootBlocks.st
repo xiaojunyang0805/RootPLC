@@ -1489,3 +1489,231 @@ IF wasAlive AND NOT Alive THEN
 END_IF;
 wasAlive := Alive;
 END_FUNCTION_BLOCK
+
+(* F11.FIFO: a first-in first-out queue of up to 32 DINT values (part IDs,
+   codes). ErrorID 1 put on a full queue (value dropped), 2 get on an empty
+   queue. *)
+FUNCTION_BLOCK RB_Fifo
+VAR_INPUT
+    Put     : BOOL;                  (* rising edge: append InValue *)
+    InValue : DINT;
+    Get     : BOOL;                  (* rising edge: take the oldest into OutValue *)
+    Clear   : BOOL;                  (* rising edge: empty the queue *)
+    Reset   : BOOL;                  (* rising edge: clear an error *)
+END_VAR
+VAR_OUTPUT
+    OutValue : DINT;
+    First    : DINT;                 (* the oldest value, without taking it *)
+    Count    : INT;
+    Empty    : BOOL;
+    Full     : BOOL;
+    Error    : BOOL;
+    ErrorID  : UDINT;
+END_VAR
+VAR
+    ePut   : R_TRIG;
+    eGet   : R_TRIG;
+    eClear : R_TRIG;
+    eReset : R_TRIG;
+    buf    : ARRAY[0..31] OF DINT;
+    head   : INT;                    (* index of the oldest value *)
+END_VAR
+ePut(CLK := Put);
+eGet(CLK := Get);
+eClear(CLK := Clear);
+eReset(CLK := Reset);
+IF eReset.Q THEN
+    Error := FALSE;
+    ErrorID := 0;
+END_IF;
+IF eClear.Q THEN
+    Count := 0;
+END_IF;
+IF eGet.Q THEN
+    IF Count > 0 THEN
+        OutValue := buf[head];
+        head := (head + 1) MOD 32;
+        Count := Count - 1;
+    ELSE
+        Error := TRUE;
+        ErrorID := UDINT#2;
+    END_IF;
+END_IF;
+IF ePut.Q THEN
+    IF Count < 32 THEN
+        buf[(head + Count) MOD 32] := InValue;
+        Count := Count + 1;
+    ELSE
+        Error := TRUE;
+        ErrorID := UDINT#1;
+    END_IF;
+END_IF;
+Empty := Count = 0;
+Full := Count >= 32;
+IF Empty THEN
+    First := 0;
+ELSE
+    First := buf[head];
+END_IF;
+END_FUNCTION_BLOCK
+
+(* F11.RECIPE: loads a recipe (8 parameters) from a table of 16 kept by the
+   application, and saves the current parameters into it. ErrorID 1 recipe
+   number out of range. *)
+FUNCTION_BLOCK RB_RecipeTable
+VAR_INPUT
+    Number : INT := 1;               (* 1 .. 16 *)
+    Load   : BOOL;                   (* rising edge: Params := table[Number] *)
+    Save   : BOOL;                   (* rising edge: table[Number] := Actual *)
+    Actual : ARRAY[1..8] OF REAL;    (* the parameters in use, to save *)
+    Reset  : BOOL;
+END_VAR
+VAR_IN_OUT
+    Table : ARRAY[1..16, 1..8] OF REAL;
+END_VAR
+VAR_OUTPUT
+    Params  : ARRAY[1..8] OF REAL;
+    Loaded  : INT;                   (* the recipe last loaded; 0: none *)
+    Done    : BOOL;                  (* TRUE for one call after a load or save *)
+    Error   : BOOL;
+    ErrorID : UDINT;
+END_VAR
+VAR
+    eLoad  : R_TRIG;
+    eSave  : R_TRIG;
+    eReset : R_TRIG;
+    k      : INT;
+END_VAR
+eLoad(CLK := Load);
+eSave(CLK := Save);
+eReset(CLK := Reset);
+Done := FALSE;
+IF eReset.Q THEN
+    Error := FALSE;
+    ErrorID := 0;
+END_IF;
+IF eLoad.Q OR eSave.Q THEN
+    IF Number < 1 OR Number > 16 THEN
+        Error := TRUE;
+        ErrorID := UDINT#1;
+    ELSE
+        FOR k := 1 TO 8 DO
+            IF eSave.Q THEN
+                Table[Number, k] := Actual[k];
+            END_IF;
+            IF eLoad.Q THEN
+                Params[k] := Table[Number, k];
+            END_IF;
+        END_FOR;
+        IF eLoad.Q THEN
+            Loaded := Number;
+        END_IF;
+        Done := TRUE;
+    END_IF;
+END_IF;
+END_FUNCTION_BLOCK
+
+(* F11.TRANSFER: hands a part to the next station with a handshake: when
+   this station has a part and the receiver is ready, Release moves it
+   until the receiver confirms arrival. ErrorID 1 the receiver did not
+   confirm within Timeout. *)
+FUNCTION_BLOCK RB_Transfer
+VAR_INPUT
+    PartReady     : BOOL;            (* this station has a part to hand on *)
+    ReceiverReady : BOOL;            (* the next station can take it *)
+    Arrived       : BOOL;            (* the next station has the part *)
+    Timeout       : TIME := T#10s;
+    Reset         : BOOL;
+END_VAR
+VAR_OUTPUT
+    Release : BOOL;                  (* move the part (conveyor, gripper, gate) *)
+    Busy    : BOOL;
+    Done    : BOOL;                  (* TRUE for one call when a part arrived *)
+    Count   : UDINT;
+    Error   : BOOL;
+    ErrorID : UDINT;
+END_VAR
+VAR
+    eReset : R_TRIG;
+    tMove  : TON;
+END_VAR
+eReset(CLK := Reset);
+Done := FALSE;
+IF eReset.Q THEN
+    Error := FALSE;
+    ErrorID := 0;
+END_IF;
+IF NOT Busy AND NOT Error AND PartReady AND ReceiverReady THEN
+    Busy := TRUE;
+END_IF;
+tMove(IN := Busy, PT := Timeout);
+IF Busy AND Arrived THEN
+    Busy := FALSE;
+    Done := TRUE;
+    Count := Count + 1;
+ELSIF Busy AND tMove.Q THEN
+    Busy := FALSE;
+    Error := TRUE;
+    ErrorID := UDINT#1;
+END_IF;
+Release := Busy;
+END_FUNCTION_BLOCK
+
+(* F02.STARTSTOP: a start/stop latch; stop wins. Wire the stop button
+   normally closed: StopOk FALSE (pressed or broken wire) stops. *)
+FUNCTION_BLOCK RB_StartStop
+VAR_INPUT
+    Start      : BOOL;               (* rising edge starts *)
+    StopOk     : BOOL := TRUE;       (* FALSE: stop *)
+    Permissive : BOOL := TRUE;       (* needed to start *)
+    Interlock  : BOOL;               (* TRUE: stop *)
+END_VAR
+VAR_OUTPUT
+    Out : BOOL;
+END_VAR
+VAR
+    eStart : R_TRIG;
+END_VAR
+eStart(CLK := Start);
+IF NOT StopOk OR Interlock THEN
+    Out := FALSE;
+ELSIF eStart.Q AND Permissive THEN
+    Out := TRUE;
+END_IF;
+END_FUNCTION_BLOCK
+
+(* F02.PERMISSIVES: up to 16 start conditions. Ok when every used one is
+   TRUE; FirstOut is the first condition that dropped (first-out), kept
+   until Reset when all are TRUE again. *)
+FUNCTION_BLOCK RB_Permissives
+VAR_INPUT
+    Cond  : ARRAY[1..16] OF BOOL;
+    Used  : WORD := WORD#16#FFFF;    (* bit k-1 set: condition k is used *)
+    Reset : BOOL;                    (* rising edge: clear FirstOut *)
+END_VAR
+VAR_OUTPUT
+    Ok       : BOOL;
+    Missing  : INT;                  (* used conditions that are FALSE *)
+    FirstOut : INT;                  (* 0: none *)
+END_VAR
+VAR
+    eReset : R_TRIG;
+    k      : INT;
+    bad    : BOOL;
+END_VAR
+eReset(CLK := Reset);
+Missing := 0;
+FOR k := 1 TO 16 DO
+    bad := ((SHR(Used, k - 1) AND WORD#1) <> WORD#0) AND NOT Cond[k];
+    IF bad THEN
+        Missing := Missing + 1;
+        IF FirstOut = 0 THEN
+            FirstOut := k;
+        END_IF;
+    END_IF;
+END_FOR;
+Ok := Missing = 0;
+IF eReset.Q AND Ok THEN
+    FirstOut := 0;
+END_IF;
+END_FUNCTION_BLOCK
