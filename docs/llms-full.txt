@@ -3134,9 +3134,11 @@ PREEMPT_RT, run it under a real-time priority (for example `chrt -f 80`).
 **[runtime.image]** The process image has three areas of up to 65,536 bytes
 each: inputs (`%I`), outputs (`%Q`) and memory (`%M`). A located variable
 ([variables.located]) of the selected program, or of a global variable list,
-is bound to its address. The size letter fixes the place and the type:
-`X` (or none) one bit, address `byte.bit`; `B` one byte; `W` two bytes; `D`
-four bytes; `L` eight bytes; multi-byte values are little-endian. Memory
+is bound to its address. The number is the **byte offset** in the area
+(as in TwinCAT): `%IW2` occupies bytes 2 and 3, `%IX2.0` is bit 0 of byte
+2. The size letter fixes the length and the type: `X` (or none) one bit,
+address `byte.bit`; `B` one byte; `W` two bytes; `D` four bytes; `L` eight
+bytes. Multi-byte values are little-endian. Memory
 variables are copied into the memory image after each cycle and back before
 the next, so other image users (for example an HMI) see and set them.
 
@@ -3171,3 +3173,22 @@ JSON (`--json`) when it stops; with `--status FILE` it also writes that
 report to the file at most once a second while it runs (written to a new
 name and renamed). `--cycles N` stops after N cycles; otherwise the runtime
 runs until it is stopped (Ctrl-C).
+
+**[runtime.modbus]** With `--modbus ADDR:PORT` the runtime serves its
+process image over Modbus TCP (default address 127.0.0.1; give `0.0.0.0`
+to serve the network). Register *n* is bytes 2*n* and 2*n*+1 of an area,
+as one little-endian word; bit *n* is bit *n* mod 8 of byte *n* / 8:
+
+| Function | Codes | Range | Area | Access |
+|---|---|---|---|---|
+| Coils | 1 | 0– | `%QX` | read |
+| Discrete inputs | 2 | 0– | `%IX` | read |
+| Holding registers | 3, 6, 16 | 0–32767 | `%M` | read and write |
+| Holding registers | 3, 6, 16 | 32768– | `%I` | read; write only while no I/O driver owns the inputs (development, simulation) |
+| Input registers | 4 | 0–32767 | `%I` | read |
+| Input registers | 4 | 32768– | `%Q` | read |
+
+Writes take effect at the next cycle start. Any other function code, or an
+address beyond the image, is answered with the Modbus exception "illegal
+function" (1) or "illegal data address" (2). Outputs are written only by the
+program, never over Modbus.
