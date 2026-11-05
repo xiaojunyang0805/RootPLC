@@ -206,10 +206,18 @@ pub fn run_runtime<D: IoDriver, C: Clock>(
     config: Config,
     io: D,
     clock: C,
+    modbus: Option<&str>,
     stop: &AtomicBool,
 ) -> Result<Report, String> {
     let p = VmProgram::new(check, program, i128::from(config.period_ns))?;
     let mut rt = Runtime::new(p, io, clock, config)?;
+    if let Some(addr) = modbus {
+        // runtime v0 has no I/O driver yet, so Modbus may set the inputs
+        let bound = rootplc_runtime::modbus::serve(addr, std::sync::Arc::clone(&rt.image), true)
+            .map_err(|e| format!("--modbus {addr}: {e}"))?;
+        rt.note(format!("Modbus TCP server on {bound} ([runtime.modbus])"));
+        eprintln!("rootplc runtime: Modbus TCP server on {bound}");
+    }
     Ok(rt.run(stop))
 }
 
@@ -288,6 +296,7 @@ END_PROGRAM
             cfg,
             NoIo,
             SystemClock::default(),
+            None,
             &AtomicBool::new(false),
         )
         .expect("runs");

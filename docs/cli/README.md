@@ -7,7 +7,7 @@ rootplc test  <file.st|dir>... [--filter TEXT] [--json]
 rootplc test  <file.st|dir>... --mutate [--mutate-limit N] [--min-score P] [--json]
 rootplc run   <file.st|dir>... [--program NAME] [--cycles N] [--cycle-ms MS] [--json]
 rootplc runtime <file.st|dir>... [--program NAME] [--cycle-ms MS] [--cycles N] [--watchdog-ms MS]
-                [--retain FILE] [--status FILE] [--json]
+                [--retain FILE] [--status FILE] [--modbus [ADDR:]PORT] [--json]
 rootplc evidence <file.st|dir>... [--out FILE] [--markdown] [--no-mutate] [--min-score P]
 rootplc explain <code> [--json]
 rootplc examples [words...] [--show ID] [--json]
@@ -128,6 +128,12 @@ development; it is not certified and has no fieldbus yet.
   saves them at stop and once a second (written to a new file, then renamed).
 - `--status FILE` writes the status report below once a second while it
   runs; the same report is printed when the runtime stops.
+- `--modbus [ADDR:]PORT` serves the process image over Modbus TCP
+  (127.0.0.1 unless an address is given): coils read `%QX`, discrete inputs
+  read `%IX`, holding registers 0–32767 are `%M` (read/write) and from 32768
+  `%I` (writable while there is no I/O driver, for bench tests), input
+  registers 0–32767 are `%I` and from 32768 `%Q`. Register *n* is bytes 2*n*
+  and 2*n*+1. Outputs are never written over Modbus.
 - On Linux with PREEMPT_RT, give it a real-time priority: `chrt -f 80 rootplc runtime ...`.
 
 ```json

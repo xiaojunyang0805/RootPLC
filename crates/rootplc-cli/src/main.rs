@@ -13,7 +13,7 @@ const USAGE: &str = "usage:
   rootplc test  <file.st|dir>... --mutate [--mutate-limit N] [--min-score P] [--json]   (mutation score of the tests)
   rootplc run   <file.st|dir>... [--program NAME] [--cycles N] [--cycle-ms MS] [--json]
   rootplc runtime <file.st|dir>... [--program NAME] [--cycle-ms MS] [--cycles N] [--watchdog-ms MS]
-                [--retain FILE] [--status FILE] [--json]   (runtime v0: run cyclically until Ctrl-C)
+                [--retain FILE] [--status FILE] [--modbus [ADDR:]PORT] [--json]   (runtime v0: until Ctrl-C)
   rootplc evidence <file.st|dir>... [--out FILE] [--markdown] [--no-mutate] [--min-score P]   (evidence pack for sign-off)
   rootplc explain <code> [--json]
   rootplc examples [words...] [--show ID] [--json]   (verified ST patterns)
@@ -46,7 +46,7 @@ impl Args {
                 "--mutate" | "--markdown" | "--no-mutate" => a.options.push((x, String::new())),
                 "--program" | "--cycles" | "--cycle-ms" | "--filter" | "--name" | "--show"
                 | "--agent" | "--library" | "--mutate-limit" | "--min-score" | "--out"
-                | "--watchdog-ms" | "--retain" | "--status" => {
+                | "--watchdog-ms" | "--retain" | "--status" | "--modbus" => {
                     let v = it.next().unwrap_or_default();
                     a.options.push((x, v));
                 }
@@ -342,6 +342,7 @@ fn cmd_runtime(paths: &[PathBuf], args: &Args) -> ExitCode {
         config,
         NoIo,
         SystemClock::default(),
+        args.opt("--modbus"),
         stop,
     ) {
         Ok(r) => r,

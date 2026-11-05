@@ -16,6 +16,8 @@ use std::time::{Duration, Instant};
 
 use rootplc_abi::{Address, Area, Kind, Program, Scalar, fits, load, store};
 
+pub mod modbus;
+
 /// FFI and hardware access. The only place where `unsafe` may appear in this
 /// crate; every block needs a `// SAFETY:` comment and a Kani proof or justification.
 #[allow(unsafe_code)]
@@ -282,6 +284,8 @@ pub struct Runtime<P: Program, D: IoDriver, C: Clock> {
     /// The image, shared with other users (HMI, Modbus server, tests).
     pub image: Arc<Mutex<Image>>,
     bindings: Vec<Binding>,
+    /// Value of each binding read at cycle start (`None` for outputs).
+    at_start: Vec<Option<Scalar>>,
     retained: Vec<usize>,
     notes: Vec<String>,
     state: State,
@@ -340,6 +344,7 @@ impl<P: Program, D: IoDriver, C: Clock> Runtime<P, D, C> {
             config,
             image: Arc::new(Mutex::new(image)),
             bindings,
+            at_start: Vec::new(),
             retained,
             notes,
             state: State::Running,
@@ -350,6 +355,11 @@ impl<P: Program, D: IoDriver, C: Clock> Runtime<P, D, C> {
         Ok(rt)
     }
 
+    /// Add a note to the report (for example where a server listens).
+    pub fn note(&mut self, text: String) {
+        self.notes.push(text);
+    }
+
     /// The program (for reading variables after a run).
     pub fn program(&self) -> &P {
         &self.program
@@ -358,10 +368,6 @@ impl<P: Program, D: IoDriver, C: Clock> Runtime<P, D, C> {
     /// Current state.
     pub fn state(&self) -> &State {
         &self.state
-    }
-
-    fn lock(&self) -> std::sync::MutexGuard<'_, Image> {
-        self.image.lock().unwrap_or_else(|e| e.into_inner())
     }
 
     /// Run until `stop` is set, the requested cycles are done, or a fault.
@@ -425,40 +431,48 @@ impl<P: Program, D: IoDriver, C: Clock> Runtime<P, D, C> {
         self.report()
     }
 
-    /// Copy the input and memory images into the located variables.
+    /// Copy the input and memory images into the located variables, under
+    /// the image lock (other users such as the Modbus server write between
+    /// cycles).
     fn inputs(&mut self) {
-        let mut img = self.lock().clone();
+        let image = Arc::clone(&self.image);
+        let mut img = image.lock().unwrap_or_else(|e| e.into_inner());
         self.io.read_inputs(&mut img);
+        self.at_start.clear();
         for b in &self.bindings {
-            if b.addr.area != Area::Output {
-                let v = load(img.area(b.addr.area), b.addr, b.kind);
+            let v =
+                (b.addr.area != Area::Output).then(|| load(img.area(b.addr.area), b.addr, b.kind));
+            if let Some(v) = v {
                 self.program.write(b.var, v);
             }
+            self.at_start.push(v);
         }
-        *self.lock() = img;
     }
 
-    /// Copy the located outputs and memory variables into the image and
-    /// hand the outputs to the driver.
+    /// Copy the located outputs into the image, and memory variables the
+    /// program changed (so a memory write by another user during the cycle
+    /// is kept), then hand the outputs to the driver.
     fn outputs(&mut self) {
-        let mut img = self.lock().clone();
-        for b in &self.bindings {
-            if b.addr.area != Area::Input {
-                if let Some(v) = self.program.read(b.var) {
-                    store(img.area_mut(b.addr.area), b.addr, v);
-                }
+        let image = Arc::clone(&self.image);
+        let mut img = image.lock().unwrap_or_else(|e| e.into_inner());
+        for (k, b) in self.bindings.iter().enumerate() {
+            let Some(v) = self.program.read(b.var) else {
+                continue;
+            };
+            let changed = self.at_start.get(k).copied().flatten() != Some(v);
+            if b.addr.area == Area::Output || (b.addr.area == Area::Memory && changed) {
+                store(img.area_mut(b.addr.area), b.addr, v);
             }
         }
         self.io.write_outputs(&img);
-        *self.lock() = img;
     }
 
     /// [runtime.watchdog]: every output bit 0, written once more.
     fn safe_outputs(&mut self) {
-        let mut img = self.lock().clone();
+        let image = Arc::clone(&self.image);
+        let mut img = image.lock().unwrap_or_else(|e| e.into_inner());
         img.output.iter_mut().for_each(|b| *b = 0);
         self.io.write_outputs(&img);
-        *self.lock() = img;
     }
 
     /// [runtime.retain]: restore RETAIN variables from the file.
