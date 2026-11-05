@@ -44,6 +44,7 @@ L1–L3 blocks).
 | [Filling station](templates/filling-station/README.md) | mode manager, machine state, scaling, filter, on/off level control, valve, alarm, debounce, step chain, pump, counter |
 | [Conveyor line](templates/conveyor-line/README.md) | mode manager, machine state, debounce ×3, accumulation zone ×3, motor ×3 |
 | [Pump station](templates/pump-station/README.md) | mode manager, machine state, scaling, filter, PID, drive ×2, run hours ×2, alarm ×2 |
+| [Batch mixer](templates/batch-mixer/README.md) | mode manager, phase, recipe table, step chain, scaling ×2, filter, PID, valve ×3, motor, alarm, counter |
 
 A template has its logic as a function block, an I/O map (`io_map.st`) for
 `rootplc runtime`, and tests against a simulated plant; `cargo test` checks
