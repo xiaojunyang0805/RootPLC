@@ -239,6 +239,9 @@ pub(crate) struct Checker<'a> {
     implements: HashMap<usize, Vec<usize>>,
     /// Function blocks declared ABSTRACT.
     abstract_fbs: HashSet<usize>,
+    /// The call being checked as a statement ([pous.oop.method]: a call
+    /// without a result is allowed only there).
+    stmt_call: Option<Span>,
     /// White-box adapters, {attribute 'rootplc.adapter'} ([diff.adapter]).
     adapter_fbs: HashSet<usize>,
     /// Structure -> (base structure, number of inherited members).
@@ -350,6 +353,7 @@ impl<'a> Checker<'a> {
             implements: HashMap::new(),
             abstract_fbs: HashSet::new(),
             adapter_fbs: HashSet::new(),
+            stmt_call: None,
             struct_base: HashMap::new(),
             raw_alias: false,
             last_block: None,
@@ -3330,7 +3334,12 @@ impl<'a> Checker<'a> {
                 };
                 Some(Stmt::Assign(target.ir(), value))
             }
-            N::CallStmt => self.first_node(n).map(|c| Stmt::Eval(self.expr(c).ir())),
+            N::CallStmt => self.first_node(n).map(|c| {
+                let outer = self.stmt_call.replace(self.span(c));
+                let v = self.expr(c);
+                self.stmt_call = outer;
+                Stmt::Eval(v.ir())
+            }),
             N::IfStmt => {
                 let mut arms = Vec::new();
                 let mut cond: Option<ir::Expr> = None;
@@ -5409,6 +5418,16 @@ impl<'a> Checker<'a> {
             }
         }
         self.note_declare_only(id, span);
+        // [pous.oop.method], [pous.function]: no result, no value
+        let is_call_stmt = self.stmt_call == Some(span);
+        if p.ret.is_none() && (recv.is_some() || p.kind == PouKind::Function) && !is_call_stmt {
+            let name = self.defs[id].name.clone();
+            let short = name.rsplit('.').next().unwrap_or(&name).to_string();
+            let msg = format!(
+                "'{short}' has no result type, so its call has no value; call it as a statement"
+            );
+            self.diag(codes::NO_RESULT_VALUE, msg, span, None);
+        }
         let (target, ty) = if let Some((inst, fb, dispatch)) = recv {
             (
                 CallTarget::Method {
