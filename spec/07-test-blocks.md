@@ -77,6 +77,11 @@ review and sign off a change. Format `rootplc-evidence/0.1`, with:
 - `tool`: name and version, and `spec_sha256`, the SHA-256 of the rule set
   compiled into the tool (the spec chapters and the diagnostic registry);
 - `inputs`: every source file with its path, size in bytes and SHA-256;
+- `libraries`: every bundled library that was active ([stdlib.compat]),
+  including the libraries it requires, sorted by name, each with its name,
+  version and the SHA-256 of its source files, so a reviewer can repeat the
+  verdict with the same library code (for example RootMotion for motion
+  programs, [motion.axis]);
 - `check`: whether the project compiles, the number of errors and warnings,
   and `iec_clean` (no error and no warning, [scope.vendor-forms]);
 - `tests`: each TEST block with its result ([tests.runner]);
