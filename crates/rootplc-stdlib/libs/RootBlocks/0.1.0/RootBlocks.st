@@ -3462,3 +3462,74 @@ IF Enable THEN
     Average := LREAL_TO_REAL(sum / UDINT_TO_LREAL(Samples));
 END_IF;
 END_FUNCTION_BLOCK
+
+(* F04.LIGHT: a lamp or light: push-button toggle, on and off commands, an
+   optional time after which it switches off by itself (stairwell light),
+   flashing, lamp test, an interlock, and the counters for maintenance
+   (switch-ons, burning time). Safe state: off (interlock). *)
+FUNCTION_BLOCK RB_Light
+VAR_INPUT
+    Toggle    : BOOL;                 (* rising edge: on <-> off *)
+    SetOn     : BOOL;                 (* rising edge: on (restarts OnTime) *)
+    SetOff    : BOOL;                 (* rising edge: off; wins over SetOn *)
+    OnTime    : TIME := T#0s;         (* off by itself after this; T#0s: stays on *)
+    Flash     : BOOL;                 (* TRUE: flash while on *)
+    FlashTime : TIME := T#500ms;      (* half period of the flashing *)
+    LampTest  : BOOL;                 (* TRUE: output on, whatever the state *)
+    Interlock : BOOL;                 (* TRUE: off now, and stays off *)
+END_VAR
+VAR_OUTPUT
+    Out        : BOOL;                (* lamp output *)
+    IsOn       : BOOL;                (* switched on (also while flashing off) *)
+    Remaining  : TIME;                (* time until it switches off by itself *)
+    Switchings : UDINT;               (* switch-ons since the block started *)
+    BurnTime   : LREAL;               (* seconds the output was on *)
+END_VAR
+VAR
+    toggleEdge : R_TRIG;
+    onEdge     : R_TRIG;
+    offEdge    : R_TRIG;
+    cyc        : RB_CycleTime;
+    blink      : RB_Blink;
+    t          : TIME;
+    restart    : BOOL;
+    was        : BOOL;
+END_VAR
+cyc();
+(* the output's state since the previous call counts as burning time *)
+IF Out THEN
+    BurnTime := BurnTime + cyc.Seconds;
+END_IF;
+toggleEdge(CLK := Toggle);
+onEdge(CLK := SetOn);
+offEdge(CLK := SetOff);
+restart := FALSE;
+IF Interlock OR offEdge.Q THEN
+    IsOn := FALSE;
+ELSIF onEdge.Q THEN
+    IsOn := TRUE;
+    restart := TRUE;
+ELSIF toggleEdge.Q THEN
+    IsOn := NOT IsOn;
+    restart := IsOn;
+END_IF;
+IF restart THEN
+    t := T#0s;
+ELSIF IsOn THEN
+    t := t + cyc.Elapsed;
+END_IF;
+IF IsOn AND OnTime > T#0s AND t >= OnTime THEN
+    IsOn := FALSE;
+END_IF;
+IF IsOn AND OnTime > T#0s THEN
+    Remaining := OnTime - t;
+ELSE
+    Remaining := T#0s;
+END_IF;
+IF IsOn AND NOT was THEN
+    Switchings := Switchings + 1;
+END_IF;
+was := IsOn;
+blink(Enable := IsOn AND Flash, OnTime := FlashTime, OffTime := FlashTime);
+Out := LampTest OR (IsOn AND (NOT Flash OR blink.Out));
+END_FUNCTION_BLOCK
