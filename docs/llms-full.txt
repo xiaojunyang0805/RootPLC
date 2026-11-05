@@ -3426,6 +3426,15 @@ loaded library. Options: `--cycles N` (default 1000), `--cycle-ms MS`
 The exit code is 0 when the blocks agree on every compared output in every
 cycle, 1 when they differ, 2 when the comparison cannot run.
 
+**[diff.slice]** Before compiling, `rootplc diff` keeps only the files the
+two blocks need: a file that declares the reference or the unit, and,
+repeatedly, every file that declares a name used in a kept file (a block,
+function, type, interface, namespace or global variable; names compare
+case-insensitively; a name used as `Type#Value` counts). The other files
+are not compiled, so errors in parts of a project the blocks do not use do
+not stop the comparison; the report lists them. Libraries given with
+`--library` are always loaded.
+
 **[diff.interface]** The blocks are matched **by name**: an input of the
 reference drives the input of the same name of the unit (names compare
 case-insensitively), and an output of the reference is compared with the
@@ -3466,7 +3475,8 @@ compared as numbers. A run-time fault in either block (for example a
 division by zero) ends the run and is reported with its cycle.
 
 **[diff.report]** The report states the verdict (`agree`, `differ` or
-`fault`), the cycles run, the inputs driven and set, and for each compared
+`fault`), the cycles run, the files left out by [diff.slice], the inputs
+driven and set, and for each compared
 output the number of cycles in which it differed. For the first difference
 it gives the cycle, both values, the driven inputs of that cycle and of up
 to four cycles before, and the last eight changes of driven inputs before
