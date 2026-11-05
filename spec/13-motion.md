@@ -15,8 +15,9 @@ They belong to certified safety hardware.
 **[motion.axis]** An axis is a variable of type `AXIS_REF`, passed to every
 block as `VAR_IN_OUT Axis`. The program sets its configuration before use:
 `CycleTime` (seconds per call of `RP_VirtualAxis`, default 0.001),
-`MaxVelocity` (units per second, default 1000), and the software limits
-`LimitsEnabled`, `PositiveLimit` and `NegativeLimit`. The other fields are
+`MaxVelocity` (units per second, default 1000), `MaxAcceleration` (the
+machine's limit in units per second², default 0: no limit set), and the
+software limits `LimitsEnabled`, `PositiveLimit` and `NegativeLimit`. The other fields are
 state, written only by RootMotion blocks: `State`, `Homed`, `Position`,
 `Velocity`, `ErrorID` and internal fields for the active command.
 
@@ -57,7 +58,9 @@ under the new command, without a jump.
 **[motion.errors]** A command that cannot start reports `Error` with
 `ErrorID`, and the axis does not change: 1 the axis is `Disabled`, 2 the axis
 is in `ErrorStop`, 3 an invalid parameter (velocity, acceleration or
-deceleration that is zero or negative where it must be positive), 4 a
+deceleration that is zero or negative where it must be positive, or an
+acceleration or deceleration above `Axis.MaxAcceleration` when that is
+set), 4 a
 software limit was reached, 5 the axis is busy (`Stopping`, or moving where
 the command needs `Standstill`).
 
@@ -113,3 +116,14 @@ for the current state ([motion.state]). Both set `Valid` to `Enable`.
 or `NegativeLimit` is never reached: the axis stops at the limit, its
 velocity becomes 0, it enters `ErrorStop` with `ErrorID` 4, and the active
 command reports `Error`.
+
+**[motion.observe]** Every call of `RP_VirtualAxis` reports the axis cycle
+to the toolchain: the axis (the path of its variable), the new velocity,
+the acceleration of this cycle (the change of velocity divided by
+`CycleTime`) and the machine limits `MaxVelocity` and `MaxAcceleration`. A
+cycle that ends in a software-limit stop ([motion.limits]) counts as a hard
+stop, and its acceleration is not counted. The test runner keeps, for each
+TEST block and axis, the number of axis cycles and hard stops, the peak
+absolute velocity and the peak absolute acceleration; the evidence pack
+reports them ([tests.evidence]). RootMotion enables the intrinsic
+`__ROOTPLC_AXIS_CYCLE` for this; it is not part of any vendor interface.

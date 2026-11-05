@@ -2705,10 +2705,17 @@ review and sign off a change. Format `rootplc-evidence/0.1`, with:
 - `check`: whether the project compiles, the number of errors and warnings,
   and `iec_clean` (no error and no warning, [scope.vendor-forms]);
 - `tests`: each TEST block with its result ([tests.runner]);
+- `motion`: every axis a RootMotion axis cycle ran on during the tests
+  ([motion.observe]), with its TEST block and variable path, the number of
+  axis cycles and hard stops, the peak velocity and acceleration, the
+  machine limits, and `within_limits` (the peak velocity is at most
+  `MaxVelocity` and, when `MaxAcceleration` is set, the peak acceleration
+  is at most `MaxAcceleration`); empty when no axis moved;
 - `mutation`: the result of [tests.mutation] (score, killed, viable, each
   survivor), unless `--no-mutate` is given;
 - `verdict`: `verified` when the project compiles, has at least one TEST
-  block, every test passes and, with `--min-score P`, the mutation score is
+  block, every test passes, every axis in `motion` is within its limits
+  and, with `--min-score P`, the mutation score is
   at least `P` percent; otherwise `not verified`, with `reasons`;
 - `signature`: `null`. A pack made by `rootplc` is never signed. A signing
   service may add a signature that covers the pack with `signature` set to
