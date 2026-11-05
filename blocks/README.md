@@ -28,6 +28,9 @@ jobs and features exist, never copied. No block is a safety function.
 | F11 | Data handling and communication | planned |
 | F12 | Material handling and process patterns | planned |
 
+How often each family occurs in real code (classifier v1, aggregate only):
+[corpus/BLOCKS_REPORT.md](../corpus/BLOCKS_REPORT.md).
+
 ## Levels
 
 L1 elementary functions, L2 device modules, L3 equipment functions (several

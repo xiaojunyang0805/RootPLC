@@ -8,6 +8,7 @@ cargo build --release
 python corpus/corpus.py fetch      # shallow clones into corpus/.cache (git-ignored)
 python corpus/corpus.py analyse    # writes REPORT.md
 python corpus/corpus.py run        # run smoke test: execute each application program (adds to REPORT.md)
+python corpus/classify.py          # block catalog: classify units into the RootBlocks families (BLOCKS_REPORT.md)
 ```
 
 The repository holds only `manifest.toml` (URL, licence, format) and the
@@ -21,4 +22,4 @@ duplicated, not Structured Text or too small to matter are removed and listed
 under `[[excluded]]` in the manifest. *Clean* is rootplc's own verdict, not a
 vendor compiler's.
 
-Latest result: [REPORT.md](REPORT.md).
+Latest result: [REPORT.md](REPORT.md). Units by job family: [BLOCKS_REPORT.md](BLOCKS_REPORT.md).
