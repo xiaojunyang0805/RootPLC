@@ -51,7 +51,7 @@ which exactly one token is changed by one of these operators:
 | boolean literal | `TRUE` ↔ `FALSE` |
 | negation | `NOT` removed |
 | integer literal | `n` → `n + 1` |
-| duration | the value doubled (`T#5s` → `T#10s`) |
+| duration | a non-zero value doubled (`T#5s` → `T#10s`; `T#0s` is left alone, doubling cannot change it) |
 
 Only tokens in statements are mutated: never inside a TEST block, a
 declaration section (`VAR` … `END_VAR`, `TYPE` … `END_TYPE`), a comment, a
