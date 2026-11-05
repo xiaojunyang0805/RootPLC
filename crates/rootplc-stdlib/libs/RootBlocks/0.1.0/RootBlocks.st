@@ -15,6 +15,8 @@ TYPE
     END_STRUCT;
     (* F08: alarm states, named as in ISA-18.2 *)
     RB_ALARM_STATE : (Normal, ActiveUnack, ActiveAcked, ReturnedUnack);
+    (* F05: batch phase states (ISA-88 names; transient states omitted) *)
+    RB_PHASE_STATE : (Idle, Running, Held, Complete, Stopped, Aborted);
 END_TYPE
 
 (* F04.VALVE.ONOFF: an on/off valve with open and closed feedback.
@@ -981,4 +983,164 @@ ELSIF Unacked THEN
 ELSE
     State := RB_ALARM_STATE#Normal;
 END_IF;
+END_FUNCTION_BLOCK
+
+(* F05.STEPS: a step chain. The application programs the actions of each
+   step in a CASE on StepNo and sets Proceed to the condition that ends the
+   current step (and NextStep to branch). StepNo 0 is idle.
+   ErrorID 1 step timeout. *)
+FUNCTION_BLOCK RB_StepChain
+VAR_INPUT
+    Start       : BOOL;               (* rising edge: idle -> step 1 *)
+    Proceed     : BOOL;               (* the current step is finished *)
+    NextStep    : INT;                (* 0: StepNo + 1; otherwise the step to go to *)
+    LastStep    : INT := 1;           (* after this step the chain is done *)
+    StepTimeout : TIME := T#0s;       (* for the current step; T#0s: none *)
+    Hold        : BOOL;               (* TRUE: stay, transitions ignored, timer paused *)
+    Abort       : BOOL;               (* TRUE: back to idle *)
+    Reset       : BOOL;               (* rising edge clears a timeout *)
+END_VAR
+VAR_OUTPUT
+    StepNo    : INT;                  (* 0 idle, 1 .. LastStep *)
+    StepTime  : TIME;                 (* time in the current step, without holds *)
+    FirstCall : BOOL;                 (* TRUE in the first call of a step *)
+    Busy      : BOOL;
+    Done      : BOOL;                 (* TRUE for one call when the chain ends *)
+    Aborted   : BOOL;                 (* TRUE for one call after an abort *)
+    Held      : BOOL;
+    Error     : BOOL;
+    ErrorID   : UDINT;
+END_VAR
+VAR
+    startEdge : R_TRIG;
+    resetEdge : R_TRIG;
+    cyc       : RB_CycleTime;
+    elapsed   : LREAL;
+END_VAR
+startEdge(CLK := Start);
+resetEdge(CLK := Reset);
+cyc();
+Done := FALSE;
+Aborted := FALSE;
+FirstCall := FALSE;
+IF resetEdge.Q AND Error THEN
+    Error := FALSE;
+    ErrorID := 0;
+    elapsed := 0.0;
+END_IF;
+IF Abort THEN
+    IF StepNo <> 0 THEN
+        Aborted := TRUE;
+    END_IF;
+    StepNo := 0;
+    Error := FALSE;
+    ErrorID := 0;
+    elapsed := 0.0;
+ELSIF StepNo = 0 THEN
+    IF startEdge.Q THEN
+        StepNo := 1;
+        elapsed := 0.0;
+        FirstCall := TRUE;
+    END_IF;
+ELSIF NOT Hold AND NOT Error THEN
+    elapsed := elapsed + cyc.Seconds;
+    IF Proceed THEN
+        IF StepNo >= LastStep AND NextStep = 0 THEN
+            StepNo := 0;
+            Done := TRUE;
+        ELSE
+            IF NextStep = 0 THEN
+                StepNo := StepNo + 1;
+            ELSE
+                StepNo := NextStep;
+            END_IF;
+            FirstCall := TRUE;
+        END_IF;
+        elapsed := 0.0;
+    ELSIF StepTimeout > T#0s AND elapsed >= TIME_TO_LREAL(StepTimeout) / 1000.0 THEN
+        Error := TRUE;
+        ErrorID := UDINT#1;
+    END_IF;
+END_IF;
+StepTime := LREAL_TO_TIME(elapsed * 1000.0);
+Busy := StepNo <> 0;
+Held := Busy AND Hold;
+END_FUNCTION_BLOCK
+
+(* F05.PHASE: the state model of a batch phase (ISA-88 state names).
+   Commands act on their rising edge; Finished (from the phase logic) ends
+   Running. A command that is not valid in the current state is ignored and
+   reported in Rejected for that call. *)
+FUNCTION_BLOCK RB_Phase
+VAR_INPUT
+    Start    : BOOL;
+    Hold     : BOOL;
+    Restart  : BOOL;
+    Stop     : BOOL;
+    Abort    : BOOL;
+    Reset    : BOOL;
+    Finished : BOOL;                  (* the phase logic has completed *)
+END_VAR
+VAR_OUTPUT
+    State    : RB_PHASE_STATE;
+    Running  : BOOL;
+    Done     : BOOL;                  (* State = Complete *)
+    Rejected : BOOL;                  (* a command was not valid in this state *)
+END_VAR
+VAR
+    eStart   : R_TRIG;
+    eHold    : R_TRIG;
+    eRestart : R_TRIG;
+    eStop    : R_TRIG;
+    eAbort   : R_TRIG;
+    eReset   : R_TRIG;
+END_VAR
+eStart(CLK := Start);
+eHold(CLK := Hold);
+eRestart(CLK := Restart);
+eStop(CLK := Stop);
+eAbort(CLK := Abort);
+eReset(CLK := Reset);
+Rejected := FALSE;
+IF eAbort.Q THEN
+    IF State = RB_PHASE_STATE#Running OR State = RB_PHASE_STATE#Held OR State = RB_PHASE_STATE#Stopped THEN
+        State := RB_PHASE_STATE#Aborted;
+    ELSE
+        Rejected := TRUE;
+    END_IF;
+ELSIF eStop.Q THEN
+    IF State = RB_PHASE_STATE#Running OR State = RB_PHASE_STATE#Held THEN
+        State := RB_PHASE_STATE#Stopped;
+    ELSE
+        Rejected := TRUE;
+    END_IF;
+ELSIF eHold.Q THEN
+    IF State = RB_PHASE_STATE#Running THEN
+        State := RB_PHASE_STATE#Held;
+    ELSE
+        Rejected := TRUE;
+    END_IF;
+ELSIF eRestart.Q THEN
+    IF State = RB_PHASE_STATE#Held THEN
+        State := RB_PHASE_STATE#Running;
+    ELSE
+        Rejected := TRUE;
+    END_IF;
+ELSIF eStart.Q THEN
+    IF State = RB_PHASE_STATE#Idle THEN
+        State := RB_PHASE_STATE#Running;
+    ELSE
+        Rejected := TRUE;
+    END_IF;
+ELSIF eReset.Q THEN
+    IF State = RB_PHASE_STATE#Complete OR State = RB_PHASE_STATE#Stopped OR State = RB_PHASE_STATE#Aborted THEN
+        State := RB_PHASE_STATE#Idle;
+    ELSE
+        Rejected := TRUE;
+    END_IF;
+ELSIF Finished AND State = RB_PHASE_STATE#Running THEN
+    State := RB_PHASE_STATE#Complete;
+END_IF;
+Running := State = RB_PHASE_STATE#Running;
+Done := State = RB_PHASE_STATE#Complete;
 END_FUNCTION_BLOCK

@@ -195,6 +195,9 @@ fn doubled_duration(text: &str) -> Option<String> {
         return None;
     }
     let n: u64 = digits.parse().ok()?;
+    if n == 0 {
+        return None; // [tests.mutation]: doubling T#0s cannot change it
+    }
     Some(format!("{prefix}#{}{unit}", n.checked_mul(2)?))
 }
 
@@ -322,6 +325,8 @@ mod tests {
             "unary minus is not mutated"
         );
         assert!(n.contains(&("T#5s".into(), "T#10s".into())));
+        assert_eq!(doubled_duration("T#0s"), None);
+        assert_eq!(doubled_duration("T#0ms"), None);
         assert!(n.contains(&("2".into(), "3".into())));
     }
 

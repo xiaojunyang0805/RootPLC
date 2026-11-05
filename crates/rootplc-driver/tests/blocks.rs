@@ -68,9 +68,23 @@ fn block_tests_kill_at_least_90_percent_of_mutants() {
     let m =
         rootplc_driver::mutate::mutation_report(sources, &[], None, 1000).expect("mutation run");
     assert!(m.baseline.ok(), "block tests fail");
-    let score = m.score().expect("viable mutants");
+    // only the library's own mutants count: helper blocks in the test files
+    // are fixtures, not catalog code
+    let lib = |p: &std::path::Path| p.file_name().is_some_and(|n| n == "RootBlocks.st");
+    let mine: Vec<_> = m.mutants.iter().filter(|(mu, _)| lib(&mu.path)).collect();
+    let viable = mine
+        .iter()
+        .filter(|(_, o)| *o != rootplc_driver::mutate::Outcome::NotViable)
+        .count();
+    let killed = mine
+        .iter()
+        .filter(|(_, o)| *o == rootplc_driver::mutate::Outcome::Killed)
+        .count();
+    assert!(viable > 0, "no viable mutants in the library");
+    let score = killed as f64 / viable as f64;
     let survivors: Vec<String> = m
         .survivors()
+        .filter(|s| lib(&s.path))
         .map(|s| {
             format!(
                 "{}:{} {} -> {}",
