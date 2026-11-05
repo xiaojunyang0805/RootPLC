@@ -38,3 +38,34 @@ clock when they are called, so a typical test calls the instance, advances,
 and calls it again. `ADVANCE` is available only in TEST blocks; elsewhere it
 is error RP0203. A negative duration does nothing.
 
+
+**[tests.mutation]** `rootplc test --mutate` measures whether the tests
+check the code, not only run it. It makes *mutants*: copies of the project in
+which exactly one token is changed by one of these operators:
+
+| Operator | Change |
+|---|---|
+| comparison | `<` ↔ `<=`, `>` ↔ `>=`, `=` ↔ `<>` |
+| arithmetic | binary `+` ↔ `-` |
+| logical | `AND` ↔ `OR`, `XOR` → `OR` |
+| boolean literal | `TRUE` ↔ `FALSE` |
+| negation | `NOT` removed |
+| integer literal | `n` → `n + 1` |
+| duration | the value doubled (`T#5s` → `T#10s`) |
+
+Only tokens in statements are mutated: never inside a TEST block, a
+declaration section (`VAR` … `END_VAR`, `TYPE` … `END_TYPE`), a comment, a
+pragma or a file of a compatibility library ([stdlib.compat]). A `+` or `-`
+that follows an operator, an opening parenthesis, a comma, `:=` or a keyword
+is unary and is not mutated. Mutants are made in source order; at most
+`--mutate-limit N` of them (default 500).
+
+Each mutant is checked and its TEST blocks are run as in [tests.runner]. A
+mutant that does not compile is *not viable* and is not counted. A viable
+mutant is *killed* when at least one test fails (a failed assertion or a
+fault, including the watchdog); otherwise it *survives*. The mutation score
+is killed ÷ viable. Mutation needs the unchanged project to compile and pass
+every test; otherwise no mutant is run and the command reports why. Each
+surviving mutant is reported with its file, line, column, the original token
+and its replacement, so a test can be added for it. With `--min-score P`
+(0–100) the command fails when the score is below `P` percent.
