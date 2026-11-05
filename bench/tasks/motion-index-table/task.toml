@@ -1,0 +1,22 @@
+id = "motion-index-table"
+version = 1
+category = "motion"
+difficulty = "medium"
+languages = ["ST"]
+split = "public"
+source = "original (RootPLC)"
+licence = "Apache-2.0"
+libraries = ["RootMotion"]
+
+equivalent_mutants = [
+    "'OR' -> 'AND' in stepMove.Error OR stepMove.CommandAborted: after a move error the axis is in ErrorStop, so inPosition stays FALSE and next is blocked either way; the block has no reset",
+    "'OR' -> 'AND' in stepMove.CommandAborted OR NOT enable: in this block a move is only aborted by switching enable off, so both are TRUE together",
+]
+
+[grading]
+iec_clean = true
+
+[scoring]
+compile = 0.1
+visible_tests = 0.2
+hidden_tests = 0.7

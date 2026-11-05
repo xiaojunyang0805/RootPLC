@@ -9,14 +9,13 @@ VAR
     hl : MC_Halt;
     rd : MC_ReadStatus;
     rp : MC_ReadActualPosition;
-    va : RP_VirtualAxis;
     i : INT;
 END_VAR
 ax.CycleTime := 0.01;
 pw(Enable := TRUE, Axis := ax);
 FOR i := 1 TO 100 DO
     mvv(Execute := TRUE, Velocity := 20.0, Acceleration := 100.0, Deceleration := 100.0, Direction := MC_DIRECTION#Negative, Axis := ax);
-    va(Axis := ax);
+    RP_VirtualAxis(Axis := ax);
 END_FOR;
 mvv(Execute := TRUE, Velocity := 20.0, Acceleration := 100.0, Deceleration := 100.0, Direction := MC_DIRECTION#Negative, Axis := ax);
 ASSERT_TRUE(mvv.InVelocity);
@@ -30,7 +29,7 @@ ASSERT_TRUE(ABS(rp.Position - ax.Position) < 0.000001);
 FOR i := 1 TO 50 DO
     hl(Execute := TRUE, Deceleration := 100.0, Axis := ax);
     mvv(Execute := TRUE, Velocity := 20.0, Acceleration := 100.0, Deceleration := 100.0, Direction := MC_DIRECTION#Negative, Axis := ax);
-    va(Axis := ax);
+    RP_VirtualAxis(Axis := ax);
 END_FOR;
 ASSERT_TRUE(hl.Done);
 ASSERT_TRUE(mvv.CommandAborted);

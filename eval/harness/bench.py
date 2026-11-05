@@ -48,6 +48,11 @@ class Task:
     def weights(self) -> dict:
         return self.meta.get("scoring", {})
 
+    @property
+    def library_args(self) -> list[str]:
+        """`--library` flags for the task's bundled libraries (e.g. RootMotion)."""
+        return [x for lib in self.meta.get("libraries", []) for x in ("--library", lib)]
+
 
 def load_tasks(ids: list[str] | None = None) -> list[Task]:
     tasks = []
@@ -119,7 +124,7 @@ def grade(task: Task, src_dir: Path) -> Grade:
         return g
     tmp, files = _stage(src, [])
     try:
-        rep = run_rootplc(["check", *files])
+        rep = run_rootplc(["check", *files, *task.library_args])
         g.compiled = bool(rep.get("ok"))
         g.diagnostics = rep.get("diagnostics", [])[:20]
         if task.meta.get("grading", {}).get("iec_clean"):
@@ -132,7 +137,7 @@ def grade(task: Task, src_dir: Path) -> Grade:
     for extra, is_hidden in ((visible, False), (hidden, True)):
         tmp, files = _stage(src, [extra])
         try:
-            rep = run_rootplc(["test", *files], timeout=300)
+            rep = run_rootplc(["test", *files, *task.library_args], timeout=300)
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
         tests = rep.get("tests", [])

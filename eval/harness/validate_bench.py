@@ -22,7 +22,8 @@ def main() -> int:
     print(f"{'task':28} {'ref':>4} {'mutants':>8} {'killed':>7} {'score':>6}")
     for t in load_tasks(a.tasks or None):
         g = grade(t, t.dir / "reference")
-        m = mutation_score(sorted((t.dir / "reference").glob("*.st")), [t.dir / "hidden_tests.st"])
+        m = mutation_score(sorted((t.dir / "reference").glob("*.st")), [t.dir / "hidden_tests.st"],
+                           extra_args=t.library_args)
         eq = len(t.meta.get("equivalent_mutants", []))
         m.viable -= min(eq, len(m.survivors))  # declared equivalent mutants are not counted
         ok = g.verified_correct and m.score >= a.min_score

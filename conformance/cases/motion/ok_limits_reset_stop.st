@@ -9,7 +9,6 @@ VAR
     mv : MC_MoveAbsolute;
     st : MC_Stop;
     rs : MC_Reset;
-    va : RP_VirtualAxis;
     i : INT;
 END_VAR
 ax.CycleTime := 0.01;
@@ -19,7 +18,7 @@ ax.NegativeLimit := -50.0;
 pw(Enable := TRUE, Axis := ax);
 FOR i := 1 TO 600 DO
     mvv(Execute := TRUE, Velocity := 20.0, Acceleration := 100.0, Deceleration := 100.0, Axis := ax);
-    va(Axis := ax);
+    RP_VirtualAxis(Axis := ax);
 END_FOR;
 mvv(Execute := TRUE, Velocity := 20.0, Acceleration := 100.0, Deceleration := 100.0, Axis := ax);
 ASSERT_TRUE(ax.State = MC_AXIS_STATE#ErrorStop);
@@ -36,10 +35,10 @@ ASSERT_EQ(UDINT#0, ax.ErrorID);
 mvv(Execute := FALSE, Axis := ax);
 mvv(Execute := FALSE, Axis := ax);
 mvv(Execute := TRUE, Velocity := 10.0, Acceleration := 100.0, Deceleration := 100.0, Direction := MC_DIRECTION#Negative, Axis := ax);
-va(Axis := ax);
+RP_VirtualAxis(Axis := ax);
 FOR i := 1 TO 50 DO
     st(Execute := TRUE, Deceleration := 100.0, Axis := ax);
-    va(Axis := ax);
+    RP_VirtualAxis(Axis := ax);
 END_FOR;
 ASSERT_TRUE(st.Done);
 ASSERT_TRUE(ax.State = MC_AXIS_STATE#Stopping);

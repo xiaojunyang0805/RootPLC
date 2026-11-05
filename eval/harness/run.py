@@ -135,7 +135,7 @@ def evaluate(task: Task, host: dict, mode: str, timeout: int, mutate: bool) -> d
         own_tests = [t for t in st_files(ws / "tests") if t.name != "visible_tests.st"]
         mut = None
         if mutate and g.compiled and own_tests:
-            m = mutation_score(st_files(ws / "src"), own_tests)
+            m = mutation_score(st_files(ws / "src"), own_tests, extra_args=task.library_args)
             mut = {"viable": m.viable, "killed": m.killed, "score": round(m.score, 4)}
         # In mode "without" rootplc is not on PATH, so it cannot be used; a
         # marker there is only the task prompt quoted back (e.g. "`rootplc check`").

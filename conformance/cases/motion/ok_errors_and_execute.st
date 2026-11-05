@@ -30,7 +30,6 @@ VAR
     ax : AXIS_REF;
     pw : MC_Power;
     mv : MC_MoveAbsolute;
-    va : RP_VirtualAxis;
     i : INT;
 END_VAR
 ax.CycleTime := 0.1;
@@ -38,7 +37,7 @@ pw(Enable := TRUE, Axis := ax);
 mv(Execute := TRUE, Position := 1.0, Velocity := 10.0, Acceleration := 100.0, Deceleration := 100.0, Axis := ax);
 FOR i := 1 TO 20 DO
     mv(Execute := FALSE, Position := 1.0, Velocity := 10.0, Acceleration := 100.0, Deceleration := 100.0, Axis := ax);
-    va(Axis := ax);
+    RP_VirtualAxis(Axis := ax);
     IF mv.Done THEN
         EXIT;
     END_IF;

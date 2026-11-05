@@ -1,6 +1,6 @@
 id = "real-isa-alarm"
 version = 1
-category = "alarms"
+category = "logic"
 difficulty = "hard"
 languages = ["ST"]
 split = "public"

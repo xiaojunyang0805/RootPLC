@@ -91,7 +91,8 @@ class MutationResult:
         return self.killed / self.viable if self.viable else 0.0
 
 
-def mutation_score(src: list[Path], tests: list[Path], limit: int = 200) -> MutationResult:
+def mutation_score(src: list[Path], tests: list[Path], limit: int = 200,
+                   extra_args: list[str] | None = None) -> MutationResult:
     """Mutate each file in `src` once per mutant; run `tests` against it."""
     base = Path(tempfile.mkdtemp(prefix="plcmut-"))
     try:
@@ -101,7 +102,8 @@ def mutation_score(src: list[Path], tests: list[Path], limit: int = 200) -> Muta
             shutil.copyfile(f, dst)
             names[f] = dst
         files = [str(names[f]) for f in src + tests]
-        if not run_rootplc(["test", *files], timeout=300).get("ok"):
+        extra = extra_args or []
+        if not run_rootplc(["test", *files, *extra], timeout=300).get("ok"):
             return MutationResult(0, 0, ["tests do not pass on the original"])
         viable = killed = 0
         survivors = []
@@ -110,7 +112,7 @@ def mutation_score(src: list[Path], tests: list[Path], limit: int = 200) -> Muta
             for mu in mutants_of(f)[:limit]:
                 mutated = text[: mu.offset] + mu.replacement + text[mu.offset + len(mu.original):]
                 names[f].write_text(mutated, encoding="utf-8")
-                rep = run_rootplc(["test", *files], timeout=300)
+                rep = run_rootplc(["test", *files, *extra], timeout=300)
                 names[f].write_text(text, encoding="utf-8")
                 if not rep.get("compiled", rep.get("ok", False)):
                     continue  # not viable

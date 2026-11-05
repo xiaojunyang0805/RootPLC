@@ -86,8 +86,9 @@ END_IF;
 END_FUNCTION
 
 (* The virtual axis: call it once per cycle, after the motion blocks
-   ([motion.cycle], [motion.profile], [motion.limits]). *)
-FUNCTION_BLOCK RP_VirtualAxis
+   ([motion.cycle], [motion.profile], [motion.limits]). Returns TRUE while
+   the axis moves. *)
+FUNCTION RP_VirtualAxis : BOOL
 VAR_IN_OUT
     Axis : AXIS_REF;
 END_VAR
@@ -181,7 +182,8 @@ IF Axis.LimitsEnabled AND (pNew > Axis.PositiveLimit OR pNew < Axis.NegativeLimi
 END_IF;
 Axis.Position := pNew;
 Axis.Velocity := vNew;
-END_FUNCTION_BLOCK
+RP_VirtualAxis := vNew <> 0.0;
+END_FUNCTION
 
 (* [motion.power] *)
 FUNCTION_BLOCK MC_Power

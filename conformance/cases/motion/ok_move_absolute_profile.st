@@ -8,7 +8,6 @@ VAR
     ax : AXIS_REF;
     pw : MC_Power;
     mv : MC_MoveAbsolute;
-    va : RP_VirtualAxis;
     i : INT;
     doneAt : INT := -1;
     vmax : LREAL;
@@ -25,7 +24,7 @@ FOR i := 1 TO 400 DO
     IF i = 1 THEN
         ASSERT_TRUE(ax.State = MC_AXIS_STATE#DiscreteMotion);
     END_IF;
-    va(Axis := ax);
+    RP_VirtualAxis(Axis := ax);
     IF ax.Velocity > vmax THEN
         vmax := ax.Velocity;
     END_IF;

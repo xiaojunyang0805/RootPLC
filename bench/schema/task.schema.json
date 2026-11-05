@@ -10,6 +10,7 @@
     "difficulty": { "enum": ["easy", "medium", "hard"] },
     "languages": { "type": "array", "items": { "enum": ["ST", "SFC", "LD", "FBD"] } },
     "split": { "enum": ["public", "held-out"] },
+    "libraries": { "type": "array", "items": { "type": "string" }, "description": "bundled libraries the solution uses, passed to rootplc as --library (e.g. RootMotion)" },
     "grading": {
       "type": "object",
       "properties": {
