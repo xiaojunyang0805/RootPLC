@@ -39,6 +39,7 @@ rootplc check <file.st|dir>... [--json]
 rootplc test  <file.st|dir>... [--filter TEXT] [--json]
 rootplc test  <file.st|dir>... --mutate [--mutate-limit N] [--min-score P] [--json]
 rootplc run   <file.st|dir>... [--program NAME] [--cycles N] [--cycle-ms MS] [--json]
+rootplc evidence <file.st|dir>... [--out FILE] [--markdown] [--no-mutate] [--min-score P]
 rootplc explain <code> [--json]
 rootplc examples [words...] [--show ID] [--json]
 rootplc coverage <file.st|dir>... [--json]
@@ -141,6 +142,34 @@ cycle, so timers behave as on a PLC with that cycle time.
 
 Faults: `DIV_BY_ZERO`, `RANGE` (subrange), `INDEX` (array bounds),
 `NULL_REF`, `WATCHDOG` (more than 10 million statements in one cycle).
+
+## evidence
+
+Writes the evidence pack an engineer reviews before approving a change
+([tests.evidence]): the tool version and a SHA-256 of its rule set, every
+input file with its SHA-256, the check result (`iec_clean` when there is no
+error and no warning), each test, the mutation score with surviving changes,
+and a verdict. `verified` needs a compiling project, at least one TEST block,
+every test passing and, with `--min-score P`, a mutation score of at least `P`
+percent. The pack has no time stamp, so the same inputs give the same pack; a
+local pack is never signed (`"signature": null`). The command fails when the
+verdict is `not verified`. The MCP tool is `rootplc_evidence`.
+
+```
+$ rootplc evidence src tests --min-score 80 --out evidence.json
+wrote evidence.json: verified
+$ rootplc evidence src tests --markdown      # a readable summary
+```
+
+```json
+{"format":"rootplc-evidence/0.1",
+ "tool":{"name":"rootplc","version":"0.0.1","spec_sha256":"..."},
+ "inputs":[{"path":"src/latch.st","bytes":155,"sha256":"..."}],
+ "check":{"compiled":true,"errors":0,"warnings":0,"iec_clean":true},
+ "tests":{"passed":3,"failed":0,"items":[{"name":"latch","passed":true}]},
+ "mutation":{"score":1.0000,"killed":3,"viable":3,"not_viable":0,"candidates":3,"run":3,"error":null,"survivors":[]},
+ "min_score":80,"verdict":"verified","reasons":[],"signature":null}
+```
 
 ## explain
 

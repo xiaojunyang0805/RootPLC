@@ -1,0 +1,16 @@
+id = "real-isa-alarm"
+version = 1
+category = "alarms"
+difficulty = "hard"
+languages = ["ST"]
+split = "public"
+source = "real code: FB_Alarm and ST_Alarm from CGainsWorks/plc-cip-batch-control (https://github.com/CGainsWorks/plc-cip-batch-control), adapted to strict IEC 61131-3 (statement semicolons); prompt and tests written for RootPLC"
+licence = "MIT (reference solution, see source); prompt and tests Apache-2.0"
+
+[grading]
+iec_clean = true
+
+[scoring]
+compile = 0.1
+visible_tests = 0.2
+hidden_tests = 0.7
