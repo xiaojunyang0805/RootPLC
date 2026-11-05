@@ -639,6 +639,7 @@ END_FUNCTION_BLOCK
 FUNCTION_BLOCK RB_CycleTime
 VAR_OUTPUT
     Seconds   : LREAL;    (* seconds since the previous call *)
+    Elapsed   : TIME;     (* the same, exact *)
     FirstCall : BOOL;
 END_VAR
 VAR
@@ -652,8 +653,10 @@ END_VAR
 clock(IN := TRUE, PT := Period);
 FirstCall := NOT started;
 IF started THEN
-    Seconds := TIME_TO_LREAL(clock.ET - last) / 1000.0;
+    Elapsed := clock.ET - last;
+    Seconds := TIME_TO_LREAL(Elapsed) / 1000.0;
 ELSE
+    Elapsed := T#0s;
     Seconds := 0.0;
     started := TRUE;
 END_IF;
@@ -2546,4 +2549,319 @@ IF parts > 0.0 THEN
     Quality := LREAL_TO_REAL(UDINT_TO_LREAL(GoodCount) / parts);
 END_IF;
 OEE := Availability * Performance * Quality;
+END_FUNCTION_BLOCK
+
+(* F06.PROFILE: a set-point program of up to 8 segments, each a ramp to a
+   target in RampTime and a soak for SoakTime (ovens, kilns, heat
+   treatment, sterilisers). Start begins at the present PV. With Band > 0
+   the soak time counts only while PV is within Band of SP (guaranteed
+   soak). Hold freezes the program. ErrorID 1 Count outside 1 .. 8; the
+   program does not start. *)
+FUNCTION_BLOCK RB_SetpointProfile
+VAR_INPUT
+    Start     : BOOL;                 (* rising edge: segment 1, startSP PV *)
+    Hold      : BOOL;                 (* TRUE: SP and timers frozen *)
+    Abort     : BOOL;                 (* rising edge: end the program *)
+    PV        : REAL;
+    Count     : INT := 1;             (* segments used, 1 .. 8 *)
+    Targets   : ARRAY[1..8] OF REAL;
+    RampTimes : ARRAY[1..8] OF TIME;
+    SoakTimes : ARRAY[1..8] OF TIME;
+    Band      : REAL;                 (* guaranteed soak; 0: off *)
+END_VAR
+VAR_OUTPUT
+    SP      : REAL;
+    Segment : INT;                    (* 0: not running *)
+    Soaking : BOOL;
+    Busy    : BOOL;
+    Done    : BOOL;                   (* the program completed *)
+    Error   : BOOL;
+    ErrorID : UDINT;
+END_VAR
+VAR
+    startEdge : R_TRIG;
+    abortEdge : R_TRIG;
+    cyc       : RB_CycleTime;
+    startSP      : REAL;
+    t         : TIME;                 (* in the ramp or soak *)
+END_VAR
+cyc();
+startEdge(CLK := Start);
+abortEdge(CLK := Abort);
+IF startEdge.Q THEN
+    Error := Count < 1 OR Count > 8;
+    Done := FALSE;
+    Soaking := FALSE;
+    t := T#0s;
+    IF Error THEN
+        ErrorID := UDINT#1;
+        Segment := 0;
+        Busy := FALSE;
+    ELSE
+        ErrorID := 0;
+        Segment := 1;
+        Busy := TRUE;
+        startSP := PV;
+        SP := PV;
+    END_IF;
+ELSIF abortEdge.Q THEN
+    Segment := 0;
+    Busy := FALSE;
+    Soaking := FALSE;
+ELSIF Busy AND NOT Hold THEN
+    IF NOT Soaking THEN
+        t := t + cyc.Elapsed;
+        IF t >= RampTimes[Segment] THEN
+            SP := Targets[Segment];
+            Soaking := TRUE;
+            t := T#0s;
+        ELSE
+            SP := startSP + (Targets[Segment] - startSP) * LREAL_TO_REAL(TIME_TO_LREAL(t) / TIME_TO_LREAL(RampTimes[Segment]));
+        END_IF;
+    ELSE
+        IF Band <= 0.0 OR ABS(PV - SP) <= Band THEN
+            t := t + cyc.Elapsed;
+        END_IF;
+        IF t >= SoakTimes[Segment] THEN
+            startSP := Targets[Segment];
+            Soaking := FALSE;
+            t := T#0s;
+            IF Segment >= Count THEN
+                Segment := 0;
+                Busy := FALSE;
+                Done := TRUE;
+            ELSE
+                Segment := Segment + 1;
+            END_IF;
+        END_IF;
+    END_IF;
+END_IF;
+END_FUNCTION_BLOCK
+
+(* F05.HOMING: a homing sequence for an axis without position feedback
+   other than a home switch (a positioning motor, a lift, a turntable):
+   move towards the switch, then away slowly until it releases; the axis
+   is then homed. ErrorID 1 the switch was not reached within Timeout, 2 it
+   did not release within Timeout; outputs off (safe state) until Reset. *)
+FUNCTION_BLOCK RB_Homing
+VAR_INPUT
+    Start      : BOOL;                (* rising edge: home *)
+    Abort      : BOOL;                (* TRUE: stop now *)
+    HomeSwitch : BOOL;
+    Timeout    : TIME := T#30s;       (* per phase *)
+    Reset      : BOOL;                (* rising edge clears a fault *)
+END_VAR
+VAR_OUTPUT
+    MoveToHome : BOOL;                (* towards the switch *)
+    MoveAway   : BOOL;                (* away from the switch *)
+    Slow       : BOOL;                (* creep speed *)
+    Homed      : BOOL;
+    Busy       : BOOL;
+    Error      : BOOL;
+    ErrorID    : UDINT;
+END_VAR
+VAR
+    startEdge : R_TRIG;
+    resetEdge : R_TRIG;
+    tPhase    : TON;
+    phase     : INT;                  (* 0 idle, 1 seek, 2 back off *)
+END_VAR
+startEdge(CLK := Start);
+resetEdge(CLK := Reset);
+IF resetEdge.Q THEN
+    Error := FALSE;
+    ErrorID := 0;
+END_IF;
+IF startEdge.Q AND NOT Error AND NOT Abort THEN
+    Homed := FALSE;
+    phase := 1;
+    tPhase(IN := FALSE, PT := Timeout);
+END_IF;
+IF phase = 1 AND HomeSwitch THEN
+    phase := 2;
+    tPhase(IN := FALSE, PT := Timeout);
+END_IF;
+IF phase = 2 AND NOT HomeSwitch THEN
+    phase := 0;
+    Homed := TRUE;
+END_IF;
+IF Abort THEN
+    phase := 0;
+END_IF;
+tPhase(IN := phase <> 0, PT := Timeout);
+IF tPhase.Q THEN
+    Error := TRUE;
+    ErrorID := INT_TO_UDINT(phase);
+    phase := 0;
+END_IF;
+MoveToHome := phase = 1;
+MoveAway := phase = 2;
+Slow := phase = 2;
+Busy := phase <> 0;
+END_FUNCTION_BLOCK
+
+(* F11.LOG: records a value every Interval into a ring of the last 64
+   samples, with the minimum, maximum and average of what is stored (a
+   trend for the HMI, a quick diagnosis record). The first sample is taken
+   when logging starts. *)
+FUNCTION_BLOCK RB_DataLog
+VAR_INPUT
+    Value    : REAL;
+    Interval : TIME := T#1s;
+    Enable   : BOOL := TRUE;
+    Clear    : BOOL;                  (* rising edge: empty the log *)
+END_VAR
+VAR_OUTPUT
+    Samples : ARRAY[1..64] OF REAL;
+    Newest  : INT;                    (* index of the newest sample; 0: none *)
+    Count   : INT;
+    Minimum : REAL;
+    Maximum : REAL;
+    Average : REAL;
+END_VAR
+VAR
+    tSample   : TON;
+    clearEdge : R_TRIG;
+    k         : INT;
+    sum       : LREAL;
+END_VAR
+clearEdge(CLK := Clear);
+IF clearEdge.Q THEN
+    Count := 0;
+    Newest := 0;
+END_IF;
+tSample(IN := Enable, PT := Interval);
+IF Enable AND (Count = 0 OR tSample.Q) THEN
+    Newest := Newest MOD 64 + 1;
+    Samples[Newest] := Value;
+    Count := MIN(Count + 1, 64);
+    tSample(IN := FALSE, PT := Interval);
+    tSample(IN := TRUE, PT := Interval);
+END_IF;
+IF Count > 0 THEN
+    Minimum := Samples[Newest];
+    Maximum := Samples[Newest];
+    sum := 0.0;
+    FOR k := 1 TO Count DO
+        Minimum := MIN(Minimum, Samples[k]);
+        Maximum := MAX(Maximum, Samples[k]);
+        sum := sum + REAL_TO_LREAL(Samples[k]);
+    END_FOR;
+    Average := LREAL_TO_REAL(sum / INT_TO_LREAL(Count));
+ELSE
+    Minimum := 0.0;
+    Maximum := 0.0;
+    Average := 0.0;
+END_IF;
+END_FUNCTION_BLOCK
+
+(* F01.SCALE.OUT: an engineering value to an analog output word (the
+   reverse of RB_Scale): limited to the engineering range, scaled to
+   RawMin .. RawMax and rounded. Fault TRUE writes FailValue instead (safe
+   state chosen per output). ErrorID 1 EngMin = EngMax; the output is
+   RawMin. *)
+FUNCTION_BLOCK RB_ScaleOut
+VAR_INPUT
+    Value     : REAL;
+    EngMin    : REAL;
+    EngMax    : REAL := 100.0;
+    RawMin    : REAL;
+    RawMax    : REAL := 27648.0;
+    Fault     : BOOL;                 (* TRUE: write FailValue *)
+    FailValue : REAL;                 (* engineering units *)
+END_VAR
+VAR_OUTPUT
+    Raw     : INT;
+    Limited : BOOL;                   (* Value was outside the range *)
+    Error   : BOOL;
+    ErrorID : UDINT;
+END_VAR
+VAR
+    v  : REAL;
+    lo : REAL;
+    hi : REAL;
+END_VAR
+Error := EngMin = EngMax;
+IF Error THEN
+    ErrorID := UDINT#1;
+    Raw := REAL_TO_INT(RawMin);
+    Limited := FALSE;
+ELSE
+    ErrorID := 0;
+    IF Fault THEN
+        v := FailValue;
+    ELSE
+        v := Value;
+    END_IF;
+    lo := MIN(EngMin, EngMax);
+    hi := MAX(EngMin, EngMax);
+    Limited := v < lo OR v > hi;
+    v := LIMIT(lo, v, hi);
+    Raw := REAL_TO_INT(RawMin + (v - EngMin) * (RawMax - RawMin) / (EngMax - EngMin));
+END_IF;
+END_FUNCTION_BLOCK
+
+(* F05.DRUM: a drum sequencer: up to 16 steps, each with a pattern of 16
+   outputs (a WORD) and a time; a step with time T#0s waits for Next. Run
+   advances by time (paused while FALSE), a rising edge of Next advances
+   at once. After the last step it starts again (Cyclic) or stays there
+   with Done. ErrorID 1 Count outside 1 .. 16; Out is 0. *)
+FUNCTION_BLOCK RB_Drum
+VAR_INPUT
+    Run      : BOOL;                  (* TRUE: step times run *)
+    Next     : BOOL;                  (* rising edge: next step now *)
+    Reset    : BOOL;                  (* rising edge: back to step 1 *)
+    Patterns : ARRAY[1..16] OF WORD;
+    Times    : ARRAY[1..16] OF TIME;  (* T#0s: wait for Next *)
+    Count    : INT := 16;             (* steps used, 1 .. 16 *)
+    Cyclic   : BOOL := TRUE;
+END_VAR
+VAR_OUTPUT
+    StepNo   : INT;
+    Out      : WORD;
+    StepTime : TIME;                  (* time spent in this step *)
+    Done     : BOOL;                  (* not cyclic: the last step ended *)
+    Error    : BOOL;
+    ErrorID  : UDINT;
+END_VAR
+VAR
+    nextEdge  : R_TRIG;
+    resetEdge : R_TRIG;
+    cyc       : RB_CycleTime;
+    t         : TIME;
+    advance   : BOOL;
+END_VAR
+cyc();
+nextEdge(CLK := Next);
+resetEdge(CLK := Reset);
+Error := Count < 1 OR Count > 16;
+IF Error THEN
+    ErrorID := UDINT#1;
+    StepNo := 0;
+    Out := 0;
+ELSE
+    ErrorID := 0;
+    IF StepNo < 1 OR StepNo > Count OR resetEdge.Q THEN
+        StepNo := 1;
+        t := T#0s;
+        Done := FALSE;
+    ELSE
+        IF Run AND NOT Done THEN
+            t := t + cyc.Elapsed;
+        END_IF;
+        advance := nextEdge.Q OR (Run AND Times[StepNo] > T#0s AND t >= Times[StepNo]);
+        IF advance AND NOT Done THEN
+            t := T#0s;
+            IF StepNo < Count THEN
+                StepNo := StepNo + 1;
+            ELSIF Cyclic THEN
+                StepNo := 1;
+            ELSE
+                Done := TRUE;
+            END_IF;
+        END_IF;
+    END_IF;
+    Out := Patterns[StepNo];
+END_IF;
+StepTime := t;
 END_FUNCTION_BLOCK

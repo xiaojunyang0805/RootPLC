@@ -10,10 +10,12 @@ VAR c : RB_CycleTime; END_VAR
 c();
 ASSERT_TRUE(c.FirstCall);
 ASSERT_TRUE(ABS(c.Seconds) < 0.000001);
+ASSERT_EQ(T#0s, c.Elapsed);
 ADVANCE(T#250ms);
 c();
 ASSERT_FALSE(c.FirstCall);
 ASSERT_TRUE(ABS(c.Seconds - 0.25) < 0.000001);
+ASSERT_EQ(T#250ms, c.Elapsed);
 ADVANCE(T#10ms);
 c();
 ASSERT_TRUE(ABS(c.Seconds - 0.01) < 0.000001);
@@ -28,6 +30,7 @@ FOR i := 1 TO 26 DO
     ADVANCE(T#1h);
     c();
     total := total + c.Seconds;
+    ASSERT_EQ(T#1h, c.Elapsed);
 END_FOR;
 ASSERT_TRUE(ABS(total - 93600.0) < 0.001);
 ASSERT_TRUE(ABS(c.Seconds - 3600.0) < 0.001);

@@ -5,7 +5,7 @@
 name = "RootBlocks"
 vendor = "RootPLC"
 version = "0.1.0"
-description = "RootBlocks: RB_MODE, RB_DEVICE_STATUS; F04 RB_ValveOnOff, RB_Motor, RB_MotorReversing, RB_Cylinder, RB_Pump, RB_Drive; F01 RB_Scale, RB_FilterPT1, RB_MovingAverage, RB_Ramp, RB_Deadband, RB_Debounce; F03 RB_CycleTime; F06 RB_PID, RB_OnOff; F08 RB_Alarm; F05 RB_StepChain, RB_Phase; F10 RB_ModeManager, RB_MachineState; F03 RB_Counter; F12 RB_ConveyorZone; F09 RB_RunHours, RB_Heartbeat; F11 RB_Fifo, RB_RecipeTable, RB_Transfer; F02 RB_StartStop, RB_Permissives; F04 RB_ValveAnalog, RB_MotorStarDelta; F06 RB_SplitRange; F08 RB_AlarmSummary; F12 RB_Diverter; F08 RB_AnalogLimits; F06 RB_Ratio; F04 RB_MotorTwoSpeed; F12 RB_Merge; F03 RB_Schedule; F06 RB_Cascade; F04 RB_DutyStandby; F09 RB_Totalizer, RB_OEE"
+description = "RootBlocks: RB_MODE, RB_DEVICE_STATUS; F04 RB_ValveOnOff, RB_Motor, RB_MotorReversing, RB_Cylinder, RB_Pump, RB_Drive; F01 RB_Scale, RB_FilterPT1, RB_MovingAverage, RB_Ramp, RB_Deadband, RB_Debounce; F03 RB_CycleTime; F06 RB_PID, RB_OnOff; F08 RB_Alarm; F05 RB_StepChain, RB_Phase; F10 RB_ModeManager, RB_MachineState; F03 RB_Counter; F12 RB_ConveyorZone; F09 RB_RunHours, RB_Heartbeat; F11 RB_Fifo, RB_RecipeTable, RB_Transfer; F02 RB_StartStop, RB_Permissives; F04 RB_ValveAnalog, RB_MotorStarDelta; F06 RB_SplitRange; F08 RB_AlarmSummary; F12 RB_Diverter; F08 RB_AnalogLimits; F06 RB_Ratio; F04 RB_MotorTwoSpeed; F12 RB_Merge; F03 RB_Schedule; F06 RB_Cascade; F04 RB_DutyStandby; F09 RB_Totalizer, RB_OEE; F06 RB_SetpointProfile; F05 RB_Homing, RB_Drum; F11 RB_DataLog; F01 RB_ScaleOut"
 requires = []
 declare_only = []
 intrinsics = []
