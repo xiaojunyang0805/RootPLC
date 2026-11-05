@@ -1717,3 +1717,317 @@ IF eReset.Q AND Ok THEN
     FirstOut := 0;
 END_IF;
 END_FUNCTION_BLOCK
+
+(* F04.VALVE.ANALOG: a control valve with a position command (0 .. 100 %)
+   and optional position feedback. ErrorID 1 position deviates from the
+   command by more than Tolerance for FeedbackTime, 2 feedback signal out of
+   range. Safe state: SafePos (default 0 %: closed; set 100 % for a valve
+   that must open on a fault). *)
+FUNCTION_BLOCK RB_ValveAnalog
+VAR_INPUT
+    Mode         : RB_MODE := RB_MODE#Off;
+    AutoPos      : REAL;              (* % *)
+    ManPos       : REAL;              (* % *)
+    Interlock    : BOOL;              (* TRUE: go to SafePos now, in every mode *)
+    SafePos      : REAL;              (* %: position in Off, on interlock and fault *)
+    PosFb        : REAL;              (* % from the positioner *)
+    Feedback     : BOOL := TRUE;      (* FALSE: no position feedback wired *)
+    Tolerance    : REAL := 5.0;       (* % *)
+    FeedbackTime : TIME := T#10s;
+    Reset        : BOOL;              (* rising edge clears a fault *)
+END_VAR
+VAR_OUTPUT
+    Out     : REAL;                   (* position command, 0 .. 100 % *)
+    Pos     : REAL;                   (* position, from the feedback *)
+    Error   : BOOL;
+    ErrorID : UDINT;
+    Status  : RB_DEVICE_STATUS;
+END_VAR
+VAR
+    resetEdge : R_TRIG;
+    want      : REAL;
+    tDev      : TON;
+    opened    : BOOL;
+END_VAR
+resetEdge(CLK := Reset);
+IF resetEdge.Q THEN
+    Error := FALSE;
+    ErrorID := 0;
+END_IF;
+IF Feedback AND (PosFb < -10.0 OR PosFb > 110.0) AND NOT Error THEN
+    Error := TRUE;
+    ErrorID := UDINT#2;
+END_IF;
+CASE Mode OF
+RB_MODE#Auto:
+    want := AutoPos;
+RB_MODE#Manual:
+    want := ManPos;
+ELSE
+    want := SafePos;
+END_CASE;
+IF Interlock OR Error THEN
+    want := SafePos;
+END_IF;
+Out := LIMIT(0.0, want, 100.0);
+IF Feedback THEN
+    tDev(IN := ABS(Out - PosFb) > Tolerance, PT := FeedbackTime);
+    IF tDev.Q AND NOT Error THEN
+        Error := TRUE;
+        ErrorID := UDINT#1;
+        Out := LIMIT(0.0, SafePos, 100.0);
+    END_IF;
+    Pos := PosFb;
+ELSE
+    tDev(IN := FALSE, PT := FeedbackTime);
+    Pos := Out;
+END_IF;
+(* a start is an opening from closed *)
+IF Out > 0.0 AND NOT opened THEN
+    Status.Starts := Status.Starts + 1;
+END_IF;
+opened := Out > 0.0;
+Status.Mode := Mode;
+Status.Commanded := opened;
+Status.Active := Pos > Tolerance;
+Status.Error := Error;
+Status.ErrorID := ErrorID;
+END_FUNCTION_BLOCK
+
+(* F04.MOTOR.STARDELTA: a motor started star-delta with three contactors
+   (main, star, delta), built on RB_Motor for the main contactor. Star and
+   delta are never on together; between them both are off for Changeover.
+   Faults as RB_Motor. Safe state: all contactors de-energised. *)
+FUNCTION_BLOCK RB_MotorStarDelta
+VAR_INPUT
+    Mode         : RB_MODE := RB_MODE#Off;
+    AutoRun      : BOOL;
+    ManRun       : BOOL;
+    Interlock    : BOOL;              (* TRUE: stop now, in every mode *)
+    Permissive   : BOOL := TRUE;      (* FALSE: do not start *)
+    FbRunning    : BOOL;              (* main contactor auxiliary contact *)
+    Overload     : BOOL;
+    Feedback     : BOOL := TRUE;
+    FeedbackTime : TIME := T#2s;
+    RestartDelay : TIME := T#0s;
+    StarTime     : TIME := T#5s;      (* time in star *)
+    Changeover   : TIME := T#50ms;    (* star off -> delta on *)
+    Reset        : BOOL;
+END_VAR
+VAR_OUTPUT
+    Main    : BOOL;                   (* main contactor *)
+    Star    : BOOL;                   (* star contactor *)
+    Delta   : BOOL;                   (* delta contactor *)
+    Running : BOOL;
+    InDelta : BOOL;                   (* started: running in delta *)
+    Error   : BOOL;
+    ErrorID : UDINT;
+    Status  : RB_DEVICE_STATUS;
+END_VAR
+VAR
+    motor : RB_Motor;
+    tStar : TON;
+    tGap  : TON;
+END_VAR
+motor(Mode := Mode, AutoRun := AutoRun, ManRun := ManRun, Interlock := Interlock,
+      Permissive := Permissive, FbRunning := FbRunning, Overload := Overload,
+      Feedback := Feedback, FeedbackTime := FeedbackTime, RestartDelay := RestartDelay,
+      Reset := Reset);
+Main := motor.Run;
+tStar(IN := Main, PT := StarTime);
+tGap(IN := tStar.Q, PT := Changeover);
+Star := Main AND NOT tStar.Q;
+Delta := Main AND tGap.Q;
+Running := motor.Running;
+InDelta := Delta;
+Error := motor.Error;
+ErrorID := motor.ErrorID;
+Status := motor.Status;
+END_FUNCTION_BLOCK
+
+(* F06.SPLIT: split range. One controller output In (0 .. 100 %) drives
+   two actuators: A over 0 .. SplitPoint, B over SplitPoint .. 100, with an
+   optional dead band between them. InvertA: A runs 100 -> 0 as In rises
+   (heating and cooling). ErrorID 1 SplitPoint and Deadband leave no range
+   for A or B; the outputs are 0 (safe state). *)
+FUNCTION_BLOCK RB_SplitRange
+VAR_INPUT
+    In         : REAL;                (* % *)
+    SplitPoint : REAL := 50.0;        (* % *)
+    Deadband   : REAL;                (* %, centred on SplitPoint *)
+    InvertA    : BOOL;
+END_VAR
+VAR_OUTPUT
+    OutA    : REAL;                   (* % *)
+    OutB    : REAL;                   (* % *)
+    Error   : BOOL;
+    ErrorID : UDINT;
+END_VAR
+VAR
+    lo : REAL;
+    hi : REAL;
+END_VAR
+lo := SplitPoint - Deadband / 2.0;
+hi := SplitPoint + Deadband / 2.0;
+Error := lo <= 0.0 OR hi >= 100.0;
+IF Error THEN
+    ErrorID := UDINT#1;
+    OutA := 0.0;
+    OutB := 0.0;
+ELSE
+    ErrorID := 0;
+    IF InvertA THEN
+        OutA := LIMIT(0.0, (lo - In) / lo * 100.0, 100.0);
+    ELSE
+        OutA := LIMIT(0.0, In / lo * 100.0, 100.0);
+    END_IF;
+    OutB := LIMIT(0.0, (In - hi) / (100.0 - hi) * 100.0, 100.0);
+END_IF;
+END_FUNCTION_BLOCK
+
+(* F08.ALARM.SUMMARY: summary of up to 32 alarms (the State of RB_Alarm
+   blocks): counts, a common lamp (flashing while any is unacknowledged,
+   steady while any is active), a horn for each new unacknowledged alarm
+   until silenced, and the first-out alarm. *)
+FUNCTION_BLOCK RB_AlarmSummary
+VAR_INPUT
+    States  : ARRAY[1..32] OF RB_ALARM_STATE;
+    Used    : DWORD := 16#FFFFFFFF;   (* bit k-1 set: alarm k is used *)
+    Silence : BOOL;                   (* rising edge stops the horn *)
+    Blink   : TIME := T#500ms;        (* half period of the flashing lamp *)
+END_VAR
+VAR_OUTPUT
+    Active   : INT;                   (* alarms active (acknowledged or not) *)
+    Unacked  : INT;                   (* alarms waiting for acknowledgement *)
+    Lamp     : BOOL;
+    Horn     : BOOL;
+    FirstOut : INT;                   (* first alarm since all were normal; 0: none *)
+END_VAR
+VAR
+    silenceEdge : R_TRIG;
+    tBlink      : TON;
+    phase       : BOOL;
+    k           : INT;
+    lastUnacked : INT;
+    act         : BOOL;
+END_VAR
+silenceEdge(CLK := Silence);
+Active := 0;
+Unacked := 0;
+FOR k := 1 TO 32 DO
+    IF (Used AND SHL(DWORD#1, k - 1)) <> 0 THEN
+        act := States[k] = RB_ALARM_STATE#ActiveUnack OR States[k] = RB_ALARM_STATE#ActiveAcked;
+        IF act THEN
+            Active := Active + 1;
+            IF FirstOut = 0 THEN
+                FirstOut := k;
+            END_IF;
+        END_IF;
+        IF States[k] = RB_ALARM_STATE#ActiveUnack OR States[k] = RB_ALARM_STATE#ReturnedUnack THEN
+            Unacked := Unacked + 1;
+        END_IF;
+    END_IF;
+END_FOR;
+IF Active = 0 AND Unacked = 0 THEN
+    FirstOut := 0;
+END_IF;
+(* the horn sounds for every new unacknowledged alarm *)
+IF Unacked > lastUnacked THEN
+    Horn := TRUE;
+END_IF;
+IF silenceEdge.Q OR Unacked = 0 THEN
+    Horn := FALSE;
+END_IF;
+lastUnacked := Unacked;
+(* flashing: the phase toggles every Blink, the timer restarts at once *)
+tBlink(IN := Unacked > 0, PT := Blink);
+IF tBlink.Q THEN
+    phase := NOT phase;
+    tBlink(IN := FALSE, PT := Blink);
+    tBlink(IN := TRUE, PT := Blink);
+END_IF;
+IF Unacked = 0 THEN
+    phase := FALSE;
+END_IF;
+Lamp := (Unacked > 0 AND NOT phase) OR (Unacked = 0 AND Active > 0);
+END_FUNCTION_BLOCK
+
+(* F12.DIVERTER: a gate that sends each part straight on or into a branch.
+   The destination (Divert) is read when the part reaches the gate eye; the
+   gate holds its position until the part has left the eye plus PassTime,
+   then returns straight. HoldPart stops the feeding conveyor while the gate
+   is not yet in position. ErrorID 1 the gate did not reach its position
+   within MoveTime. Safe state: gate de-energised (straight), HoldPart TRUE. *)
+FUNCTION_BLOCK RB_Diverter
+VAR_INPUT
+    PartAtGate : BOOL;                (* eye in front of the gate *)
+    Divert     : BOOL;                (* destination of the arriving part: TRUE branch *)
+    FbDiverted : BOOL;
+    FbStraight : BOOL;
+    Feedback   : BOOL := TRUE;        (* FALSE: no gate position switches *)
+    MoveTime   : TIME := T#2s;
+    PassTime   : TIME := T#1s;        (* after the eye clears *)
+    Reset      : BOOL;
+END_VAR
+VAR_OUTPUT
+    Gate       : BOOL;                (* TRUE: gate to the branch *)
+    HoldPart   : BOOL;                (* stop the feeding conveyor *)
+    ToBranch   : UDINT;
+    ToStraight : UDINT;
+    Error      : BOOL;
+    ErrorID    : UDINT;
+END_VAR
+VAR
+    resetEdge : R_TRIG;
+    arrive    : R_TRIG;
+    leave     : F_TRIG;
+    tPass     : TON;
+    tMove     : TON;
+    busy      : BOOL;
+    passing   : BOOL;
+    route     : BOOL;
+    inPlace   : BOOL;
+END_VAR
+resetEdge(CLK := Reset);
+IF resetEdge.Q THEN
+    Error := FALSE;
+    ErrorID := 0;
+    tMove(IN := FALSE, PT := MoveTime);  (* the gate gets a new MoveTime *)
+END_IF;
+arrive(CLK := PartAtGate);
+leave(CLK := PartAtGate);
+IF arrive.Q THEN
+    route := Divert;
+    busy := TRUE;
+    passing := FALSE;
+END_IF;
+IF leave.Q AND busy THEN
+    IF route THEN
+        ToBranch := ToBranch + 1;
+    ELSE
+        ToStraight := ToStraight + 1;
+    END_IF;
+    passing := TRUE;
+END_IF;
+tPass(IN := passing, PT := PassTime);
+IF tPass.Q THEN
+    busy := FALSE;
+END_IF;
+Gate := busy AND route AND NOT Error;
+IF Feedback THEN
+    IF Gate THEN
+        inPlace := FbDiverted AND NOT FbStraight;
+    ELSE
+        inPlace := FbStraight AND NOT FbDiverted;
+    END_IF;
+ELSE
+    inPlace := TRUE;
+END_IF;
+tMove(IN := NOT inPlace, PT := MoveTime);
+IF tMove.Q AND NOT Error THEN
+    Error := TRUE;
+    ErrorID := UDINT#1;
+    Gate := FALSE;
+END_IF;
+HoldPart := Error OR (busy AND NOT passing AND NOT inPlace);
+END_FUNCTION_BLOCK
