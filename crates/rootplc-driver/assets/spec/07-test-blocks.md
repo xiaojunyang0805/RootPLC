@@ -69,3 +69,27 @@ every test; otherwise no mutant is run and the command reports why. Each
 surviving mutant is reported with its file, line, column, the original token
 and its replacement, so a test can be added for it. With `--min-score P`
 (0–100) the command fails when the score is below `P` percent.
+
+**[tests.evidence]** `rootplc evidence <file.st|dir>...` writes an *evidence
+pack*: one JSON document that records what was verified, so an engineer can
+review and sign off a change. Format `rootplc-evidence/0.1`, with:
+
+- `tool`: name and version, and `spec_sha256`, the SHA-256 of the rule set
+  compiled into the tool (the spec chapters and the diagnostic registry);
+- `inputs`: every source file with its path, size in bytes and SHA-256;
+- `check`: whether the project compiles, the number of errors and warnings,
+  and `iec_clean` (no error and no warning, [scope.vendor-forms]);
+- `tests`: each TEST block with its result ([tests.runner]);
+- `mutation`: the result of [tests.mutation] (score, killed, viable, each
+  survivor), unless `--no-mutate` is given;
+- `verdict`: `verified` when the project compiles, has at least one TEST
+  block, every test passes and, with `--min-score P`, the mutation score is
+  at least `P` percent; otherwise `not verified`, with `reasons`;
+- `signature`: `null`. A pack made by `rootplc` is never signed. A signing
+  service may add a signature that covers the pack with `signature` set to
+  `null`.
+
+The pack contains no time stamp, so the same inputs and the same tool give
+the same pack byte for byte. `--out FILE` writes the pack to a file instead
+of standard output; `--markdown` writes a readable summary instead of JSON.
+The command fails when the verdict is `not verified`.
