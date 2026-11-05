@@ -57,6 +57,7 @@ Codes RP00xx are lexical, RP01xx types, RP02xx names and structure, RP03xx synta
 | [RP0111](#rp0111) | error | unknown type name |
 | [RP0203](#rp0203) | error | unknown name |
 | [RP0204](#rp0204) | error | name declared twice in the same POU |
+| [RP0205](#rp0205) | error | located variable's type does not fit the size of its address |
 | [RP0125](#rp0125) | warning | chained assignment a := b := v (not portable) |
 | [RP0126](#rp0126) | warning | bit string used as a number, or bitwise operator on integers (not portable) |
 | [RP0127](#rp0127) | warning | integer literal 0 or 1 used as BOOL, or 0 as a reference (not portable) |
@@ -810,6 +811,14 @@ across all its sections. Names compare case-insensitively
 ([lexical.identifier.case]). Likewise, every type and POU name is declared once
 in a project. A second declaration is error RP0204, reported at the second
 one. A user POU may replace a standard function block (spec/08-stdlib.md).
+
+## RP0205
+
+error: located variable's type does not fit the size of its address
+
+Rule `runtime.image.type` in ``:
+
+
 
 ## RP0125
 

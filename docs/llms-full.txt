@@ -694,6 +694,7 @@ Codes RP00xx are lexical, RP01xx types, RP02xx names and structure, RP03xx synta
 | [RP0111](#rp0111) | error | unknown type name |
 | [RP0203](#rp0203) | error | unknown name |
 | [RP0204](#rp0204) | error | name declared twice in the same POU |
+| [RP0205](#rp0205) | error | located variable's type does not fit the size of its address |
 | [RP0125](#rp0125) | warning | chained assignment a := b := v (not portable) |
 | [RP0126](#rp0126) | warning | bit string used as a number, or bitwise operator on integers (not portable) |
 | [RP0127](#rp0127) | warning | integer literal 0 or 1 used as BOOL, or 0 as a reference (not portable) |
@@ -1448,6 +1449,14 @@ across all its sections. Names compare case-insensitively
 in a project. A second declaration is error RP0204, reported at the second
 one. A user POU may replace a standard function block (spec/08-stdlib.md).
 
+## RP0205
+
+error: located variable's type does not fit the size of its address
+
+Rule `runtime.image.type` in ``:
+
+
+
 ## RP0125
 
 warning: chained assignment a := b := v (not portable)
@@ -2096,7 +2105,9 @@ with warning RP0135 ([scope.vendor-forms]).
 
 **[variables.located]** `AT` binds a variable to a directly represented
 address (`%IX0.0`, `%QW4`, `%I*`, see [lexical.direct-variable]):
-`start_btn AT %IX0.0 : BOOL;`.
+`start_btn AT %IX0.0 : BOOL;`. The type must fit the size of the address
+([runtime.image.type]); the runtime binds the variable to its place in the
+process image ([runtime.image]).
 
 **[variables.initializer]** An initial value is an expression, an array
 initializer or a structure initializer:

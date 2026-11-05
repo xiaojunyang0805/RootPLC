@@ -360,6 +360,13 @@ spec = "variables.unique"
 stage = "sema"
 
 [[code]]
+id = "RP0205"
+severity = "error"
+summary = "located variable's type does not fit the size of its address"
+spec = "runtime.image.type"
+stage = "sema"
+
+[[code]]
 id = "RP0125"
 severity = "warning"
 summary = "chained assignment a := b := v (not portable)"

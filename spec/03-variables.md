@@ -55,7 +55,9 @@ with warning RP0135 ([scope.vendor-forms]).
 
 **[variables.located]** `AT` binds a variable to a directly represented
 address (`%IX0.0`, `%QW4`, `%I*`, see [lexical.direct-variable]):
-`start_btn AT %IX0.0 : BOOL;`.
+`start_btn AT %IX0.0 : BOOL;`. The type must fit the size of the address
+([runtime.image.type]); the runtime binds the variable to its place in the
+process image ([runtime.image]).
 
 **[variables.initializer]** An initial value is an expression, an array
 initializer or a structure initializer:
