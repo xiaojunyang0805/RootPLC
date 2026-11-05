@@ -14,7 +14,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use rootplc_abi::{Address, Area, Kind, Program, Scalar, fits, load, store};
+use rootplc_abi::{Address, Area, Kind, MAX_AREA, Program, Scalar, bindable, load, store_n, width};
 
 pub mod modbus;
 
@@ -302,9 +302,11 @@ fn bind<P: Program>(program: &P, image: &mut Image) -> Result<Bound, String> {
     for (i, v) in program.vars().iter().enumerate() {
         let Some(at) = &v.at else { continue };
         match Address::parse(at) {
-            Ok(addr) if fits(v.kind, addr.size) => {
+            Ok(addr)
+                if bindable(v.kind, addr.size) && addr.byte + width(addr, v.kind) <= MAX_AREA =>
+            {
                 let area = image.area_mut(addr.area);
-                let end = addr.byte + addr.size.bytes();
+                let end = addr.byte + width(addr, v.kind);
                 if area.len() < end {
                     area.resize(end, 0);
                 }
@@ -314,8 +316,18 @@ fn bind<P: Program>(program: &P, image: &mut Image) -> Result<Bound, String> {
                     kind: v.kind,
                 });
             }
+            Ok(addr) if !bindable(v.kind, addr.size) && v.kind == Kind::Other => {
+                problems.push(format!(
+                    "{} AT {addr}: type {} is not elementary; version 0 cannot bind it",
+                    v.name, v.type_name
+                ))
+            }
+            Ok(addr) if !bindable(v.kind, addr.size) => problems.push(format!(
+                "{} AT {addr}: type {} does not fit a bit address",
+                v.name, v.type_name
+            )),
             Ok(addr) => problems.push(format!(
-                "{} AT {addr}: type {} does not fit the address",
+                "{} AT {addr}: type {} runs past the end of the image",
                 v.name, v.type_name
             )),
             Err(e) => problems.push(format!("{}: {e}", v.name)),
@@ -545,7 +557,7 @@ impl<P: Program, D: IoDriver, C: Clock> Runtime<P, D, C> {
             };
             let changed = self.at_start.get(k).copied().flatten() != Some(v);
             if b.addr.area == Area::Output || (b.addr.area == Area::Memory && changed) {
-                store(img.area_mut(b.addr.area), b.addr, v);
+                store_n(img.area_mut(b.addr.area), b.addr, v, width(b.addr, b.kind));
             }
         }
         self.io.write_outputs(&img);

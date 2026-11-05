@@ -2247,22 +2247,30 @@ impl<'a> Checker<'a> {
             _ => return,
         };
         let ok = matches!(self.strip(ty), Ty::Elem(e) if fits.contains(&e));
-        if !ok {
-            let allowed: Vec<String> = fits
-                .iter()
-                .map(|e| format!("{e:?}").to_ascii_uppercase())
-                .collect();
+        if ok {
+            return;
+        }
+        let allowed: Vec<String> = fits
+            .iter()
+            .map(|e| format!("{e:?}").to_ascii_uppercase())
+            .collect();
+        if size == 'X' {
             self.diag(
                 codes::LOCATED_TYPE_MISMATCH,
+                format!("the bit address {addr} holds a BOOL; the variable's type does not fit it"),
+                span,
+                Some("declare it as BOOL or use a byte, word, double or long address".into()),
+            );
+        } else {
+            // the TwinCAT reading: the number is the byte offset, the type the size
+            self.diag(
+                codes::VENDOR_MEANING,
                 format!(
-                    "the address {addr} holds {}; the variable's type does not fit it",
+                    "in IEC 61131-3 {addr} holds {}; TwinCAT reads the number as a byte offset and the variable's type as the size",
                     allowed.join(", ")
                 ),
                 span,
-                Some(format!(
-                    "declare it as {} or use an address of the right size",
-                    allowed[0]
-                )),
+                None,
             );
         }
     }

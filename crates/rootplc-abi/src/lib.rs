@@ -188,9 +188,30 @@ pub fn fits(kind: Kind, size: Size) -> bool {
     )
 }
 
+/// Can a variable of `kind` be bound at an address of `size`? A bit address
+/// takes BOOL only; a byte, word, double or long address any elementary
+/// type, read as a byte offset (the TwinCAT reading, [runtime.image.type]).
+pub fn bindable(kind: Kind, size: Size) -> bool {
+    match size {
+        Size::Bit => kind == Kind::Bool,
+        _ => kind != Kind::Other,
+    }
+}
+
+/// Bytes a variable of `kind` occupies at `addr`: its own size from the
+/// byte offset ([runtime.image.type]); BOOL takes the address's size.
+pub fn width(addr: Address, kind: Kind) -> usize {
+    match (addr.size, kind) {
+        (Size::Bit, _) | (_, Kind::Bool | Kind::Other) => addr.size.bytes(),
+        (_, Kind::Int(w) | Kind::UInt(w)) => usize::from(w),
+        (_, Kind::Real) => 4,
+        (_, Kind::LReal) => 8,
+    }
+}
+
 /// Read a value of `kind` at `addr` from an image area (little-endian).
 pub fn load(area: &[u8], addr: Address, kind: Kind) -> Scalar {
-    let n = addr.size.bytes();
+    let n = width(addr, kind);
     let mut b = [0u8; 8];
     if let Some(src) = area.get(addr.byte..addr.byte + n) {
         b[..n].copy_from_slice(src);
@@ -209,9 +230,9 @@ pub fn load(area: &[u8], addr: Address, kind: Kind) -> Scalar {
     }
 }
 
-/// Write `v` at `addr` into an image area (little-endian).
-pub fn store(area: &mut [u8], addr: Address, v: Scalar) {
-    let n = addr.size.bytes();
+/// Write `v` at `addr` into an image area (little-endian), `n` bytes:
+/// [`width`] of the variable's kind.
+pub fn store_n(area: &mut [u8], addr: Address, v: Scalar, n: usize) {
     let Some(dst) = area.get_mut(addr.byte..addr.byte + n) else {
         return;
     };
@@ -234,6 +255,12 @@ pub fn store(area: &mut [u8], addr: Address, v: Scalar) {
         Scalar::Real(x) => x.to_bits(),
     };
     dst.copy_from_slice(&raw.to_le_bytes()[..n]);
+}
+
+/// Write `v` at `addr` into an image area (little-endian), the address's
+/// own size.
+pub fn store(area: &mut [u8], addr: Address, v: Scalar) {
+    store_n(area, addr, v, addr.size.bytes());
 }
 
 /// One variable of a program, as the runtime sees it.
@@ -271,6 +298,30 @@ pub trait Program {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn byte_offset_addresses_take_the_type_size() {
+        // [runtime.image.type]: REAL AT %MB20 occupies bytes 20 to 23
+        let a = Address::parse("%MB20").expect("address");
+        assert!(bindable(Kind::Real, a.size) && !fits(Kind::Real, a.size));
+        assert_eq!(width(a, Kind::Real), 4);
+        assert_eq!(width(a, Kind::LReal), 8);
+        assert_eq!(width(a, Kind::Int(4)), 4);
+        assert_eq!(width(a, Kind::Bool), 1);
+        let w = Address::parse("%QW0").expect("address");
+        assert_eq!(width(w, Kind::Bool), 2);
+        let bit = Address::parse("%IX0.1").expect("address");
+        assert!(!bindable(Kind::Int(2), bit.size) && bindable(Kind::Bool, bit.size));
+        assert!(!bindable(Kind::Other, a.size));
+        let mut area = vec![0u8; 32];
+        store_n(&mut area, a, Scalar::Real(2.5), width(a, Kind::Real));
+        assert_eq!(&area[20..24], &2.5f32.to_le_bytes());
+        assert_eq!(load(&area, a, Kind::Real), Scalar::Real(2.5));
+        let d = Address::parse("%MB24").expect("address");
+        store_n(&mut area, d, Scalar::Int(-7), width(d, Kind::Int(4)));
+        assert_eq!(load(&area, d, Kind::Int(4)), Scalar::Int(-7));
+        assert_eq!(area[28], 0, "nothing written past the variable");
+    }
 
     #[test]
     fn addresses_parse_and_print() {
