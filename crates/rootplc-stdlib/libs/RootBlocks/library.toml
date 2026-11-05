@@ -5,7 +5,7 @@
 name = "RootBlocks"
 vendor = "RootPLC"
 version = "0.1.0"
-description = "RootBlocks: RB_MODE, RB_DEVICE_STATUS; F04 RB_ValveOnOff, RB_Motor, RB_MotorReversing, RB_Cylinder, RB_Pump, RB_Drive; F01 RB_Scale, RB_FilterPT1, RB_MovingAverage, RB_Ramp, RB_Deadband, RB_Debounce; F03 RB_CycleTime"
+description = "RootBlocks: RB_MODE, RB_DEVICE_STATUS; F04 RB_ValveOnOff, RB_Motor, RB_MotorReversing, RB_Cylinder, RB_Pump, RB_Drive; F01 RB_Scale, RB_FilterPT1, RB_MovingAverage, RB_Ramp, RB_Deadband, RB_Debounce; F03 RB_CycleTime; F06 RB_PID, RB_OnOff; F08 RB_Alarm"
 requires = []
 declare_only = []
 intrinsics = []

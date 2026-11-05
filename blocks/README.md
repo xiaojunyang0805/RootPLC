@@ -20,9 +20,9 @@ jobs and features exist, never copied. No block is a safety function.
 | F03 | Timing, counting, scheduling | [`RB_CycleTime`](cards/F03.CYCLETIME.md) |
 | F04 | Device modules | [`RB_ValveOnOff`](cards/F04.VALVE.ONOFF.md), [`RB_Motor`](cards/F04.MOTOR.DOL.md), [`RB_MotorReversing`](cards/F04.MOTOR.REV.md), [`RB_Cylinder`](cards/F04.CYLINDER.md), [`RB_Pump`](cards/F04.PUMP.md), [`RB_Drive`](cards/F04.DRIVE.md) |
 | F05 | Sequencing | planned |
-| F06 | Closed-loop control | planned |
+| F06 | Closed-loop control | [`RB_PID`](cards/F06.PID.md), [`RB_OnOff`](cards/F06.ONOFF.md) |
 | F07 | Motion | the RootMotion library (spec/13-motion.md) |
-| F08 | Alarms and events | planned |
+| F08 | Alarms and events | [`RB_Alarm`](cards/F08.ALARM.md) |
 | F09 | Supervision and diagnostics | planned |
 | F10 | Machine modes and states | planned |
 | F11 | Data handling and communication | planned |

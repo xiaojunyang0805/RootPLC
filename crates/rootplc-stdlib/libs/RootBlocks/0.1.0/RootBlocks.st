@@ -13,6 +13,8 @@ TYPE
         ErrorID   : UDINT;
         Starts    : UDINT;    (* switch-ons since the block started *)
     END_STRUCT;
+    (* F08: alarm states, named as in ISA-18.2 *)
+    RB_ALARM_STATE : (Normal, ActiveUnack, ActiveAcked, ReturnedUnack);
 END_TYPE
 
 (* F04.VALVE.ONOFF: an on/off valve with open and closed feedback.
@@ -802,5 +804,181 @@ IF tOn.Q THEN
     Out := TRUE;
 ELSIF tOff.Q THEN
     Out := FALSE;
+END_IF;
+END_FUNCTION_BLOCK
+
+(* F06.PID: PID controller with anti-windup (the integral is kept within
+   the output range), derivative on the measurement, bumpless manual/auto
+   switching, reverse (heating) or direct (cooling) action.
+   ErrorID 1 invalid output range (OutMin >= OutMax). Safe state: Out =
+   OutMin. *)
+FUNCTION_BLOCK RB_PID
+VAR_INPUT
+    Mode     : RB_MODE := RB_MODE#Off;
+    SP       : REAL;               (* set point *)
+    PV       : REAL;               (* process value *)
+    Kp       : REAL := 1.0;        (* proportional gain *)
+    Ti       : TIME := T#0s;       (* integral time; T#0s: no integral *)
+    Td       : TIME := T#0s;       (* derivative time; T#0s: no derivative *)
+    OutMin   : REAL := 0.0;
+    OutMax   : REAL := 100.0;
+    ManValue : REAL;               (* output in Manual *)
+    Direct   : BOOL;               (* FALSE: error = SP - PV; TRUE: PV - SP *)
+    Reset    : BOOL;
+END_VAR
+VAR_OUTPUT
+    Out       : REAL;
+    Saturated : BOOL;              (* Auto and Out at OutMin or OutMax *)
+    Error     : BOOL;
+    ErrorID   : UDINT;
+END_VAR
+VAR
+    resetEdge : R_TRIG;
+    cyc       : RB_CycleTime;
+    e         : LREAL;
+    p         : LREAL;
+    i         : LREAL;
+    d         : LREAL;
+    u         : LREAL;
+    lo        : LREAL;
+    hi        : LREAL;
+    lastPV    : LREAL;
+    intSec    : LREAL;
+    derSec    : LREAL;
+END_VAR
+resetEdge(CLK := Reset);
+IF resetEdge.Q THEN
+    Error := FALSE;
+    ErrorID := 0;
+END_IF;
+cyc();
+IF OutMin >= OutMax AND NOT Error THEN
+    Error := TRUE;
+    ErrorID := UDINT#1;
+END_IF;
+lo := REAL_TO_LREAL(OutMin);
+hi := REAL_TO_LREAL(OutMax);
+IF Direct THEN
+    e := REAL_TO_LREAL(PV) - REAL_TO_LREAL(SP);
+ELSE
+    e := REAL_TO_LREAL(SP) - REAL_TO_LREAL(PV);
+END_IF;
+p := REAL_TO_LREAL(Kp) * e;
+intSec := TIME_TO_LREAL(Ti) / 1000.0;
+derSec := TIME_TO_LREAL(Td) / 1000.0;
+d := 0.0;
+IF cyc.Seconds > 0.0 THEN
+    (* on the measurement, so a set-point step gives no kick *)
+    d := REAL_TO_LREAL(Kp) * derSec * (REAL_TO_LREAL(PV) - lastPV) / cyc.Seconds;
+    IF NOT Direct THEN
+        d := -d;
+    END_IF;
+END_IF;
+lastPV := REAL_TO_LREAL(PV);
+IF Error THEN
+    u := lo;
+    i := 0.0;
+ELSIF Mode = RB_MODE#Auto THEN
+    IF intSec > 0.0 THEN
+        i := i + REAL_TO_LREAL(Kp) * e * cyc.Seconds / intSec;
+    ELSE
+        i := 0.0;
+    END_IF;
+    (* anti-windup: the integral never pushes beyond the output range *)
+    i := LIMIT(lo - p - d, i, hi - p - d);
+    u := LIMIT(lo, p + i + d, hi);
+ELSE
+    IF Mode = RB_MODE#Manual THEN
+        u := LIMIT(lo, REAL_TO_LREAL(ManValue), hi);
+    ELSE
+        u := lo;
+    END_IF;
+    (* bumpless: the integral tracks, so Auto starts from this output *)
+    i := u - p;
+END_IF;
+Out := LREAL_TO_REAL(u);
+Saturated := Mode = RB_MODE#Auto AND NOT Error AND (u <= lo OR u >= hi);
+END_FUNCTION_BLOCK
+
+(* F06.ONOFF: on/off control with hysteresis (thermostat). Heating
+   (Direct FALSE): on at or below SP - Hysteresis/2, off at or above
+   SP + Hysteresis/2; cooling (Direct TRUE) the other way round. *)
+FUNCTION_BLOCK RB_OnOff
+VAR_INPUT
+    Enable     : BOOL;
+    SP         : REAL;
+    PV         : REAL;
+    Hysteresis : REAL := 1.0;      (* total band around SP *)
+    Direct     : BOOL;             (* TRUE: cooling *)
+END_VAR
+VAR_OUTPUT
+    Out : BOOL;
+END_VAR
+VAR
+    half : REAL;
+END_VAR
+half := ABS(Hysteresis) / 2.0;
+IF NOT Enable THEN
+    Out := FALSE;
+ELSIF Direct THEN
+    IF PV >= SP + half THEN
+        Out := TRUE;
+    ELSIF PV <= SP - half THEN
+        Out := FALSE;
+    END_IF;
+ELSE
+    IF PV <= SP - half THEN
+        Out := TRUE;
+    ELSIF PV >= SP + half THEN
+        Out := FALSE;
+    END_IF;
+END_IF;
+END_FUNCTION_BLOCK
+
+(* F08.ALARM: an alarm with on/off delays and acknowledgement, with the
+   ISA-18.2 states. Enable FALSE takes it out of service (shelved). *)
+FUNCTION_BLOCK RB_Alarm
+VAR_INPUT
+    In       : BOOL;               (* alarm condition *)
+    Enable   : BOOL := TRUE;       (* FALSE: out of service, state Normal *)
+    OnDelay  : TIME := T#0s;
+    OffDelay : TIME := T#0s;
+    Ack      : BOOL;               (* rising edge acknowledges *)
+END_VAR
+VAR_OUTPUT
+    Active  : BOOL;                (* condition present, after the delays *)
+    Unacked : BOOL;                (* needs acknowledging *)
+    State   : RB_ALARM_STATE;
+    Count   : UDINT;               (* times the alarm became active *)
+END_VAR
+VAR
+    tOn     : TON;
+    tOff    : TON;
+    ackEdge : R_TRIG;
+END_VAR
+ackEdge(CLK := Ack);
+tOn(IN := Enable AND In AND NOT Active, PT := OnDelay);
+tOff(IN := Active AND NOT In, PT := OffDelay);
+IF NOT Enable THEN
+    Active := FALSE;
+    Unacked := FALSE;
+ELSIF tOn.Q THEN
+    Active := TRUE;
+    Unacked := TRUE;
+    Count := Count + 1;
+ELSIF tOff.Q THEN
+    Active := FALSE;
+END_IF;
+IF ackEdge.Q THEN
+    Unacked := FALSE;
+END_IF;
+IF Active AND Unacked THEN
+    State := RB_ALARM_STATE#ActiveUnack;
+ELSIF Active THEN
+    State := RB_ALARM_STATE#ActiveAcked;
+ELSIF Unacked THEN
+    State := RB_ALARM_STATE#ReturnedUnack;
+ELSE
+    State := RB_ALARM_STATE#Normal;
 END_IF;
 END_FUNCTION_BLOCK
