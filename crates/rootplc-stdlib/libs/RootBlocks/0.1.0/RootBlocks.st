@@ -1342,7 +1342,8 @@ END_FUNCTION_BLOCK
 
 (* F12.ZONE: a zone of a zero-pressure accumulation conveyor with one photo
    eye at its end. A part moves on while the next zone is free and waits at
-   the end otherwise. ErrorID 1 jam (a part being handed on does not leave
+   the end otherwise. The zone is occupied from the moment the previous zone
+   has handed a part over (or the eye sees one) until the part has left. ErrorID 1 jam (a part being handed on does not leave
    the photo eye within JamTime). Safe state: zone motor off. *)
 FUNCTION_BLOCK RB_ConveyorZone
 VAR_INPUT
@@ -1366,9 +1367,11 @@ END_VAR
 VAR
     resetEdge : R_TRIG;
     leaving   : F_TRIG;
+    received  : F_TRIG;
     tIdle     : TON;
     tJam      : TON;
     awake     : BOOL;
+    holding   : BOOL;
 END_VAR
 resetEdge(CLK := Reset);
 IF resetEdge.Q THEN
@@ -1384,13 +1387,21 @@ IF tJam.Q AND NOT Error THEN
     ErrorID := UDINT#1;
     Feeding := FALSE;
 END_IF;
+(* occupancy: a part handed over by the previous zone, or seen at the end *)
 leaving(CLK := PartAtEnd);
-IF leaving.Q AND Run THEN
-    Count := Count + 1;
+received(CLK := UpstreamFeeding);
+IF leaving.Q THEN
+    holding := FALSE;
+    IF Run THEN
+        Count := Count + 1;
+    END_IF;
+END_IF;
+IF received.Q OR PartAtEnd THEN
+    holding := TRUE;
 END_IF;
 Run := Enable AND NOT Error AND (Feeding OR (NOT PartAtEnd AND awake));
-Occupied := PartAtEnd;
-Free := Enable AND NOT Error AND NOT PartAtEnd;
+Occupied := holding;
+Free := Enable AND NOT Error AND NOT holding;
 END_FUNCTION_BLOCK
 
 (* F09.RUNHOURS: run hours, starts and a maintenance interval. The

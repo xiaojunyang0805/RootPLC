@@ -35,6 +35,27 @@ ASSERT_FALSE(z.Run);
 (* a part removed by hand while stopped is not counted *)
 z(Enable := FALSE, PartAtEnd := FALSE, DownstreamFree := TRUE);
 ASSERT_EQ(UDINT#1, z.Count);
+ASSERT_FALSE(z.Occupied);
+END_TEST
+
+TEST zone_is_occupied_from_the_hand_over
+VAR z : RB_ConveyorZone; END_VAR
+z(Enable := TRUE, PartAtEnd := FALSE, DownstreamFree := FALSE, UpstreamFeeding := FALSE);
+ASSERT_TRUE(z.Free);
+z(Enable := TRUE, PartAtEnd := FALSE, DownstreamFree := FALSE, UpstreamFeeding := TRUE);
+ASSERT_TRUE(z.Free);
+(* the previous zone has handed the part over: occupied, still travelling *)
+z(Enable := TRUE, PartAtEnd := FALSE, DownstreamFree := FALSE, UpstreamFeeding := FALSE);
+ASSERT_TRUE(z.Occupied);
+ASSERT_FALSE(z.Free);
+ASSERT_TRUE(z.Run);
+z(Enable := TRUE, PartAtEnd := TRUE, DownstreamFree := FALSE, UpstreamFeeding := FALSE);
+ASSERT_FALSE(z.Run);
+ASSERT_TRUE(z.Occupied);
+z(Enable := TRUE, PartAtEnd := TRUE, DownstreamFree := TRUE, UpstreamFeeding := FALSE);
+z(Enable := TRUE, PartAtEnd := FALSE, DownstreamFree := TRUE, UpstreamFeeding := FALSE);
+ASSERT_FALSE(z.Occupied);
+ASSERT_TRUE(z.Free);
 END_TEST
 
 TEST zone_sleeps_when_empty_and_not_fed
