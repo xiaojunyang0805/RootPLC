@@ -66,8 +66,10 @@ fn block_tests_kill_at_least_90_percent_of_mutants() {
     let mut sources = library_sources();
     sources.extend(block_tests());
     let m =
-        rootplc_driver::mutate::mutation_report(sources, &[], None, 1000).expect("mutation run");
+        rootplc_driver::mutate::mutation_report(sources, &[], None, 10_000).expect("mutation run");
     assert!(m.baseline.ok(), "block tests fail");
+    // every mutant runs: a capped run would leave the last blocks unchecked
+    assert_eq!(m.mutants.len(), m.candidates, "mutation run was truncated");
     // only the library's own mutants count: helper blocks in the test files
     // are fixtures, not catalog code
     let lib = |p: &std::path::Path| p.file_name().is_some_and(|n| n == "RootBlocks.st");
@@ -179,7 +181,13 @@ fn templates_compile_pass_and_are_mutation_tested() {
             .into_iter()
             .filter(|(p, _)| p.file_name().is_none_or(|n| n != "io_map.st"))
             .collect();
-        let m = rootplc_driver::mutate::mutation_report(logic, &libs, None, 1000).expect("mutate");
+        let m =
+            rootplc_driver::mutate::mutation_report(logic, &libs, None, 10_000).expect("mutate");
+        assert_eq!(
+            m.mutants.len(),
+            m.candidates,
+            "{name}: mutation run truncated"
+        );
         let mine: Vec<_> = m
             .mutants
             .iter()
