@@ -273,3 +273,54 @@ FUNCTION F_Not : BOOL VAR_INPUT x : BOOL; END_VAR F_Not := NOT x; END_FUNCTION";
             .contains("cannot read")
     );
 }
+
+#[test]
+fn only_the_files_the_blocks_need_are_compiled() {
+    let dir = repo().join("conformance/cases/diff");
+    let mut sources = rootplc_driver::read_sources(&[dir.join("ok_diff_slice.st")]).expect("case");
+    // unrelated parts of the same project, one of them broken
+    sources.push((
+        PathBuf::from("broken.st"),
+        "PROGRAM P VAR x : INT; END_VAR x := ; END_PROGRAM".into(),
+    ));
+    sources.push((
+        PathBuf::from("other.st"),
+        "FUNCTION_BLOCK FB_Other VAR_OUTPUT y : BOOL; END_VAR y := TRUE; END_FUNCTION_BLOCK".into(),
+    ));
+    // the whole project does not compile
+    let whole = rootplc_driver::check_sources_with(sources.clone(), &[]).expect("check");
+    assert!(!whole.ok());
+    let mut o = opts("FB_Ref", "FB_Uses");
+    o.ranges = vec![("x".into(), 0.0, 100.0)];
+    let run = rootplc_driver::diff::diff_sources(sources.clone(), &[], &o).expect("diff");
+    let rootplc_driver::diff::DiffRun::Report(r) = run else {
+        panic!("the slice should compile");
+    };
+    assert_eq!(r.verdict, Verdict::Agree, "{}", render(&r));
+    assert_eq!(r.left_out, ["broken.st", "other.st"]);
+    assert!(to_json(&r).contains("\"left_out\":[\"broken.st\",\"other.st\"]"));
+    // the slice follows dependencies across files
+    let (kept, left) = rootplc_driver::diff::slice(
+        vec![
+            (PathBuf::from("a.st"), "FUNCTION_BLOCK A VAR h : B; END_VAR END_FUNCTION_BLOCK".into()),
+            (PathBuf::from("b.st"), "FUNCTION_BLOCK B VAR_INPUT m : E_M; END_VAR IF m = E_M#On THEN END_IF; END_FUNCTION_BLOCK".into()),
+            (PathBuf::from("t.st"), "TYPE E_M : (Off, On); END_TYPE".into()),
+            (PathBuf::from("g.st"), "NAMESPACE G VAR_GLOBAL c : INT; END_VAR END_NAMESPACE".into()),
+            (PathBuf::from("u.st"), "FUNCTION_BLOCK U END_FUNCTION_BLOCK".into()),
+        ],
+        &["a"],
+    );
+    let kept: Vec<_> = kept.iter().map(|(p, _)| p.display().to_string()).collect();
+    assert_eq!(kept, ["a.st", "b.st", "t.st"]);
+    assert_eq!(left.len(), 2);
+    // a broken file the blocks need still stops the comparison
+    sources.push((
+        PathBuf::from("helper2.st"),
+        "FUNCTION_BLOCK FB_Helper VAR_OUTPUT q : BOOL; END_VAR q := ; END_FUNCTION_BLOCK".into(),
+    ));
+    let run = rootplc_driver::diff::diff_sources(sources, &[], &o).expect("diff");
+    assert!(matches!(
+        run,
+        rootplc_driver::diff::DiffRun::NotCompiling(_)
+    ));
+}

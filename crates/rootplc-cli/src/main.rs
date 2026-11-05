@@ -323,7 +323,7 @@ fn cmd_run(paths: &[PathBuf], args: &Args) -> ExitCode {
 }
 
 fn cmd_diff(paths: &[PathBuf], args: &Args) -> ExitCode {
-    use rootplc_driver::diff::{DiffOptions, Verdict, diff, render, to_json};
+    use rootplc_driver::diff::{DiffOptions, DiffRun, Verdict, diff_sources, render, to_json};
     let mut opt = DiffOptions::default();
     let (Some(reference), Some(unit)) = (args.opt("--reference"), args.opt("--unit")) else {
         return io_error("diff", "give --reference FB and --unit FB", args.json);
@@ -377,21 +377,21 @@ fn cmd_diff(paths: &[PathBuf], args: &Args) -> ExitCode {
             }
         }
     }
-    let check = match load("diff", paths, args) {
-        Ok(c) => c,
-        Err(code) => return code,
+    let sources = match rootplc_driver::read_sources(paths) {
+        Ok(s) => s,
+        Err(e) => return io_error("diff", &e, args.json),
     };
-    if !check.ok() {
-        if args.json {
-            println!("{}", json::check(&check));
-        } else {
-            print_diagnostics(&check);
-            eprintln!("rootplc diff: the sources do not compile");
+    let r = match diff_sources(sources, &args.all("--library"), &opt) {
+        Ok(DiffRun::Report(r)) => *r,
+        Ok(DiffRun::NotCompiling(check)) => {
+            if args.json {
+                println!("{}", json::check(&check));
+            } else {
+                print_diagnostics(&check);
+                eprintln!("rootplc diff: the files the blocks need do not compile");
+            }
+            return ExitCode::from(2);
         }
-        return ExitCode::from(2);
-    }
-    let r = match diff(&check, &opt) {
-        Ok(r) => r,
         Err(e) => return io_error("diff", &e, args.json),
     };
     if args.json {

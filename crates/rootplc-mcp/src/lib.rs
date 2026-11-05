@@ -262,12 +262,15 @@ fn call_tool(name: &str, args: &Json) -> String {
                     None => return fail("diff", &format!("ranges {item}: write NAME=LO..HI")),
                 }
             }
-            match sources(args).and_then(|s| checked(s, args)) {
-                Ok(c) if !c.ok() => tool_result(&rootplc_driver::json::check(&c), true),
-                Ok(c) => match rootplc_driver::diff::diff(&c, &opt) {
-                    Ok(rep) => tool_result(&rootplc_driver::diff::to_json(&rep), false),
-                    Err(e) => fail("diff", &e),
-                },
+            match sources(args)
+                .and_then(|s| rootplc_driver::diff::diff_sources(s, &libraries(args), &opt))
+            {
+                Ok(rootplc_driver::diff::DiffRun::NotCompiling(c)) => {
+                    tool_result(&rootplc_driver::json::check(&c), true)
+                }
+                Ok(rootplc_driver::diff::DiffRun::Report(rep)) => {
+                    tool_result(&rootplc_driver::diff::to_json(&rep), false)
+                }
                 Err(e) => fail("diff", &e),
             }
         }
