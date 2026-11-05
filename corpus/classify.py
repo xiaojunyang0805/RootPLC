@@ -16,7 +16,9 @@ projects are skipped without being read. Output is aggregate only
 (counts per family and kind); code is never copied.
 
 Usage:  python corpus/classify.py        (needs the corpus cache: corpus.py fetch / analyse)
-Writes: corpus/BLOCKS_REPORT.md and <cache>/blocks.json
+Writes: corpus/BLOCKS_REPORT.md, <cache>/blocks.json and <cache>/units.json (one
+entry per classified unit: project, file, name, family, kind, category, licence;
+it stays in the cache, the starting list of the R2 verified layer)
 """
 from __future__ import annotations
 
@@ -147,6 +149,7 @@ def main() -> None:
     kinds: dict[str, Counter] = defaultdict(Counter)
     total = classified = tests = 0
     kinds_total = Counter()
+    units: list[dict] = []
     for name, p in sorted(core.items()):
         root = CACHE / name
         if not root.exists():
@@ -173,16 +176,22 @@ def main() -> None:
                 fam_projects[f_id].add(name)
                 if p["category"] == "application":
                     fam_apps[f_id] += 1
+                k = None
                 if f_id in KINDS:
                     k = next((KINDS[f_id][w] for w in nw if w in KINDS[f_id]), "other")
                     kinds[f_id][k] += 1
                     kinds_total[f_id] += 1
+                units.append({"project": name, "file": f.relative_to(root).as_posix(),
+                              "name": pou_name, "pou": m.group(1).upper(), "family": f_id,
+                              "kind": k, "category": p["category"], "licence": p.get("licence", ""),
+                              "redistribute": bool(p.get("redistribute"))})
 
     out = {"units": total, "classified": classified, "test_units": tests,
            "families": {f: {"units": fam[f], "projects": len(fam_projects[f]), "applications": fam_apps[f]}
                         for f in FAMILIES},
            "kinds": {f: dict(c) for f, c in kinds.items()}}
     (CACHE / "blocks.json").write_text(json.dumps(out, indent=1), encoding="utf-8")
+    (CACHE / "units.json").write_text(json.dumps(units, indent=0), encoding="utf-8")
 
     lines = [
         "# Block catalog: real code by job family",
