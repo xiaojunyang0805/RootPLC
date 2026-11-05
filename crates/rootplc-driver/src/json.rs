@@ -158,17 +158,19 @@ pub fn examples(query: &str, found: &[Example], with_source: bool) -> String {
         .iter()
         .map(|e| {
             let tags: Vec<String> = e.tags.iter().map(|t| json_string(t)).collect();
+            let libs: Vec<String> = e.libraries.iter().map(|l| json_string(l)).collect();
             let source = if with_source {
                 format!(",\"source\":{}", json_string(e.source))
             } else {
                 String::new()
             };
             format!(
-                "{{\"id\":{},\"title\":{},\"tags\":[{}],\"description\":{}{source}}}",
+                "{{\"id\":{},\"title\":{},\"tags\":[{}],\"description\":{},\"libraries\":[{}]{source}}}",
                 json_string(e.id),
                 json_string(&e.title),
                 tags.join(","),
-                json_string(&e.description)
+                json_string(&e.description),
+                libs.join(",")
             )
         })
         .collect();

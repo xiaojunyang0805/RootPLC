@@ -354,8 +354,13 @@ fn cmd_examples(words: &[String], args: &Args) -> ExitCode {
         return ExitCode::SUCCESS;
     }
     for e in &found {
+        let needs = if e.libraries.is_empty() {
+            String::new()
+        } else {
+            format!(" (needs --library {})", e.libraries.join(","))
+        };
         println!(
-            "{:<22} {}
+            "{:<22} {}{needs}
 {:<22} {}",
             e.id, e.title, "", e.description
         );

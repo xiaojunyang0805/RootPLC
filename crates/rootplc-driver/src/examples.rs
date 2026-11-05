@@ -48,6 +48,10 @@ const LIBRARY: &[(&str, &str)] = &[
         "flip-flops",
         include_str!("../assets/examples/flip-flops.st"),
     ),
+    (
+        "motion-shuttle",
+        include_str!("../assets/examples/motion-shuttle.st"),
+    ),
 ];
 
 /// One verified example.
@@ -61,6 +65,8 @@ pub struct Example {
     pub tags: Vec<String>,
     /// What the pattern does and when to use it.
     pub description: String,
+    /// Bundled libraries the example needs ([stdlib.compat]), e.g. `RootMotion`.
+    pub libraries: Vec<String>,
     /// Complete source, including the header comment and TEST blocks.
     pub source: &'static str,
 }
@@ -75,7 +81,7 @@ fn header_field(source: &str, key: &str) -> String {
     for line in header.lines().map(str::trim) {
         let field = line
             .split_once(':')
-            .filter(|(k, _)| ["title", "tags", "description"].contains(&k.trim()));
+            .filter(|(k, _)| ["title", "tags", "description", "libraries"].contains(&k.trim()));
         if let Some((k, v)) = field {
             inside = k.trim() == key;
             if inside {
@@ -89,16 +95,21 @@ fn header_field(source: &str, key: &str) -> String {
     value
 }
 
+fn list_field(source: &str, key: &str) -> Vec<String> {
+    header_field(source, key)
+        .split(',')
+        .map(|t| t.trim().to_string())
+        .filter(|t| !t.is_empty())
+        .collect()
+}
+
 fn parse(id: &'static str, source: &'static str) -> Example {
     Example {
         id,
         title: header_field(source, "title"),
-        tags: header_field(source, "tags")
-            .split(',')
-            .map(|t| t.trim().to_string())
-            .filter(|t| !t.is_empty())
-            .collect(),
+        tags: list_field(source, "tags"),
         description: header_field(source, "description"),
+        libraries: list_field(source, "libraries"),
         source,
     }
 }
@@ -155,7 +166,11 @@ mod tests {
             assert!(!e.title.is_empty(), "{}: no title", e.id);
             assert!(!e.tags.is_empty(), "{}: no tags", e.id);
             assert!(!e.description.is_empty(), "{}: no description", e.id);
-            let check = crate::check_sources(vec![(PathBuf::from(e.id), e.source.to_string())]);
+            let check = crate::check_sources_with(
+                vec![(PathBuf::from(e.id), e.source.to_string())],
+                &e.libraries,
+            )
+            .unwrap_or_else(|err| panic!("{}: {err}", e.id));
             assert!(check.ok(), "{}: {:?}", e.id, check.files[0].diagnostics);
             assert_eq!(
                 check.count(rootplc_diag::Severity::Warning),
@@ -177,6 +192,11 @@ mod tests {
         assert!(search("no such pattern xyz").is_empty());
         assert_eq!(search("").len(), LIBRARY.len());
         assert_eq!(get("FLIP-FLOPS").map(|e| e.id), Some("flip-flops"));
+        assert_eq!(search("motion axis")[0].id, "motion-shuttle");
+        assert_eq!(
+            get("motion-shuttle").map(|e| e.libraries),
+            Some(vec!["RootMotion".to_string()])
+        );
     }
 
     fn pou_names(source: &str) -> Vec<String> {

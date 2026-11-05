@@ -146,10 +146,12 @@ text of the spec rule that defines the code.
 ## examples
 
 A library of verified ST patterns: edge detection, on/off delays, state
-machines, scaling, counters, interlocks, arrays, structs, flip-flops and the
-TEST pattern. Every example compiles and passes its TEST blocks in this
-toolchain version (enforced by the test suite), and none reproduces a
-benchmark solution.
+machines, scaling, counters, interlocks, arrays, structs, flip-flops, the
+TEST pattern and single-axis motion. Every example compiles and passes its
+TEST blocks in this toolchain version (enforced by the test suite), and none
+reproduces a benchmark solution. An example that needs a bundled library
+names it in `libraries` (for example `motion-shuttle` needs
+`--library RootMotion`).
 
 `rootplc examples timer` lists matches (all words must match; tags weigh
 most). `rootplc examples --show on-off-delay` prints the code. Exit code 1
@@ -158,7 +160,8 @@ if nothing matches.
 ```json
 {"command":"examples","ok":true,"query":"timer","verified":true,"count":1,
  "examples":[{"id":"on-off-delay","title":"On-delay and off-delay timers",
-   "tags":["timer","TON","TOF","delay","time"],"description":"…","source":"…"}]}
+   "tags":["timer","TON","TOF","delay","time"],"description":"…",
+   "libraries":[],"source":"…"}]}
 ```
 
 ## coverage
