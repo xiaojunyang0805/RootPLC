@@ -187,6 +187,37 @@ pub struct UnitResult {
     pub message: String,
 }
 
+/// What one axis did over a run, reported by RootMotion's axis cycle
+/// ([motion.observe]).
+#[derive(Debug, Clone, PartialEq)]
+pub struct AxisStats {
+    /// Path of the axis variable, e.g. `my_test.ax`.
+    pub path: String,
+    /// Axis cycles reported.
+    pub cycles: u64,
+    /// Cycles that ended in a software-limit stop (their acceleration is
+    /// not counted).
+    pub hard_stops: u64,
+    /// Peak absolute velocity.
+    pub peak_velocity: f64,
+    /// Peak absolute acceleration.
+    pub peak_acceleration: f64,
+    /// Machine velocity limit (the last one reported).
+    pub max_velocity: f64,
+    /// Machine acceleration limit; 0 when none is set.
+    pub max_acceleration: f64,
+}
+
+impl AxisStats {
+    /// The peaks stay within the machine limits (with a tiny tolerance for
+    /// floating-point rounding).
+    pub fn within_limits(&self) -> bool {
+        let ok = |peak: f64, max: f64| peak <= max * (1.0 + 1e-9) + 1e-9;
+        ok(self.peak_velocity, self.max_velocity)
+            && (self.max_acceleration <= 0.0 || ok(self.peak_acceleration, self.max_acceleration))
+    }
+}
+
 /// A failed assertion of a TEST block.
 #[derive(Debug, Clone, PartialEq)]
 pub struct AssertFailure {
@@ -238,6 +269,8 @@ pub struct Vm<'p> {
     /// Test results reported by a unit-test library such as TcUnit,
     /// [stdlib.compat.unit].
     pub unit_results: Vec<UnitResult>,
+    /// Axes moved by RootMotion, in order of first report, [motion.observe].
+    pub axes: Vec<AxisStats>,
     steps: u64,
     file: usize,
     /// Root holding the global variables, [config.global-list].
@@ -465,6 +498,7 @@ impl<'p> Vm<'p> {
             now_ns: 0,
             failures: Vec::new(),
             unit_results: Vec::new(),
+            axes: Vec::new(),
             steps: 0,
             file: 0,
             globals: None,
@@ -1886,6 +1920,46 @@ impl<'p> Vm<'p> {
                     status: int(&arg(2)).clamp(0, 2) as u8,
                     message: to_text(&arg(3)),
                 });
+                Ok(Value::Int(0))
+            }
+            "__ROOTPLC_AXIS_CYCLE" => {
+                let path = match arg(0) {
+                    Value::Ref(Some(l)) => self.path_name(&l),
+                    _ => String::new(),
+                };
+                let real = |v: &Value| match v {
+                    Value::Real(x) => *x,
+                    Value::Int(i) => *i as f64,
+                    _ => 0.0,
+                };
+                let (v, a, vmax, amax) =
+                    (real(&arg(1)), real(&arg(2)), real(&arg(3)), real(&arg(4)));
+                let hard = matches!(arg(5), Value::Bool(true));
+                let i = match self.axes.iter().position(|x| x.path == path) {
+                    Some(i) => i,
+                    None => {
+                        self.axes.push(AxisStats {
+                            path,
+                            cycles: 0,
+                            hard_stops: 0,
+                            peak_velocity: 0.0,
+                            peak_acceleration: 0.0,
+                            max_velocity: vmax,
+                            max_acceleration: amax,
+                        });
+                        self.axes.len() - 1
+                    }
+                };
+                let st = &mut self.axes[i];
+                st.cycles += 1;
+                st.max_velocity = vmax;
+                st.max_acceleration = amax;
+                st.peak_velocity = st.peak_velocity.max(v.abs());
+                if hard {
+                    st.hard_stops += 1;
+                } else {
+                    st.peak_acceleration = st.peak_acceleration.max(a.abs());
+                }
                 Ok(Value::Int(0))
             }
             "__ROOTPLC_ANY_EQUAL" | "__ROOTPLC_ANY_TEXT" => {

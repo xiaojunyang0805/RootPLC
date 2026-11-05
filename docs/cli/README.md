@@ -116,9 +116,11 @@ Writes the evidence pack an engineer reviews before approving a change
 ([tests.evidence]): the tool version and a SHA-256 of its rule set, every
 input file with its SHA-256, the active bundled libraries (`--library`, for
 example RootMotion) with version and SHA-256, the check result (`iec_clean` when there is no
-error and no warning), each test, the mutation score with surviving changes,
+error and no warning), each test, for motion code the peak velocity and
+acceleration of every axis against its machine limits, the mutation score with
+surviving changes,
 and a verdict. `verified` needs a compiling project, at least one TEST block,
-every test passing and, with `--min-score P`, a mutation score of at least `P`
+every test passing, every axis within its limits and, with `--min-score P`, a mutation score of at least `P`
 percent. The pack has no time stamp, so the same inputs give the same pack; a
 local pack is never signed (`"signature": null`). The command fails when the
 verdict is `not verified`. The MCP tool is `rootplc_evidence`.
@@ -136,6 +138,7 @@ $ rootplc evidence src tests --markdown      # a readable summary
  "libraries":[],
  "check":{"compiled":true,"errors":0,"warnings":0,"iec_clean":true},
  "tests":{"passed":3,"failed":0,"items":[{"name":"latch","passed":true}]},
+ "motion":[],
  "mutation":{"score":1.0000,"killed":3,"viable":3,"not_viable":0,"candidates":3,"run":3,"error":null,"survivors":[]},
  "min_score":80,"verdict":"verified","reasons":[],"signature":null}
 ```

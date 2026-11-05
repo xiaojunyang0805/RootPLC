@@ -6,10 +6,10 @@
 name = "RootMotion"
 vendor = "RootPLC"
 version = "0.1.0"
-description = "RootMotion: AXIS_REF, RP_VirtualAxis (trapezoid profile, software limits), MC_Power, MC_Home, MC_MoveAbsolute, MC_MoveRelative, MC_MoveVelocity, MC_Stop, MC_Halt, MC_Reset, MC_ReadActualPosition, MC_ReadStatus"
+description = "RootMotion: AXIS_REF (with machine limits), RP_VirtualAxis (trapezoid profile, software limits), MC_Power, MC_Home, MC_MoveAbsolute, MC_MoveRelative, MC_MoveVelocity, MC_Stop, MC_Halt, MC_Reset, MC_ReadActualPosition, MC_ReadStatus"
 requires = []
 declare_only = []
-intrinsics = []
+intrinsics = ["__ROOTPLC_AXIS_CYCLE"]
 references = [
   "https://www.plcopen.org/sites/default/files/downloads/plcopen_motion_control_overview.pdf (function-block names and the single-axis state model, public overview)",
 ]

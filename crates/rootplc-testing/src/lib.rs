@@ -6,7 +6,7 @@
 //! a fault ends the test.
 
 use rootplc_sema::ir::Program;
-use rootplc_vm::{AssertFailure, Fault, Vm};
+use rootplc_vm::{AssertFailure, AxisStats, Fault, Vm};
 
 /// Result of one TEST block.
 #[derive(Debug, Clone)]
@@ -19,6 +19,8 @@ pub struct TestOutcome {
     pub failures: Vec<AssertFailure>,
     /// Fault that ended the test, if any.
     pub fault: Option<Fault>,
+    /// Axes RootMotion moved during the test, [motion.observe].
+    pub axes: Vec<AxisStats>,
 }
 
 impl TestOutcome {
@@ -38,6 +40,7 @@ pub fn run_test(prog: &Program, def: usize) -> TestOutcome {
         file: prog.defs[def].file,
         failures: vm.failures,
         fault,
+        axes: vm.axes,
     }
 }
 

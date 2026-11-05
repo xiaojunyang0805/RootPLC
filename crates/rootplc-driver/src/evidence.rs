@@ -144,6 +144,21 @@ pub fn evidence(sources: Vec<(PathBuf, String)>, opts: &Options) -> Result<Evide
         )
     };
     let mut reasons = Vec::new();
+    for o in &tests.outcomes {
+        for a in o.axes.iter().filter(|a| !a.within_limits()) {
+            if a.peak_velocity > a.max_velocity * (1.0 + 1e-9) + 1e-9 {
+                reasons.push(format!(
+                    "axis {}: peak velocity {:.4} is above MaxVelocity {:.4}",
+                    a.path, a.peak_velocity, a.max_velocity
+                ));
+            } else {
+                reasons.push(format!(
+                    "axis {}: peak acceleration {:.4} is above MaxAcceleration {:.4}",
+                    a.path, a.peak_acceleration, a.max_acceleration
+                ));
+            }
+        }
+    }
     if !tests.check.ok() {
         reasons.push(format!(
             "the project does not compile ({} error(s))",
@@ -222,6 +237,30 @@ pub fn to_json(e: &Evidence) -> String {
             )
         })
         .collect();
+    let motion: Vec<String> = e
+        .tests
+        .outcomes
+        .iter()
+        .flat_map(|o| o.axes.iter().map(move |a| (o, a)))
+        .map(|(o, a)| {
+            format!(
+                "{{\"test\":{},\"axis\":{},\"cycles\":{},\"hard_stops\":{},\"peak_velocity\":{:.4},\"peak_acceleration\":{:.4},\"max_velocity\":{:.4},\"max_acceleration\":{},\"within_limits\":{}}}",
+                json_string(&o.name),
+                json_string(&a.path),
+                a.cycles,
+                a.hard_stops,
+                a.peak_velocity,
+                a.peak_acceleration,
+                a.max_velocity,
+                if a.max_acceleration > 0.0 {
+                    format!("{:.4}", a.max_acceleration)
+                } else {
+                    "null".to_string()
+                },
+                a.within_limits()
+            )
+        })
+        .collect();
     let mutation = match &e.mutation {
         None => "null".to_string(),
         Some(m) => {
@@ -266,6 +305,7 @@ pub fn to_json(e: &Evidence) -> String {
 \"libraries\":[{}],\
 \"check\":{{\"compiled\":{},\"errors\":{},\"warnings\":{},\"iec_clean\":{}}},\
 \"tests\":{{\"passed\":{},\"failed\":{},\"items\":[{}]}},\
+\"motion\":[{}],\
 \"mutation\":{mutation},\
 \"min_score\":{},\
 \"verdict\":\"{}\",\"reasons\":[{}],\
@@ -281,6 +321,7 @@ pub fn to_json(e: &Evidence) -> String {
         e.tests.outcomes.iter().filter(|o| o.passed()).count(),
         e.tests.outcomes.iter().filter(|o| !o.passed()).count(),
         tests.join(","),
+        motion.join(","),
         e.min_score
             .map_or_else(|| "null".to_string(), |m| format!("{m}")),
         if e.verified() {
@@ -340,6 +381,33 @@ pub fn to_markdown(e: &Evidence) -> String {
             if o.passed() { "PASS" } else { "FAIL" },
             o.name
         ));
+    }
+    let axes: Vec<_> = e
+        .tests
+        .outcomes
+        .iter()
+        .flat_map(|o| o.axes.iter())
+        .collect();
+    if !axes.is_empty() {
+        s.push_str(
+            "\n## Motion\n\nAxis cycles observed in the tests ([motion.observe]).\n\n| Axis | Cycles | Peak velocity | MaxVelocity | Peak acceleration | MaxAcceleration | Within limits |\n|---|---:|---:|---:|---:|---:|---|\n",
+        );
+        for a in axes {
+            s.push_str(&format!(
+                "| {} | {} | {:.3} | {:.3} | {:.3} | {} | {} |\n",
+                a.path,
+                a.cycles,
+                a.peak_velocity,
+                a.max_velocity,
+                a.peak_acceleration,
+                if a.max_acceleration > 0.0 {
+                    format!("{:.3}", a.max_acceleration)
+                } else {
+                    "not set".to_string()
+                },
+                if a.within_limits() { "yes" } else { "**no**" }
+            ));
+        }
     }
     s.push_str("\n## Mutation testing\n\n");
     match &e.mutation {
@@ -457,5 +525,49 @@ mod tests {
     fn no_tests_is_not_verified() {
         let e = evidence(latch(""), &Options::default()).expect("pack");
         assert_eq!(e.reasons, vec!["there are no TEST blocks".to_string()]);
+    }
+
+    fn motion(body: &str) -> Evidence {
+        let src = format!(
+            "TEST axis_test{n}VAR ax : AXIS_REF; pw : MC_Power; mv : MC_MoveRelative; i : INT; END_VAR{n}{body}{n}END_TEST{n}",
+            n = "\n"
+        );
+        let opts = Options {
+            libraries: vec!["RootMotion".to_string()],
+            mutate: false,
+            ..Options::default()
+        };
+        evidence(vec![(PathBuf::from("src/axis.st"), src)], &opts).expect("pack")
+    }
+
+    const MOVE: &str = "ax.CycleTime := 0.01; ax.MaxAcceleration := 500.0;\n        pw(Enable := TRUE, Axis := ax);\n        FOR i := 1 TO 100 DO mv(Execute := TRUE, Distance := 10.0, Velocity := 50.0,\n        Acceleration := 400.0, Deceleration := 400.0, Axis := ax); RP_VirtualAxis(Axis := ax); END_FOR;\n        ASSERT_TRUE(mv.Done);";
+
+    #[test]
+    fn motion_peaks_are_reported_within_limits() {
+        let e = motion(MOVE);
+        assert!(e.verified(), "{:?}", e.reasons);
+        let a = &e.tests.outcomes[0].axes[0];
+        assert_eq!(a.path, "axis_test.ax");
+        assert!((a.peak_velocity - 50.0).abs() < 1e-9);
+        assert!(a.peak_acceleration <= 400.0 + 1e-6 && a.peak_acceleration > 399.0);
+        let json = to_json(&e);
+        assert!(json.contains("\"axis\":\"axis_test.ax\""), "{json}");
+        assert!(json.contains("\"within_limits\":true"));
+        assert!(to_markdown(&e).contains("## Motion"));
+    }
+
+    #[test]
+    fn writing_axis_state_directly_breaks_the_limits() {
+        // the program jumps the velocity instead of commanding a move
+        let e = motion(&format!(
+            "{MOVE}\nax.Velocity := 40.0; RP_VirtualAxis(Axis := ax);"
+        ));
+        assert!(!e.verified());
+        assert!(
+            e.reasons[0].contains("above MaxAcceleration"),
+            "{:?}",
+            e.reasons
+        );
+        assert!(to_json(&e).contains("\"within_limits\":false"));
     }
 }

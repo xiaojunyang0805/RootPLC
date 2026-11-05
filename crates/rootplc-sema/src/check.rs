@@ -5095,7 +5095,12 @@ impl<'a> Checker<'a> {
         // [stdlib.compat.unit]: __ROOTPLC_UNIT_RESULT(suite, test, status,
         // message) records one test result (status 0 passed, 1 failed,
         // 2 skipped) for the suite instance `suite` refers to
-        if up == "__ROOTPLC_UNIT_RESULT" && self.intrinsics.contains(&up) && args.len() == 4 {
+        // [motion.observe]: __ROOTPLC_AXIS_CYCLE(axis, velocity, acceleration,
+        // max velocity, max acceleration, hard stop) reports one axis cycle
+        if (up == "__ROOTPLC_UNIT_RESULT" && args.len() == 4
+            || up == "__ROOTPLC_AXIS_CYCLE" && args.len() == 6)
+            && self.intrinsics.contains(&up)
+        {
             let irs: Vec<ir::Expr> = args.iter().map(|a| self.expr(a.expr).ir()).collect();
             let call = ir::Call {
                 target: CallTarget::Builtin {

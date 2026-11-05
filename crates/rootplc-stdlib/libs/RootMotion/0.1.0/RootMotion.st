@@ -12,6 +12,7 @@ TYPE
         (* configuration, set by the program before use *)
         CycleTime       : LREAL := 0.001;    (* seconds per call of RP_VirtualAxis *)
         MaxVelocity     : LREAL := 1000.0;   (* units per second *)
+        MaxAcceleration : LREAL := 0.0;      (* machine limit, units per second^2; 0: none set *)
         LimitsEnabled   : BOOL := FALSE;
         PositiveLimit   : LREAL := 0.0;
         NegativeLimit   : LREAL := 0.0;
@@ -33,6 +34,16 @@ END_TYPE
 
 (* Error IDs ([motion.errors]): 1 not powered, 2 axis in ErrorStop,
    3 invalid parameter, 4 software limit, 5 axis busy (stopping or moving). *)
+
+(* An acceleration or deceleration above the machine limit, when one is set
+   ([motion.errors] 3). *)
+FUNCTION RP_OverMax : BOOL
+VAR_INPUT
+    Axis  : AXIS_REF;
+    Value : LREAL;
+END_VAR
+RP_OverMax := Axis.MaxAcceleration > 0.0 AND Value > Axis.MaxAcceleration;
+END_FUNCTION
 
 (* Take control of the axis for a new command ([motion.abort]). *)
 FUNCTION RP_TakeAxis : UDINT
@@ -103,6 +114,7 @@ VAR
     vDesired : LREAL;
     vNew     : LREAL;
     pNew     : LREAL;
+    hardStop : BOOL;
 END_VAR
 tc := Axis.CycleTime;
 IF tc <= 0.0 THEN
@@ -176,10 +188,14 @@ IF Axis.LimitsEnabled AND (pNew > Axis.PositiveLimit OR pNew < Axis.NegativeLimi
         pNew := Axis.NegativeLimit;
     END_IF;
     vNew := 0.0;
+    hardStop := TRUE;
     Axis.Mode := RP_AXIS_MODE#Hold;
     Axis.State := MC_AXIS_STATE#ErrorStop;
     Axis.ErrorID := UDINT#4;
 END_IF;
+(* [motion.observe]: report this axis cycle to the toolchain *)
+__ROOTPLC_AXIS_CYCLE(REF(Axis), vNew, ABS(vNew - Axis.Velocity) / tc, Axis.MaxVelocity,
+                     Axis.MaxAcceleration, hardStop);
 Axis.Position := pNew;
 Axis.Velocity := vNew;
 RP_VirtualAxis := vNew <> 0.0;
@@ -288,7 +304,9 @@ IF edge.Q THEN
     Error := FALSE;
     ErrorID := 0;
     why := RP_CanMove(Axis := Axis);
-    IF why = 0 AND (Velocity <= 0.0 OR Acceleration <= 0.0 OR Deceleration <= 0.0) THEN
+    IF why = 0 AND (Velocity <= 0.0 OR Acceleration <= 0.0 OR Deceleration <= 0.0
+                    OR RP_OverMax(Axis := Axis, Value := Acceleration)
+                    OR RP_OverMax(Axis := Axis, Value := Deceleration)) THEN
         why := UDINT#3;
     END_IF;
     IF why <> 0 THEN
@@ -430,7 +448,9 @@ IF edge.Q THEN
     Error := FALSE;
     ErrorID := 0;
     why := RP_CanMove(Axis := Axis);
-    IF why = 0 AND (Velocity < 0.0 OR Acceleration <= 0.0 OR Deceleration <= 0.0) THEN
+    IF why = 0 AND (Velocity < 0.0 OR Acceleration <= 0.0 OR Deceleration <= 0.0
+                    OR RP_OverMax(Axis := Axis, Value := Acceleration)
+                    OR RP_OverMax(Axis := Axis, Value := Deceleration)) THEN
         why := UDINT#3;
     END_IF;
     IF why <> 0 THEN
@@ -506,7 +526,7 @@ IF edge.Q THEN
         ELSE
             ErrorID := UDINT#2;
         END_IF;
-    ELSIF Deceleration <= 0.0 THEN
+    ELSIF Deceleration <= 0.0 OR RP_OverMax(Axis := Axis, Value := Deceleration) THEN
         Error := TRUE;
         ErrorID := UDINT#3;
     ELSE
