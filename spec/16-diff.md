@@ -61,8 +61,10 @@ division by zero) ends the run and is reported with its cycle.
 **[diff.report]** The report states the verdict (`agree`, `differ` or
 `fault`), the cycles run, the inputs driven and set, and for each compared
 output the number of cycles in which it differed. For the first difference
-it gives the cycle, both values, and the driven inputs of that cycle and of
-up to four cycles before, so the difference can be reproduced as a TEST.
+it gives the cycle, both values, the driven inputs of that cycle and of up
+to four cycles before, and the last eight changes of driven inputs before
+it with their cycles (timers and supervision often act seconds after the
+change that caused them), so the difference can be reproduced as a TEST.
 With `--json` the same content is one JSON object.
 
 **[diff.limits]** Agreement means no difference was found in the sampled
