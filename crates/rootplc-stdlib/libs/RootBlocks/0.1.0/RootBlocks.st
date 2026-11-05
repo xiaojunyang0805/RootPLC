@@ -361,3 +361,152 @@ Status.Active := RunningFwd OR RunningRev;
 Status.Error := Error;
 Status.ErrorID := ErrorID;
 END_FUNCTION_BLOCK
+
+(* F04.CYLINDER: a pneumatic cylinder, double-acting (two solenoids) or
+   single-acting (one solenoid, spring return), with end-position switches.
+   ErrorID 1 did not extend in time, 2 did not retract in time, 3 both end
+   switches on. Safe state: both solenoids off. *)
+FUNCTION_BLOCK RB_Cylinder
+VAR_INPUT
+    Mode         : RB_MODE := RB_MODE#Off;
+    AutoExtend   : BOOL;              (* TRUE extended, FALSE retracted *)
+    ManExtend    : BOOL;
+    Interlock    : BOOL;              (* TRUE: both solenoids off now *)
+    Permissive   : BOOL := TRUE;      (* FALSE: do not extend *)
+    FbExtended   : BOOL;
+    FbRetracted  : BOOL;
+    DoubleActing : BOOL := TRUE;      (* FALSE: spring return, Retract unused *)
+    Feedback     : BOOL := TRUE;
+    MoveTime     : TIME := T#3s;      (* supervision time for a stroke *)
+    Reset        : BOOL;
+END_VAR
+VAR_OUTPUT
+    Extend      : BOOL;               (* solenoid A *)
+    Retract     : BOOL;               (* solenoid B (double-acting only) *)
+    IsExtended  : BOOL;
+    IsRetracted : BOOL;
+    Error       : BOOL;
+    ErrorID     : UDINT;
+    Status      : RB_DEVICE_STATUS;
+END_VAR
+VAR
+    resetEdge : R_TRIG;
+    want      : BOOL;
+    active    : BOOL;
+    tMove     : TON;
+    tBoth     : TON;
+END_VAR
+resetEdge(CLK := Reset);
+IF resetEdge.Q THEN
+    Error := FALSE;
+    ErrorID := 0;
+END_IF;
+active := Mode <> RB_MODE#Off AND NOT Interlock;
+want := (Mode = RB_MODE#Auto AND AutoExtend) OR (Mode = RB_MODE#Manual AND ManExtend);
+IF want AND NOT Extend AND NOT Permissive THEN
+    want := FALSE;
+END_IF;
+IF NOT active OR Error THEN
+    want := FALSE;
+END_IF;
+IF want AND NOT Extend THEN
+    Status.Starts := Status.Starts + 1;
+END_IF;
+Extend := want;
+Retract := DoubleActing AND active AND NOT Error AND NOT want;
+IF Feedback THEN
+    tBoth(IN := FbExtended AND FbRetracted, PT := MoveTime);
+    tMove(IN := (Extend AND NOT FbExtended) OR (Retract AND NOT FbRetracted)
+               OR (NOT DoubleActing AND NOT Extend AND active AND NOT FbRetracted), PT := MoveTime);
+    IF NOT Error THEN
+        IF tBoth.Q THEN
+            Error := TRUE;
+            ErrorID := UDINT#3;
+        ELSIF tMove.Q THEN
+            Error := TRUE;
+            IF Extend THEN
+                ErrorID := UDINT#1;
+            ELSE
+                ErrorID := UDINT#2;
+            END_IF;
+        END_IF;
+    END_IF;
+    IsExtended := FbExtended AND NOT FbRetracted;
+    IsRetracted := FbRetracted AND NOT FbExtended;
+ELSE
+    tBoth(IN := FALSE, PT := MoveTime);
+    tMove(IN := FALSE, PT := MoveTime);
+    IsExtended := Extend;
+    IsRetracted := NOT Extend;
+END_IF;
+IF Error THEN
+    Extend := FALSE;
+    Retract := FALSE;
+END_IF;
+Status.Mode := Mode;
+Status.Commanded := Extend;
+Status.Active := IsExtended;
+Status.Error := Error;
+Status.ErrorID := ErrorID;
+END_FUNCTION_BLOCK
+
+(* F04.PUMP: a pump driven by RB_Motor, with dry-run protection.
+   ErrorID 1-3 as RB_Motor (no running feedback, contactor stuck, overload),
+   4 dry run while running. Safe state: motor off. *)
+FUNCTION_BLOCK RB_Pump
+VAR_INPUT
+    Mode         : RB_MODE := RB_MODE#Off;
+    AutoRun      : BOOL;
+    ManRun       : BOOL;
+    Interlock    : BOOL;
+    Permissive   : BOOL := TRUE;
+    FbRunning    : BOOL;
+    Overload     : BOOL;
+    DryRun       : BOOL;              (* TRUE: no liquid (level or flow switch) *)
+    DryRunTime   : TIME := T#10s;     (* dry run while running this long: fault 4 *)
+    Feedback     : BOOL := TRUE;
+    FeedbackTime : TIME := T#2s;
+    RestartDelay : TIME := T#0s;
+    Reset        : BOOL;
+END_VAR
+VAR_OUTPUT
+    Run     : BOOL;
+    Running : BOOL;
+    Error   : BOOL;
+    ErrorID : UDINT;
+    Status  : RB_DEVICE_STATUS;
+END_VAR
+VAR
+    motor     : RB_Motor;
+    resetEdge : R_TRIG;
+    dry       : BOOL;
+    tDry      : TON;
+END_VAR
+resetEdge(CLK := Reset);
+IF resetEdge.Q THEN
+    dry := FALSE;
+END_IF;
+motor(Mode := Mode, AutoRun := AutoRun, ManRun := ManRun, Interlock := Interlock OR dry,
+      Permissive := Permissive, FbRunning := FbRunning, Overload := Overload, Feedback := Feedback,
+      FeedbackTime := FeedbackTime, RestartDelay := RestartDelay, Reset := Reset);
+tDry(IN := motor.Running AND DryRun, PT := DryRunTime);
+IF tDry.Q AND NOT dry AND NOT motor.Error THEN
+    dry := TRUE;
+    motor(Mode := Mode, AutoRun := AutoRun, ManRun := ManRun, Interlock := TRUE,
+          Permissive := Permissive, FbRunning := FbRunning, Overload := Overload, Feedback := Feedback,
+          FeedbackTime := FeedbackTime, RestartDelay := RestartDelay, Reset := Reset);
+END_IF;
+Run := motor.Run;
+Running := motor.Running;
+Error := motor.Error OR dry;
+IF motor.Error THEN
+    ErrorID := motor.ErrorID;
+ELSIF dry THEN
+    ErrorID := UDINT#4;
+ELSE
+    ErrorID := 0;
+END_IF;
+Status := motor.Status;
+Status.Error := Error;
+Status.ErrorID := ErrorID;
+END_FUNCTION_BLOCK
