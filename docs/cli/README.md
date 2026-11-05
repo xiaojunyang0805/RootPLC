@@ -4,7 +4,7 @@
 rootplc init  [dir] [--name NAME] [--agent claude|gemini|qwen|cursor|codex|all]
 rootplc check <file.st|dir>... [--json]
 rootplc test  <file.st|dir>... [--filter TEXT] [--json]
-rootplc test  <file.st|dir>... --mutate [--mutate-limit N] [--min-score P] [--json]
+rootplc test  <file.st|dir>... --mutate [--mutate-limit N] [--mutate-only TEXT] [--min-score P] [--json]
 rootplc run   <file.st|dir>... [--program NAME] [--cycles N] [--cycle-ms MS] [--json]
 rootplc diff  <file.st|dir>... --reference FB --unit FB [--cycles N] [--cycle-ms MS] [--seed N]
               [--set NAME=VALUE]... [--range NAME=LO..HI]... [--toggle P] [--tolerance T] [--json]
@@ -85,7 +85,9 @@ changes one token in a statement (a comparison, `+`/`-`, `AND`/`OR`/`XOR`,
 duration). A mutant is killed when a test fails on it. The score is killed ÷
 viable mutants (mutants that do not compile are not counted). Needs every test
 passing first. Each surviving mutant is listed so a test can be added for it.
-`--mutate-limit N` caps the mutants (default 500); `--min-score P` makes the
+`--mutate-only TEXT` mutates only files whose path contains `TEXT` (the
+other files still compile and run: score a real block, not its tests or
+adapter). `--mutate-limit N` caps the mutants (default 500); `--min-score P` makes the
 command fail below `P` percent, for CI. The MCP tool `rootplc_test` takes
 `"mutate": true` for the same report.
 

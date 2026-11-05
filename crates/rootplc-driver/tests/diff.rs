@@ -145,6 +145,23 @@ END_FUNCTION_BLOCK";
     assert_eq!(run.differing, 0, "{}", render(&r));
     assert!(r.missing_outputs.contains(&"Error".to_string()));
     assert!(r.held.contains(&"FeedbackTime".to_string()));
+    // a reference-only input can be set: a unit without a mode
+    let src2 = "
+FUNCTION_BLOCK FB_Bare
+VAR_INPUT AutoRun, Interlock : BOOL; END_VAR
+VAR_OUTPUT Run : BOOL; END_VAR
+Run := AutoRun AND NOT Interlock;
+END_FUNCTION_BLOCK";
+    let check2 = inline(src2, &["RootBlocks"]);
+    let mut o = opts("RB_Motor", "FB_Bare");
+    o.set = vec![
+        ("Mode".into(), "RB_MODE#Auto".into()),
+        ("Feedback".into(), "FALSE".into()),
+    ];
+    let r = diff(&check2, &o).expect("diff");
+    assert_eq!(r.verdict, Verdict::Agree, "{}", render(&r));
+    assert!(!r.missing_inputs.contains(&"Mode".to_string()));
+    assert!(r.missing_inputs.contains(&"ManRun".to_string()));
     let mut o = opts("RB_Motor", "FB_MyMotor");
     o.set = vec![("Mode".into(), "RB_MODE#Fast".into())];
     assert!(

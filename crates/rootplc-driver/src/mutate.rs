@@ -208,6 +208,19 @@ pub fn mutation_report(
     filter: Option<&str>,
     limit: usize,
 ) -> Result<MutationReport, String> {
+    mutation_report_only(sources, libraries, filter, limit, None)
+}
+
+/// [`mutation_report`], mutating only the files whose path contains `only`
+/// (`--mutate-only`, [tests.mutation]); every file still compiles and every
+/// test still runs.
+pub fn mutation_report_only(
+    sources: Vec<(PathBuf, String)>,
+    libraries: &[String],
+    filter: Option<&str>,
+    limit: usize,
+    only: Option<&str>,
+) -> Result<MutationReport, String> {
     let baseline = test_report(check_sources_with(sources.clone(), libraries)?, filter);
     let mut report = MutationReport {
         baseline,
@@ -230,9 +243,17 @@ pub fn mutation_report(
         );
         return Ok(report);
     }
+    let selected = |p: &PathBuf| {
+        only.is_none_or(|t| {
+            p.to_string_lossy()
+                .replace('\\', "/")
+                .contains(&t.replace('\\', "/"))
+        })
+    };
     let all: Vec<Mutant> = sources
         .iter()
         .enumerate()
+        .filter(|(_, (p, _))| selected(p))
         .flat_map(|(i, (p, s))| mutants_of(i, p, s))
         .collect();
     report.candidates = all.len();
@@ -288,6 +309,7 @@ fn run_mutant(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::Path;
 
     fn names(src: &str) -> Vec<(String, String)> {
         mutants_of(0, std::path::Path::new("a.st"), src)
@@ -365,6 +387,37 @@ mod tests {
         assert!(r.error.expect("error").contains("green baseline"));
         let none = mutation_report(project(""), &[], None, DEFAULT_LIMIT).expect("mutation run");
         assert!(none.error.expect("error").contains("no TEST blocks"));
+    }
+
+    #[test]
+    fn mutate_only_selects_files() {
+        // a helper block in the test file has mutants of its own
+        let tests = "FUNCTION_BLOCK Helper
+VAR_OUTPUT y : BOOL; END_VAR
+y := TRUE AND NOT FALSE;
+END_FUNCTION_BLOCK
+                     TEST latches
+VAR l : Latch; h : Helper; END_VAR
+h(); l(start := TRUE, stop := FALSE); ASSERT_TRUE(l.running);
+                     l(start := FALSE, stop := FALSE); ASSERT_TRUE(l.running);
+                     l(start := TRUE, stop := TRUE); ASSERT_FALSE(l.running);
+END_TEST
+";
+        let all = mutation_report(project(tests), &[], None, DEFAULT_LIMIT).expect("mutation run");
+        let only = mutation_report_only(project(tests), &[], None, DEFAULT_LIMIT, Some("latch.st"))
+            .expect("mutation run");
+        assert!(
+            only.mutants
+                .iter()
+                .all(|(m, _)| m.path == Path::new("latch.st"))
+        );
+        assert!(!only.mutants.is_empty());
+        assert!(only.mutants.len() < all.mutants.len());
+        assert_eq!(only.score(), Some(1.0));
+        assert!(all.score().expect("score") < 1.0);
+        let none = mutation_report_only(project(tests), &[], None, DEFAULT_LIMIT, Some("nowhere"))
+            .expect("mutation run");
+        assert!(none.mutants.is_empty());
     }
 
     #[test]

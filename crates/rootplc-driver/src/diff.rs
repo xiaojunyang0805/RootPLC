@@ -354,22 +354,24 @@ pub fn diff(check: &CheckReport, opt: &DiffOptions) -> Result<DiffReport, String
     // inputs: set, driven, held or missing ([diff.interface], [diff.stimuli])
     let mut inputs: Vec<Input> = Vec::new();
     for v in &r_in {
-        if !has(&u_in, &v.name) {
-            report.missing_inputs.push(v.name.clone());
-            continue;
-        }
+        // a set input configures the reference even when the unit lacks it
         if let Some((_, text)) = opt
             .set
             .iter()
             .find(|(n, _)| n.eq_ignore_ascii_case(&v.name))
         {
             let value = parse_value(prog, text).map_err(|e| format!("--set {}: {e}", v.name))?;
+            let in_unit = has(&u_in, &v.name);
             if !vm.write_var(rroot, rdef, &v.name, value.clone())
-                || !vm.write_var(uroot, udef, &v.name, value)
+                || (in_unit && !vm.write_var(uroot, udef, &v.name, value))
             {
                 return Err(format!("--set {}: the value does not fit", v.name));
             }
             report.set.push((v.name.clone(), text.trim().to_string()));
+            continue;
+        }
+        if !has(&u_in, &v.name) {
+            report.missing_inputs.push(v.name.clone());
             continue;
         }
         let range = opt

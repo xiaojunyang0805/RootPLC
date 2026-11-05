@@ -10,7 +10,8 @@ const USAGE: &str = "usage:
   rootplc init  [dir] [--name NAME] [--agent claude|gemini|qwen|cursor|codex|all]
   rootplc check <file.st|dir>... [--json]
   rootplc test  <file.st|dir>... [--filter TEXT] [--json]
-  rootplc test  <file.st|dir>... --mutate [--mutate-limit N] [--min-score P] [--json]   (mutation score of the tests)
+  rootplc test  <file.st|dir>... --mutate [--mutate-limit N] [--mutate-only TEXT] [--min-score P] [--json]
+                (mutation score of the tests; --mutate-only: mutate only files whose path contains TEXT)
   rootplc run   <file.st|dir>... [--program NAME] [--cycles N] [--cycle-ms MS] [--json]
   rootplc diff  <file.st|dir>... --reference FB --unit FB [--cycles N] [--cycle-ms MS] [--seed N]
                 [--set NAME=VALUE]... [--range NAME=LO..HI]... [--toggle P] [--tolerance T] [--json]
@@ -52,10 +53,10 @@ impl Args {
                     a.options.push((x, String::new()))
                 }
                 "--program" | "--cycles" | "--cycle-ms" | "--filter" | "--name" | "--show"
-                | "--agent" | "--library" | "--mutate-limit" | "--min-score" | "--out"
-                | "--watchdog-ms" | "--retain" | "--status" | "--modbus" | "--deploy" | "--to"
-                | "--reference" | "--unit" | "--seed" | "--set" | "--range" | "--toggle"
-                | "--tolerance" => {
+                | "--agent" | "--library" | "--mutate-limit" | "--mutate-only" | "--min-score"
+                | "--out" | "--watchdog-ms" | "--retain" | "--status" | "--modbus" | "--deploy"
+                | "--to" | "--reference" | "--unit" | "--seed" | "--set" | "--range"
+                | "--toggle" | "--tolerance" => {
                     let v = it.next().unwrap_or_default();
                     a.options.push((x, v));
                 }
@@ -191,11 +192,12 @@ fn cmd_mutate(paths: &[PathBuf], filter: Option<&str>, args: &Args) -> ExitCode 
         .and_then(|v| v.parse().ok())
         .unwrap_or(rootplc_driver::mutate::DEFAULT_LIMIT);
     let min_score: Option<f64> = args.opt("--min-score").and_then(|v| v.parse().ok());
-    let r = match rootplc_driver::mutate::mutation_report(
+    let r = match rootplc_driver::mutate::mutation_report_only(
         sources,
         &args.all("--library"),
         filter,
         limit,
+        args.opt("--mutate-only"),
     ) {
         Ok(r) => r,
         Err(e) => return io_error("test", &e, json_out),
