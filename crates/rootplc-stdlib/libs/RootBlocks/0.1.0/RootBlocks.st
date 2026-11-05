@@ -17,6 +17,8 @@ TYPE
     RB_ALARM_STATE : (Normal, ActiveUnack, ActiveAcked, ReturnedUnack);
     (* F05: batch phase states (ISA-88 names; transient states omitted) *)
     RB_PHASE_STATE : (Idle, Running, Held, Complete, Stopped, Aborted);
+    (* F10: machine states, a subset of the PackML state model (public names) *)
+    RB_MACHINE_STATE : (Stopped, Resetting, Idle, Starting, Execute, Stopping, Held, Aborted);
 END_TYPE
 
 (* F04.VALVE.ONOFF: an on/off valve with open and closed feedback.
@@ -1143,4 +1145,197 @@ ELSIF Finished AND State = RB_PHASE_STATE#Running THEN
 END_IF;
 Running := State = RB_PHASE_STATE#Running;
 Done := State = RB_PHASE_STATE#Complete;
+END_FUNCTION_BLOCK
+
+(* F10.MODES: the operating mode of a machine or unit, fed to the Mode
+   input of its device modules. The emergency-stop status from the safety
+   system forces Off (the safety function itself stays on certified
+   hardware). *)
+FUNCTION_BLOCK RB_ModeManager
+VAR_INPUT
+    ReqOff        : BOOL;             (* rising edge: request Off *)
+    ReqManual     : BOOL;             (* rising edge: request Manual *)
+    ReqAuto       : BOOL;             (* rising edge: request Auto *)
+    AutoAllowed   : BOOL := TRUE;     (* e.g. homed, no fault, guards closed *)
+    ManualAllowed : BOOL := TRUE;
+    EStopOk       : BOOL := TRUE;     (* status from the safety system *)
+    Fault         : BOOL;             (* a machine fault: Auto drops to Off *)
+END_VAR
+VAR_OUTPUT
+    Mode        : RB_MODE;
+    ModeChanged : BOOL;               (* TRUE for one call after a change *)
+    Rejected    : BOOL;               (* a request was not allowed *)
+END_VAR
+VAR
+    eOff    : R_TRIG;
+    eManual : R_TRIG;
+    eAuto   : R_TRIG;
+    before  : RB_MODE;
+END_VAR
+eOff(CLK := ReqOff);
+eManual(CLK := ReqManual);
+eAuto(CLK := ReqAuto);
+before := Mode;
+Rejected := FALSE;
+IF NOT EStopOk THEN
+    Mode := RB_MODE#Off;
+    Rejected := eManual.Q OR eAuto.Q;
+ELSIF eOff.Q THEN
+    Mode := RB_MODE#Off;
+ELSIF eManual.Q THEN
+    IF ManualAllowed THEN
+        Mode := RB_MODE#Manual;
+    ELSE
+        Rejected := TRUE;
+    END_IF;
+ELSIF eAuto.Q THEN
+    IF AutoAllowed AND NOT Fault THEN
+        Mode := RB_MODE#Auto;
+    ELSE
+        Rejected := TRUE;
+    END_IF;
+END_IF;
+IF Mode = RB_MODE#Auto AND (Fault OR NOT AutoAllowed) THEN
+    Mode := RB_MODE#Off;
+END_IF;
+IF Mode = RB_MODE#Manual AND NOT ManualAllowed THEN
+    Mode := RB_MODE#Off;
+END_IF;
+ModeChanged := Mode <> before;
+END_FUNCTION_BLOCK
+
+(* F10.STATE: the state of a machine, a subset of the PackML state model.
+   Commands act on their rising edge; the acting states (Resetting,
+   Starting, Stopping) end when the machine logic reports done. A command
+   not valid in the state is ignored and reported in Rejected. *)
+FUNCTION_BLOCK RB_MachineState
+VAR_INPUT
+    Reset     : BOOL;
+    Start     : BOOL;
+    Stop      : BOOL;
+    Hold      : BOOL;
+    Unhold    : BOOL;
+    Abort     : BOOL;
+    Clear     : BOOL;
+    ResetDone : BOOL;                 (* machine logic: resetting finished *)
+    StartDone : BOOL;                 (* machine logic: starting finished *)
+    StopDone  : BOOL;                 (* machine logic: stopping finished *)
+END_VAR
+VAR_OUTPUT
+    State    : RB_MACHINE_STATE;
+    Producing : BOOL;                 (* State = Execute *)
+    Rejected : BOOL;
+END_VAR
+VAR
+    eReset  : R_TRIG;
+    eStart  : R_TRIG;
+    eStop   : R_TRIG;
+    eHold   : R_TRIG;
+    eUnhold : R_TRIG;
+    eAbort  : R_TRIG;
+    eClear  : R_TRIG;
+END_VAR
+eReset(CLK := Reset);
+eStart(CLK := Start);
+eStop(CLK := Stop);
+eHold(CLK := Hold);
+eUnhold(CLK := Unhold);
+eAbort(CLK := Abort);
+eClear(CLK := Clear);
+Rejected := FALSE;
+IF eAbort.Q THEN
+    IF State <> RB_MACHINE_STATE#Aborted THEN
+        State := RB_MACHINE_STATE#Aborted;
+    ELSE
+        Rejected := TRUE;
+    END_IF;
+ELSIF eClear.Q THEN
+    IF State = RB_MACHINE_STATE#Aborted THEN
+        State := RB_MACHINE_STATE#Stopped;
+    ELSE
+        Rejected := TRUE;
+    END_IF;
+ELSIF eStop.Q THEN
+    IF State = RB_MACHINE_STATE#Idle OR State = RB_MACHINE_STATE#Starting
+       OR State = RB_MACHINE_STATE#Execute OR State = RB_MACHINE_STATE#Held THEN
+        State := RB_MACHINE_STATE#Stopping;
+    ELSE
+        Rejected := TRUE;
+    END_IF;
+ELSIF eHold.Q THEN
+    IF State = RB_MACHINE_STATE#Execute THEN
+        State := RB_MACHINE_STATE#Held;
+    ELSE
+        Rejected := TRUE;
+    END_IF;
+ELSIF eUnhold.Q THEN
+    IF State = RB_MACHINE_STATE#Held THEN
+        State := RB_MACHINE_STATE#Execute;
+    ELSE
+        Rejected := TRUE;
+    END_IF;
+ELSIF eStart.Q THEN
+    IF State = RB_MACHINE_STATE#Idle THEN
+        State := RB_MACHINE_STATE#Starting;
+    ELSE
+        Rejected := TRUE;
+    END_IF;
+ELSIF eReset.Q THEN
+    IF State = RB_MACHINE_STATE#Stopped THEN
+        State := RB_MACHINE_STATE#Resetting;
+    ELSE
+        Rejected := TRUE;
+    END_IF;
+ELSIF State = RB_MACHINE_STATE#Resetting AND ResetDone THEN
+    State := RB_MACHINE_STATE#Idle;
+ELSIF State = RB_MACHINE_STATE#Starting AND StartDone THEN
+    State := RB_MACHINE_STATE#Execute;
+ELSIF State = RB_MACHINE_STATE#Stopping AND StopDone THEN
+    State := RB_MACHINE_STATE#Stopped;
+END_IF;
+Producing := State = RB_MACHINE_STATE#Execute;
+END_FUNCTION_BLOCK
+
+(* F03.COUNTER: counts rising edges of In up to Preset, with a lifetime
+   total and batch counting. *)
+FUNCTION_BLOCK RB_Counter
+VAR_INPUT
+    In          : BOOL;               (* counts on the rising edge *)
+    Preset      : UDINT := 10;
+    AutoRestart : BOOL;               (* TRUE: start the next batch at once *)
+    Reset       : BOOL;               (* rising edge: count back to 0 *)
+END_VAR
+VAR_OUTPUT
+    Count     : UDINT;
+    Done      : BOOL;                 (* Count reached Preset *)
+    Remaining : UDINT;
+    BatchDone : BOOL;                 (* TRUE for one call when a batch completes *)
+    Batches   : UDINT;
+    Total     : UDINT;                (* every count, never reset *)
+END_VAR
+VAR
+    eIn    : R_TRIG;
+    eReset : R_TRIG;
+END_VAR
+eIn(CLK := In);
+eReset(CLK := Reset);
+BatchDone := FALSE;
+IF eReset.Q THEN
+    Count := 0;
+END_IF;
+IF eIn.Q THEN
+    Total := Total + 1;
+    IF Count >= Preset AND AutoRestart THEN
+        Count := 0;
+    END_IF;
+    IF Count < Preset THEN
+        Count := Count + 1;
+        IF Count >= Preset THEN
+            BatchDone := TRUE;
+            Batches := Batches + 1;
+        END_IF;
+    END_IF;
+END_IF;
+Done := Count >= Preset;
+Remaining := Preset - MIN(Count, Preset);
 END_FUNCTION_BLOCK

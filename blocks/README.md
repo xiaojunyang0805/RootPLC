@@ -17,14 +17,14 @@ jobs and features exist, never copied. No block is a safety function.
 |---|---|---|
 | F01 | Signal conditioning | [`RB_Scale`](cards/F01.SCALE.md), [`RB_FilterPT1`](cards/F01.FILTER.PT1.md), [`RB_MovingAverage`](cards/F01.AVERAGE.md), [`RB_Ramp`](cards/F01.RAMP.md), [`RB_Deadband`](cards/F01.DEADBAND.md), [`RB_Debounce`](cards/F01.DEBOUNCE.md) |
 | F02 | Discrete logic and interlocks | planned |
-| F03 | Timing, counting, scheduling | [`RB_CycleTime`](cards/F03.CYCLETIME.md) |
+| F03 | Timing, counting, scheduling | [`RB_CycleTime`](cards/F03.CYCLETIME.md), [`RB_Counter`](cards/F03.COUNTER.md) |
 | F04 | Device modules | [`RB_ValveOnOff`](cards/F04.VALVE.ONOFF.md), [`RB_Motor`](cards/F04.MOTOR.DOL.md), [`RB_MotorReversing`](cards/F04.MOTOR.REV.md), [`RB_Cylinder`](cards/F04.CYLINDER.md), [`RB_Pump`](cards/F04.PUMP.md), [`RB_Drive`](cards/F04.DRIVE.md) |
 | F05 | Sequencing | [`RB_StepChain`](cards/F05.STEPS.md), [`RB_Phase`](cards/F05.PHASE.md) |
 | F06 | Closed-loop control | [`RB_PID`](cards/F06.PID.md), [`RB_OnOff`](cards/F06.ONOFF.md) |
 | F07 | Motion | the RootMotion library (spec/13-motion.md) |
 | F08 | Alarms and events | [`RB_Alarm`](cards/F08.ALARM.md) |
 | F09 | Supervision and diagnostics | planned |
-| F10 | Machine modes and states | planned |
+| F10 | Machine modes and states | [`RB_ModeManager`](cards/F10.MODES.md), [`RB_MachineState`](cards/F10.STATE.md) |
 | F11 | Data handling and communication | planned |
 | F12 | Material handling and process patterns | planned |
 

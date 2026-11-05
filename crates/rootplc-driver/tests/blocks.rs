@@ -82,6 +82,7 @@ fn block_tests_kill_at_least_90_percent_of_mutants() {
         .count();
     assert!(viable > 0, "no viable mutants in the library");
     let score = killed as f64 / viable as f64;
+    eprintln!("RootBlocks mutation score: {killed} of {viable} library mutants killed");
     let survivors: Vec<String> = m
         .survivors()
         .filter(|s| lib(&s.path))
