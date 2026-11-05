@@ -1,0 +1,17 @@
+id = "motion-jog-axis"
+version = 1
+category = "motion"
+difficulty = "medium"
+languages = ["ST"]
+split = "public"
+source = "original (RootPLC)"
+licence = "Apache-2.0"
+libraries = ["RootMotion"]
+
+[grading]
+iec_clean = true
+
+[scoring]
+compile = 0.1
+visible_tests = 0.2
+hidden_tests = 0.7

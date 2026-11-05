@@ -5,7 +5,7 @@ programs. Tasks run headless with `rootplc`, so anyone can reproduce the
 scores without a vendor IDE or licence.
 
 **Sizes:**
-- v0 (now): 30 tasks in `tasks/` (6 hard tasks added 4 Nov: strings, precision, OOP, numeric control, long sequence, strict-IEC migration; 2 tasks from real projects added 5 Nov: `real-pump-supervision`, `real-isa-alarm`, MIT-licensed code with attribution in `task.toml`; the first motion task `motion-index-table` added 5 Nov, which uses the bundled RootMotion library through `libraries = ["RootMotion"]` in `task.toml`), every reference solution passing, hidden tests
+- v0 (now): 31 tasks in `tasks/` (6 hard tasks added 4 Nov: strings, precision, OOP, numeric control, long sequence, strict-IEC migration; 2 tasks from real projects added 5 Nov: `real-pump-supervision`, `real-isa-alarm`, MIT-licensed code with attribution in `task.toml`; two motion tasks added 5 Nov, `motion-index-table` and `motion-jog-axis`, which use the bundled RootMotion library through `libraries = ["RootMotion"]` in `task.toml`), every reference solution passing, hidden tests
   validated by mutation testing (`python eval/harness/validate_bench.py`).
 - v0 target for G1: about 100 tasks.
 - v1: more tasks, adding simulation and formal properties.
