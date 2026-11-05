@@ -121,21 +121,41 @@ fn library_passes_the_checker_as_user_code() {
     assert!(check.ok());
 }
 
+/// The libraries a template uses, as its sources name them
+/// (`--library RootBlocks --library RootMotion`); RootBlocks always.
+fn template_libraries(sources: &[(PathBuf, String)]) -> Vec<String> {
+    let mut libs = vec!["RootBlocks".to_string()];
+    for (_, text) in sources {
+        for part in text.split("--library").skip(1) {
+            let name: String = part
+                .trim_start()
+                .chars()
+                .take_while(|c| c.is_ascii_alphanumeric() || *c == '_')
+                .collect();
+            if !name.is_empty() && !libs.contains(&name) {
+                libs.push(name);
+            }
+        }
+    }
+    libs
+}
+
 /// L4 templates (blocks/templates/<name>/): they compile with RootBlocks
-/// (warnings only in their test files), their tests pass, and the tests
-/// kill at least 70% of the mutants of the template's logic (the I/O map
-/// `io_map.st` is wiring and is checked on the runtime instead).
+/// and the libraries they name (warnings only in their test files), their
+/// tests pass, and the tests kill at least 70% of the mutants of the
+/// template's logic (the I/O map `io_map.st` is wiring and is checked on
+/// the runtime instead).
 #[test]
 fn templates_compile_pass_and_are_mutation_tested() {
     let Ok(dirs) = std::fs::read_dir(repo().join("blocks/templates")) else {
         return;
     };
-    let libs = vec!["RootBlocks".to_string()];
     let mut seen = 0;
     for d in dirs.flatten().filter(|d| d.path().is_dir()) {
         seen += 1;
         let name = d.file_name().to_string_lossy().to_string();
         let all = rootplc_driver::read_sources(&[d.path()]).expect("template sources");
+        let libs = template_libraries(&all);
         let is_test = |p: &std::path::Path| p.components().any(|c| c.as_os_str() == "tests");
         let check = rootplc_driver::check_sources_with(all.clone(), &libs).expect("check");
         assert!(check.ok(), "{name}: does not compile");

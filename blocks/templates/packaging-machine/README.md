@@ -52,7 +52,7 @@ states with hold and unhold. Built only from catalog blocks.
 `cargo test` (driver test `templates_compile_pass_and_are_mutation_tested`)
 checks that the template compiles without warnings, passes its 8 TEST
 blocks against the simulated packer, and kills at least 70% of the mutants
-of its logic: 106 of 129 (82%, 5 Nov 2026). The survivors are mainly the
+of its logic: 50 of 61 (82%, 5 Nov 2026). The survivors are mainly the
 debounce and stroke-supervision times, which the simulation does not
 reach, and condition variants that change behaviour only on a sequence the
 tests do not drive.

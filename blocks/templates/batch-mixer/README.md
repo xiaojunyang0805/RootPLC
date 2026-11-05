@@ -56,7 +56,7 @@ of A, `[2]` kg of B, `[3]` temperature in °C, `[4]` mix time in s.
 `cargo test` (driver test `templates_compile_pass_and_are_mutation_tested`)
 checks that the template compiles without warnings, passes its 7 TEST
 blocks against the simulated tank, and kills at least 70% of the mutants
-of its logic: 81 of 95 (85%, 5 Nov 2026). The survivors are the end
+of its logic: 64 of 74 (86%, 5 Nov 2026). The survivors are the end
 conditions of the steps (`>=` against `>` on one simulation cycle), the
 filter time, the PID tuning and set point while control starts at full
 power, and the over-temperature comparison boundary.
