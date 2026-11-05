@@ -1,6 +1,6 @@
 # Real-world PLC code corpus: what rootplc handles today
 
-*Generated 2026-11-04 by `corpus/corpus.py`. 226 public projects, 15470 program units (POUs, types, global lists), 1,397,311 lines of Structured Text.*
+*Generated 2026-11-06 by `corpus/corpus.py`. 226 public projects, 15470 program units (POUs, types, global lists), 1,397,311 lines of Structured Text.*
 
 A unit is *syntax OK* when rootplc lexes and parses it; *clean* when it also passes the type
 checker with no errors. Units are checked per project, so references to other libraries that
@@ -14,15 +14,15 @@ TwinCAT form RootPLC knows of, so it is IEC 61131-3 Structured Text as far as Ro
 | Figure | Projects | Units | Syntax OK | Clean | IEC clean |
 |---|---|---|---|---|---|
 | Headline (core set) | 200 | 13372 | 96.4% | 73.1% | 21.3% |
-| Holdout part of the core set (never used to choose fixes) | 32 | 901 | 95.2% | 66.4% | 23.0% |
+| Holdout part of the core set (never used to choose fixes) | 32 | 901 | 95.2% | 66.4% | 22.9% |
 | Everything analysed, tool inputs included | 226 | 15470 | 94.7% | 70.8% | 23.4% |
 
 | Category | Units | Syntax OK | Clean | IEC clean |
 |---|---|---|---|---|
 | application | 2455 | 95.2% | 81.7% | 35.3% |
 | library | 9594 | 96.6% | 72.7% | 17.5% |
-| sample | 1323 | 97.2% | 59.6% | 22.5% |
-| tool-input | 2098 | 84.0% | 56.3% | 36.9% |
+| sample | 1323 | 97.2% | 59.6% | 22.4% |
+| tool-input | 2098 | 84.0% | 56.2% | 36.8% |
 
 Categories (manifest `category`): *application* (a program for a machine or plant), *library*,
 *sample* (vendor samples, tutorials, blog and course code), *tool-input* (test inputs and examples
@@ -75,7 +75,7 @@ as empty, duplicated, not Structured Text or too small are listed at the end of 
 | [siyka-au-mobject-ext](https://github.com/siyka-au/mobject-ext) | library | MIT License | 62 | 4,145 | 97% | 45% | 10% |
 | [fisothemes-twincat-dynamic-string-kit](https://github.com/fisothemes/TwinCAT-Dynamic-String-Kit) | library | MIT License | 56 | 2,125 | 100% | 80% | 29% |
 | [sionverhoef-twincat-st](https://github.com/SionVerhoef/twincat-st) | tool-input | MIT License | 55 | 1,838 | 96% | 60% | 22% |
-| [iec-checker](https://github.com/iec-checker/iec-checker) | tool-input | LGPL-3.0 | 54 | 1,723 | 80% | 43% | 41% |
+| [iec-checker](https://github.com/iec-checker/iec-checker) | tool-input | LGPL-3.0 | 54 | 1,723 | 80% | 39% | 37% |
 | [controlforge-systems-controlforge-structured-text](https://github.com/ControlForge-Systems/controlforge-structured-text) | tool-input | MIT License | 54 | 3,112 | 78% | 65% | 35% |
 | [pcdshub-lcls-twincat-common-components](https://github.com/pcdshub/lcls-twincat-common-components) | library | other (see repository) | 54 | 7,029 | 67% | 33% | 4% |
 | [fisothemes-standard-library](https://github.com/fisothemes/FisoThemes-Standard-Library-for-TwinCAT) | library (holdout) | MIT | 53 | 841 | 100% | 72% | 25% |
@@ -155,7 +155,7 @@ as empty, duplicated, not Structured Text or too small are listed at the end of 
 | [fisothemes-twincat-hashing-algorithms](https://github.com/fisothemes/TwinCAT-Hashing-Algorithms) | library | MIT License | 14 | 301 | 100% | 57% | 36% |
 | [stefanhenneken-blog-2016-04-iec61131-command-sample03](https://github.com/StefanHenneken/Blog-2016-04-IEC61131-Command-Sample03) | sample (holdout) | BSD 2-Clause "Simplified" License | 14 | 415 | 100% | 43% | 7% |
 | [autonomy-logic-smart-traffic-light](https://github.com/Autonomy-Logic/smart-traffic-light) | application | MIT License | 13 | 984 | 46% | 38% | 23% |
-| [mbi-div-b-twincat-libmbidivb](https://github.com/MBI-Div-B/twincat-libMBIDivB) | library | MIT License | 13 | 379 | 100% | 100% | 38% |
+| [mbi-div-b-twincat-libmbidivb](https://github.com/MBI-Div-B/twincat-libMBIDivB) | library | MIT License | 13 | 379 | 100% | 92% | 38% |
 | [jozefchmelar-beckhoff-examples](https://github.com/jozefchmelar/Beckhoff-Examples) | sample | MIT License | 12 | 184 | 100% | 100% | 8% |
 | [ninjamonkeytutorials-functions-part-two](https://github.com/NinjaMonkeyTutorials/functions-part-two) | sample | Apache License 2.0 | 12 | 792 | 42% | 33% | 0% |
 | [controltheplant-pid-controller](https://github.com/controltheplant/PID-controller) | library | other (see repository) | 12 | 1,100 | 100% | 67% | 0% |
@@ -185,7 +185,7 @@ as empty, duplicated, not Structured Text or too small are listed at the end of 
 | [cristianmori-mori-escaflow](https://github.com/CristianMori/Mori.EscaFlow) | tool-input | Apache License 2.0 | 9 | 659 | 56% | 0% | 0% |
 | [stefanhenneken-blog-2021-05-iec61131-dip-sample01](https://github.com/StefanHenneken/Blog-2021-05-IEC61131-DIP-Sample01) | sample | BSD 2-Clause "Simplified" License | 9 | 289 | 100% | 100% | 33% |
 | [hopperpop-tclinkedlist](https://github.com/Hopperpop/TcLinkedList) | sample | MIT License | 9 | 400 | 89% | 67% | 11% |
-| [mbi-div-b-maxi-beckhoff](https://github.com/MBI-Div-B/MAXI-beckhoff) | application | MIT License | 9 | 302 | 100% | 89% | 22% |
+| [mbi-div-b-maxi-beckhoff](https://github.com/MBI-Div-B/MAXI-beckhoff) | application | MIT License | 9 | 302 | 100% | 78% | 22% |
 | [giuliosistilli-twincat-implementation-automated-drill-machine-simulation](https://github.com/GiulioSistilli/TwinCAT-Implementation-Automated-Drill-Machine-Simulation) | application | MIT License | 9 | 592 | 100% | 67% | 33% |
 | [dalageo-twincat-virtual-tram](https://github.com/Dalageo/twincat-virtual-tram) | application (holdout) | other (see repository) | 8 | 132 | 100% | 75% | 25% |
 | [stefanhenneken-blog-2018-08-iec61131-decoratorpattern-sample03](https://github.com/StefanHenneken/Blog-2018-08-IEC61131-DecoratorPattern-Sample03) | sample | BSD 2-Clause "Simplified" License | 8 | 185 | 100% | 88% | 38% |
@@ -217,7 +217,7 @@ as empty, duplicated, not Structured Text or too small are listed at the end of 
 | [richard-luc-homesight](https://github.com/richard-luc/HomeSight) | sample | MIT License | 5 | 292 | 100% | 60% | 0% |
 | [mtassone1-packml-codesys](https://github.com/mtassone1/PackML-CODESYS) | library | MIT License | 5 | 246 | 100% | 0% | 0% |
 | [svroonland-twinrx](https://github.com/svroonland/TwinRx) | sample (holdout) | Apache License 2.0 | 4 | 38 | 75% | 75% | 0% |
-| [beckhoff-adstojava](https://github.com/Beckhoff/AdsToJava) | sample | MIT License | 4 | 111 | 100% | 75% | 25% |
+| [beckhoff-adstojava](https://github.com/Beckhoff/AdsToJava) | sample | MIT License | 4 | 111 | 100% | 75% | 0% |
 | [stefanhenneken-blog-2017-08-iec61131-unittests-sample01](https://github.com/StefanHenneken/Blog-2017-08-IEC61131-UnitTests-Sample01) | sample | BSD 2-Clause "Simplified" License | 4 | 149 | 100% | 50% | 25% |
 | [stefanhenneken-blog-2020-03-iec61131-abstract-sample01](https://github.com/StefanHenneken/Blog-2020-03-IEC61131-Abstract-Sample01) | sample | BSD 2-Clause "Simplified" License | 4 | 163 | 100% | 75% | 0% |
 | [lmyhit-ubuntu-twincat-adscommunication](https://github.com/lmyhit/Ubuntu-Twincat-ADSCommunication) | sample | MIT License | 4 | 91 | 100% | 0% | 0% |
@@ -280,7 +280,6 @@ rootplc, not whether it behaves correctly.
 but does not implement; *fault*: a run-time error (index, division, watchdog, ...); *not runnable*:
 the program or something it uses has check errors.
 <!-- /run smoke test -->
-
 
 <!-- unit tests -->
 ## The projects' own unit tests (TcUnit)
@@ -364,7 +363,7 @@ Portability warnings: units with each vendor form (why clean units are not IEC c
 | RP0118 | 931 |
 | RP0117 | 833 |
 | RP0116 | 581 |
-| RP0135 | 572 |
+| RP0135 | 579 |
 | RP0127 | 494 |
 | RP0120 | 492 |
 | RP0129 | 484 |
