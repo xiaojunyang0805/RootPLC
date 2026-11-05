@@ -239,6 +239,8 @@ pub(crate) struct Checker<'a> {
     implements: HashMap<usize, Vec<usize>>,
     /// Function blocks declared ABSTRACT.
     abstract_fbs: HashSet<usize>,
+    /// White-box adapters, {attribute 'rootplc.adapter'} ([diff.adapter]).
+    adapter_fbs: HashSet<usize>,
     /// Structure -> (base structure, number of inherited members).
     struct_base: HashMap<usize, (usize, usize)>,
     /// While set, a REFERENCE TO variable denotes the reference itself.
@@ -347,6 +349,7 @@ impl<'a> Checker<'a> {
             itf_bases: HashMap::new(),
             implements: HashMap::new(),
             abstract_fbs: HashSet::new(),
+            adapter_fbs: HashSet::new(),
             struct_base: HashMap::new(),
             raw_alias: false,
             last_block: None,
@@ -1990,6 +1993,28 @@ impl<'a> Checker<'a> {
                 .any(|i| matches!(i, Item::Tok(t) if self.is_kw(*t, "ABSTRACT")))
             {
                 self.abstract_fbs.insert(id);
+            }
+            // [diff.adapter]: {attribute 'rootplc.adapter'} directly before the block
+            let start = self.span(node).start as usize;
+            let before = &self.src()[..start];
+            // the text since the end of the previous declaration
+            let from = match before.rfind("END_") {
+                Some(i) => before[i..]
+                    .find(|c: char| c.is_whitespace())
+                    .map_or(start, |k| i + k),
+                None => 0,
+            };
+            if before[from..]
+                .to_ascii_lowercase()
+                .contains("'rootplc.adapter'")
+            {
+                self.adapter_fbs.insert(id);
+                let name = self.defs[id].name.clone();
+                let msg = format!(
+                    "white-box adapter '{name}': it may read and write internal variables of other blocks (RootPLC extension for rootplc diff, not portable)"
+                );
+                let sp = Span::new(start, start + 14);
+                self.diag(codes::WHITEBOX_ADAPTER, msg, sp, None);
             }
         }
         let kind = match node.kind {
@@ -4790,7 +4815,10 @@ impl<'a> Checker<'a> {
         };
         let tname = self.defs[id].name.clone();
         // [tests.whitebox]: TEST blocks may read every variable of an instance.
-        let whitebox = self.scope_kind() == Some(PouKind::Test);
+        let whitebox = self.scope_kind() == Some(PouKind::Test)
+            || self
+                .current_fb()
+                .is_some_and(|f| self.adapter_fbs.contains(&f));
         // THIS^.x: an instance's own variables, also inherited ones
         let own = self
             .current_fb()
