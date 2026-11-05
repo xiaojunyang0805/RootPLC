@@ -31,6 +31,15 @@ fault (division by zero, index or subrange violation, NULL dereference,
 watchdog) ends the test. A test passes when no assertion failed and no fault
 occurred.
 
+**[tests.slice]** `rootplc test --slice` compiles only the files the tests
+need: every file that contains a TEST block and, repeatedly, every file
+that declares a name used in a kept file, as in [diff.slice]. Errors in
+other files of the project then do not stop the tests; the command says
+how many files it left out. Without `--slice` the whole project must
+compile. `--slice` also applies to `--mutate`, where only kept files are
+mutated. Use it to test a block inside a project that does not compile
+as a whole; the result says nothing about the files left out.
+
 **[tests.time]** Time in a test is virtual. The clock starts at 0 and moves
 only when the test calls `ADVANCE(d)` with a duration `d` (`TIME` or
 `LTIME`), for example `ADVANCE(T#5s)`. Timers (`TON`, `TOF`, `TP`) read the
