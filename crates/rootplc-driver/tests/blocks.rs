@@ -103,6 +103,24 @@ fn block_tests_kill_at_least_90_percent_of_mutants() {
     );
 }
 
+/// The bundled library passes every check user code gets: library sources
+/// are loaded without diagnostics, so a reserved word or a name clash
+/// (e.g. an output `Min` hiding `MIN()`) would otherwise only show up as a
+/// VM fault at run time.
+#[test]
+fn library_passes_the_checker_as_user_code() {
+    let check = rootplc_driver::check_sources_with(library_sources(), &[]).expect("check");
+    for f in &check.files {
+        assert!(
+            f.diagnostics.is_empty(),
+            "{}: {:?}",
+            f.path.display(),
+            f.diagnostics
+        );
+    }
+    assert!(check.ok());
+}
+
 /// L4 templates (blocks/templates/<name>/): they compile with RootBlocks
 /// (warnings only in their test files), their tests pass, and the tests
 /// kill at least 70% of the mutants of the template's logic (the I/O map
