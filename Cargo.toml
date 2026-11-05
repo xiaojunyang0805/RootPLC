@@ -48,3 +48,15 @@ todo = "warn"
 lto = "thin"
 codegen-units = 1
 strip = "symbols"
+
+# Tests run many PLC programs (mutation testing of RootBlocks and its
+# templates); an optimised interpreter keeps `cargo test` fast while the
+# other crates keep quick debug builds.
+[profile.dev.package.rootplc-vm]
+opt-level = 2
+
+[profile.dev.package.rootplc-sema]
+opt-level = 2
+
+[profile.dev.package.rootplc-driver]
+opt-level = 2
