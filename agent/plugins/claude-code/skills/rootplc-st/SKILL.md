@@ -23,9 +23,14 @@ otherwise the same commands with `--json`.
 5. `rootplc test . --json` until every test passes. Failures give the
    assertion's location; faults (DIV_BY_ZERO, INDEX, RANGE, NULL_REF,
    WATCHDOG) give where execution stopped.
-6. Report success only when check is clean and all tests pass. Show the test
-   names you added.
-7. Never deploy to a real PLC. A human approves deployments.
+6. `rootplc test . --mutate --json` (MCP: `rootplc_test` with `mutate: true`)
+   checks the tests themselves: each listed survivor is a change to the code
+   that no test notices. Add a test for each until the score is high.
+7. `rootplc evidence . --markdown` (MCP: `rootplc_evidence`) gives the
+   evidence pack: input hashes, check, tests, mutation score and a verdict.
+8. Report success only when check is clean, all tests pass and the evidence
+   verdict is `verified`. Show the test names you added and the mutation score.
+9. Never deploy to a real PLC. A human approves deployments.
 
 ## Language notes (strict, like the IEC standard)
 

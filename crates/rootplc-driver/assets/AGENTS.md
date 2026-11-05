@@ -12,9 +12,12 @@ with `rootplc`.
   RP0134 or RP0135 marks a CODESYS / TwinCAT form; keep one only when the
   project must stay vendor-specific.
 - Test: `rootplc test . --json`. Every program change needs a passing test.
+- Test the tests: `rootplc test . --mutate --json` changes the code one token
+  at a time; add a test for every surviving change it lists.
 - Inspect: `rootplc run . --cycles 10 --json` shows variable values.
 - Existing code: `rootplc coverage <dir> --json` says which files are
   portable, which use vendor constructs, and why.
 - The MCP server `rootplc mcp` offers the same as tools.
-- Done means: check clean and all tests pass.
+- Done means: check clean, all tests pass, and a high mutation score.
+  Finish with `rootplc evidence . --markdown` and show the verdict.
 - Never run `rootplc deploy`. A human approves deployments.
