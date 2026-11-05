@@ -77,7 +77,11 @@ it with their cycles (timers and supervision often act seconds after the
 change that caused them), so the difference can be reproduced as a TEST.
 With `--json` the same content is one JSON object.
 
-**[diff.limits]** Agreement means no difference was found in the sampled
+**[diff.limits]** Both blocks run in one machine and share its global
+variables: a block that writes a global variable can disturb the other,
+and a block compared with itself may then differ; compare such blocks
+through adapters that keep the global state apart, or with TEST blocks.
+Agreement means no difference was found in the sampled
 cycles; behaviour that the stimuli never reach (a long timer, a rare input
 pattern) is not covered. Increase `--cycles`, set slow inputs with `--set`,
 narrow ranges with `--range`, or write TEST blocks for such cases.
