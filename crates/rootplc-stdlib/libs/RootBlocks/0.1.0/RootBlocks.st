@@ -627,3 +627,180 @@ Status.Active := Running;
 Status.Error := Error;
 Status.ErrorID := ErrorID;
 END_FUNCTION_BLOCK
+
+(* F03.CYCLETIME: the time since the previous call, in seconds, measured
+   with a standard timer ([blocks.testable]). Seconds is 0 in the first call. *)
+FUNCTION_BLOCK RB_CycleTime
+VAR_OUTPUT
+    Seconds   : LREAL;    (* seconds since the previous call *)
+    FirstCall : BOOL;
+END_VAR
+VAR
+    clock   : TON;
+    last    : TIME;
+    started : BOOL;
+END_VAR
+VAR CONSTANT
+    Period : TIME := T#1d;    (* the clock restarts once per period *)
+END_VAR
+clock(IN := TRUE, PT := Period);
+FirstCall := NOT started;
+IF started THEN
+    Seconds := TIME_TO_LREAL(clock.ET - last) / 1000.0;
+ELSE
+    Seconds := 0.0;
+    started := TRUE;
+END_IF;
+last := clock.ET;
+IF clock.Q THEN
+    (* restart the clock once a day without losing time *)
+    clock(IN := FALSE, PT := Period);
+    clock(IN := TRUE, PT := Period);
+    last := clock.ET;
+END_IF;
+END_FUNCTION_BLOCK
+
+(* F01.FILTER.PT1: first-order low-pass filter with time constant T. *)
+FUNCTION_BLOCK RB_FilterPT1
+VAR_INPUT
+    In    : REAL;
+    T     : TIME := T#1s;     (* time constant; T#0s passes In through *)
+    Track : BOOL;             (* TRUE: Out follows In directly *)
+END_VAR
+VAR_OUTPUT
+    Out : REAL;
+END_VAR
+VAR
+    cyc : RB_CycleTime;
+    tc : LREAL;
+END_VAR
+cyc();
+tc := TIME_TO_LREAL(T) / 1000.0;
+IF cyc.FirstCall OR Track OR tc <= 0.0 THEN
+    Out := In;
+ELSE
+    Out := LREAL_TO_REAL(REAL_TO_LREAL(Out) + (REAL_TO_LREAL(In) - REAL_TO_LREAL(Out)) * cyc.Seconds / (tc + cyc.Seconds));
+END_IF;
+END_FUNCTION_BLOCK
+
+(* F01.AVERAGE: moving average over the last Window samples (one sample
+   per call, at most 32). Valid when the window is full. *)
+FUNCTION_BLOCK RB_MovingAverage
+VAR_INPUT
+    In     : REAL;
+    Window : INT := 10;       (* 1 .. 32 samples *)
+    Reset  : BOOL;            (* rising edge: empty the window *)
+END_VAR
+VAR_OUTPUT
+    Out   : REAL;
+    Valid : BOOL;
+END_VAR
+VAR
+    resetEdge : R_TRIG;
+    buf       : ARRAY[1..32] OF REAL;
+    n         : INT;
+    pos       : INT;
+    used      : INT;
+    sum       : LREAL;
+    i         : INT;
+END_VAR
+resetEdge(CLK := Reset);
+n := LIMIT(1, Window, 32);
+IF resetEdge.Q THEN
+    used := 0;
+    pos := 0;
+END_IF;
+pos := pos MOD n + 1;
+buf[pos] := In;
+used := MIN(used + 1, n);
+sum := 0.0;
+FOR i := 1 TO used DO
+    sum := sum + REAL_TO_LREAL(buf[i]);
+END_FOR;
+Out := LREAL_TO_REAL(sum / INT_TO_LREAL(used));
+Valid := used >= n;
+END_FUNCTION_BLOCK
+
+(* F01.RAMP: rate limiter. Out follows In at most at RiseRate (up) and
+   FallRate (down), in units per second; a rate of 0 means no limit. *)
+FUNCTION_BLOCK RB_Ramp
+VAR_INPUT
+    In       : REAL;
+    RiseRate : REAL := 0.0;
+    FallRate : REAL := 0.0;
+    Track    : BOOL;          (* TRUE: Out follows In directly *)
+END_VAR
+VAR_OUTPUT
+    Out  : REAL;
+    Busy : BOOL;              (* Out has not reached In yet *)
+END_VAR
+VAR
+    cyc : RB_CycleTime;
+    o   : LREAL;
+    x   : LREAL;
+    hi  : LREAL;
+    lo  : LREAL;
+END_VAR
+cyc();
+o := REAL_TO_LREAL(Out);
+x := REAL_TO_LREAL(In);
+IF cyc.FirstCall OR Track THEN
+    o := x;
+ELSE
+    (* the output may move at most one rate step up or down this call *)
+    hi := MAX(o, x);
+    lo := MIN(o, x);
+    IF RiseRate > 0.0 THEN
+        hi := o + REAL_TO_LREAL(RiseRate) * cyc.Seconds;
+    END_IF;
+    IF FallRate > 0.0 THEN
+        lo := o - REAL_TO_LREAL(FallRate) * cyc.Seconds;
+    END_IF;
+    o := LIMIT(lo, x, hi);
+END_IF;
+Out := LREAL_TO_REAL(o);
+Busy := Out <> In;
+END_FUNCTION_BLOCK
+
+(* F01.DEADBAND: Out changes only when In has moved more than Deadband
+   away from it (suppresses noise and chatter downstream). *)
+FUNCTION_BLOCK RB_Deadband
+VAR_INPUT
+    In       : REAL;
+    Deadband : REAL := 0.0;
+END_VAR
+VAR_OUTPUT
+    Out : REAL;
+END_VAR
+VAR
+    started : BOOL;
+END_VAR
+IF NOT started OR ABS(In - Out) > Deadband THEN
+    Out := In;
+    started := TRUE;
+END_IF;
+END_FUNCTION_BLOCK
+
+(* F01.DEBOUNCE: a contact that must be stable before Out follows it:
+   OnDelay before it switches on, OffDelay before it switches off. *)
+FUNCTION_BLOCK RB_Debounce
+VAR_INPUT
+    In       : BOOL;
+    OnDelay  : TIME := T#20ms;
+    OffDelay : TIME := T#20ms;
+END_VAR
+VAR_OUTPUT
+    Out : BOOL;
+END_VAR
+VAR
+    tOn  : TON;
+    tOff : TON;
+END_VAR
+tOn(IN := In AND NOT Out, PT := OnDelay);
+tOff(IN := Out AND NOT In, PT := OffDelay);
+IF tOn.Q THEN
+    Out := TRUE;
+ELSIF tOff.Q THEN
+    Out := FALSE;
+END_IF;
+END_FUNCTION_BLOCK

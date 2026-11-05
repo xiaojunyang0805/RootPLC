@@ -15,9 +15,9 @@ jobs and features exist, never copied. No block is a safety function.
 
 | ID | Family | Blocks |
 |---|---|---|
-| F01 | Signal conditioning | [`RB_Scale`](cards/F01.SCALE.md) |
+| F01 | Signal conditioning | [`RB_Scale`](cards/F01.SCALE.md), [`RB_FilterPT1`](cards/F01.FILTER.PT1.md), [`RB_MovingAverage`](cards/F01.AVERAGE.md), [`RB_Ramp`](cards/F01.RAMP.md), [`RB_Deadband`](cards/F01.DEADBAND.md), [`RB_Debounce`](cards/F01.DEBOUNCE.md) |
 | F02 | Discrete logic and interlocks | planned |
-| F03 | Timing, counting, scheduling | planned |
+| F03 | Timing, counting, scheduling | [`RB_CycleTime`](cards/F03.CYCLETIME.md) |
 | F04 | Device modules | [`RB_ValveOnOff`](cards/F04.VALVE.ONOFF.md), [`RB_Motor`](cards/F04.MOTOR.DOL.md), [`RB_MotorReversing`](cards/F04.MOTOR.REV.md), [`RB_Cylinder`](cards/F04.CYLINDER.md), [`RB_Pump`](cards/F04.PUMP.md), [`RB_Drive`](cards/F04.DRIVE.md) |
 | F05 | Sequencing | planned |
 | F06 | Closed-loop control | planned |
