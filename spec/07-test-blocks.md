@@ -57,8 +57,11 @@ Only tokens in statements are mutated: never inside a TEST block, a
 declaration section (`VAR` … `END_VAR`, `TYPE` … `END_TYPE`), a comment, a
 pragma or a file of a compatibility library ([stdlib.compat]). A `+` or `-`
 that follows an operator, an opening parenthesis, a comma, `:=` or a keyword
-is unary and is not mutated. Mutants are made in source order; at most
-`--mutate-limit N` of them (default 500).
+is unary and is not mutated. With `--mutate-only TEXT`, only files whose
+path contains `TEXT` are mutated; the other files still compile and their
+tests still run (for example: score a block from a real project with tests
+and an adapter kept in other files). Mutants are made in source order; at
+most `--mutate-limit N` of them (default 500).
 
 Each mutant is checked and its TEST blocks are run as in [tests.runner]. A
 mutant that does not compile is *not viable* and is not counted. A viable

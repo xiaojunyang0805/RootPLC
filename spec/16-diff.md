@@ -34,7 +34,9 @@ sequence that depends only on `--seed`, so a run can be repeated: a BOOL
 input changes with probability `--toggle`; an integer or REAL input takes,
 with the same probability, a new value spread evenly over its range
 (`--range`, default 0 .. 100; integers are whole numbers in the range). An
-input given with `--set` keeps that value in every cycle. Inputs of other
+input given with `--set` keeps that value in every cycle, in both blocks;
+a reference input the unit lacks can be set too (for example the reference
+block's mode), and is then not reported as missing. Inputs of other
 types (TIME, enumerations, strings, structures) keep their initial value
 unless they are set. `--set` takes TRUE, FALSE, integers, reals, durations
 (`T#1s500ms`) and enumeration values (`TYPE#Value`). Both blocks receive
