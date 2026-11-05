@@ -92,6 +92,8 @@ pub struct FirstDiff {
     pub unit: String,
     /// Driven inputs of this cycle and up to four before: (cycle, [(name, value)]).
     pub trace: Vec<(u64, Vec<(String, String)>)>,
+    /// The last eight changes of driven inputs up to this cycle: (cycle, name, new value).
+    pub changes: Vec<(u64, String, String)>,
 }
 
 /// Result of [`diff`].
@@ -226,8 +228,9 @@ fn parse_duration(text: &str) -> Option<i128> {
     Some(if neg { -ns } else { ns })
 }
 
-/// The value of a `--set` literal ([diff.stimuli]).
-fn parse_value(prog: &rootplc_sema::ir::Program, text: &str) -> Result<Value, String> {
+/// The value of a `--set` literal for an input of type `ty` ([diff.stimuli]).
+/// The VM keeps TIME in milliseconds and LTIME in nanoseconds.
+fn parse_value(prog: &rootplc_sema::ir::Program, text: &str, ty: &Ty) -> Result<Value, String> {
     let t = text.trim();
     if t.eq_ignore_ascii_case("TRUE") {
         return Ok(Value::Bool(true));
@@ -236,7 +239,10 @@ fn parse_value(prog: &rootplc_sema::ir::Program, text: &str) -> Result<Value, St
         return Ok(Value::Bool(false));
     }
     if let Some(ns) = parse_duration(t) {
-        return Ok(Value::Int(ns));
+        return Ok(Value::Int(match strip(prog, ty) {
+            Ty::Elem(Elem::Ltime) => ns,
+            _ => ns / 1_000_000,
+        }));
     }
     if let Some((ty, name)) = t.split_once('#') {
         if let Some(d) = prog.find(ty) {
@@ -360,7 +366,8 @@ pub fn diff(check: &CheckReport, opt: &DiffOptions) -> Result<DiffReport, String
             .iter()
             .find(|(n, _)| n.eq_ignore_ascii_case(&v.name))
         {
-            let value = parse_value(prog, text).map_err(|e| format!("--set {}: {e}", v.name))?;
+            let value =
+                parse_value(prog, text, &v.ty).map_err(|e| format!("--set {}: {e}", v.name))?;
             let in_unit = has(&u_in, &v.name);
             if !vm.write_var(rroot, rdef, &v.name, value.clone())
                 || (in_unit && !vm.write_var(uroot, udef, &v.name, value))
@@ -419,6 +426,7 @@ pub fn diff(check: &CheckReport, opt: &DiffOptions) -> Result<DiffReport, String
     let mut rng = Rng::new(opt.seed);
     let cycle_ns = i128::from(opt.cycle_ms) * 1_000_000;
     let mut trace: Vec<(u64, Vec<(String, String)>)> = Vec::new();
+    let mut changes: Vec<(u64, String, String)> = Vec::new();
     for c in 1..=opt.cycles {
         vm.advance(cycle_ns);
         for inp in &mut inputs {
@@ -427,6 +435,7 @@ pub fn diff(check: &CheckReport, opt: &DiffOptions) -> Result<DiffReport, String
             if !change {
                 continue;
             }
+            let before = inp.value.clone();
             inp.value = match inp.drive {
                 Drive::Bool => Value::Bool(!matches!(inp.value, Value::Bool(true))),
                 Drive::Int(lo, hi) => {
@@ -436,6 +445,12 @@ pub fn diff(check: &CheckReport, opt: &DiffOptions) -> Result<DiffReport, String
                 }
                 Drive::Real(lo, hi) => Value::Real(lo + pick * (hi - lo)),
             };
+            if inp.value != before {
+                changes.push((c, inp.name.clone(), vm.display(&inp.value, &inp.ty)));
+                if changes.len() > 8 {
+                    changes.remove(0);
+                }
+            }
         }
         let mut row = Vec::new();
         for inp in &inputs {
@@ -482,6 +497,7 @@ pub fn diff(check: &CheckReport, opt: &DiffOptions) -> Result<DiffReport, String
                     reference: vm.display(&a, &v.ty),
                     unit: vm.display(&b, &uty),
                     trace: trace.clone(),
+                    changes: changes.clone(),
                 });
             }
         }
@@ -544,6 +560,12 @@ pub fn render(r: &DiffReport) -> String {
             let vals: Vec<String> = row.iter().map(|(n, v)| format!("{n}={v}")).collect();
             s += &format!("  cycle {c}: {}\n", vals.join(", "));
         }
+        if !f.changes.is_empty() {
+            s += "last input changes before it:\n";
+            for (c, n, v) in &f.changes {
+                s += &format!("  cycle {c}: {n} := {v}\n");
+            }
+        }
     }
     if let Some(f) = &r.fault {
         s += &format!("fault: {f}\n");
@@ -600,8 +622,20 @@ pub fn to_json(r: &DiffReport) -> String {
                 })
                 .collect::<Vec<_>>()
                 .join(",");
+            let changes = f
+                .changes
+                .iter()
+                .map(|(c, n, v)| {
+                    format!(
+                        "{{\"cycle\":{c},\"input\":{},\"value\":{}}}",
+                        jstr(n),
+                        jstr(v)
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join(",");
             format!(
-                "{{\"cycle\":{},\"output\":{},\"reference\":{},\"unit\":{},\"trace\":[{trace}]}}",
+                "{{\"cycle\":{},\"output\":{},\"reference\":{},\"unit\":{},\"trace\":[{trace}],\"changes\":[{changes}]}}",
                 f.cycle,
                 jstr(&f.output),
                 jstr(&f.reference),

@@ -65,6 +65,12 @@ fn a_difference_is_found_and_reproducible() {
     assert_eq!(*c, f.cycle);
     assert!(row.contains(&("Start".into(), "TRUE".into())));
     assert!(row.contains(&("StopOk".into(), "FALSE".into())));
+    // the last input changes up to the difference, oldest first
+    assert!(!f.changes.is_empty() && f.changes.len() <= 8);
+    assert!(f.changes.iter().all(|(c, _, _)| *c <= f.cycle));
+    assert!(f.changes.windows(2).all(|w| w[0].0 <= w[1].0));
+    assert!(to_json(&r).contains("\"changes\":[{\"cycle\":"));
+    assert!(render(&r).contains("last input changes before it:"));
     // the same seed gives the same run; another seed another one
     let again = diff(&check, &opts("FB_StopWins", "FB_StartWins")).expect("diff");
     assert_eq!(again.outputs[0].differing, r.outputs[0].differing);
@@ -115,6 +121,44 @@ END_FUNCTION_BLOCK";
     let r = diff(&check, &opts("FB_A", "FB_B")).expect("diff");
     assert!(r.outputs[1].differing > 0);
     assert_eq!(r.held, ["d"]);
+}
+
+#[test]
+fn set_durations_reach_timers() {
+    // the set time drives a timer: agreement needs the exact duration
+    let src = "
+FUNCTION_BLOCK FB_Ref
+VAR_INPUT x : BOOL; d : TIME; ld : LTIME; END_VAR
+VAR_OUTPUT q : BOOL; long : BOOL; END_VAR
+VAR t : TON; END_VAR
+t(IN := x, PT := d);
+q := t.Q;
+long := ld > LT#1s;
+END_FUNCTION_BLOCK
+FUNCTION_BLOCK FB_Fixed
+VAR_INPUT x : BOOL; d : TIME; ld : LTIME; END_VAR
+VAR_OUTPUT q : BOOL; long : BOOL; END_VAR
+VAR t : TON; END_VAR
+t(IN := x, PT := T#150ms);
+q := t.Q;
+long := TRUE;
+END_FUNCTION_BLOCK";
+    let check = inline(src, &[]);
+    let mut o = opts("FB_Ref", "FB_Fixed");
+    o.set = vec![
+        ("d".into(), "T#150ms".into()),
+        ("ld".into(), "LT#2s".into()),
+    ];
+    let r = diff(&check, &o).expect("diff");
+    assert_eq!(r.verdict, Verdict::Agree, "{}", render(&r));
+    o.set = vec![
+        ("d".into(), "T#160ms".into()),
+        ("ld".into(), "LT#2s".into()),
+    ];
+    let r = diff(&check, &o).expect("diff");
+    assert_eq!(r.verdict, Verdict::Differ);
+    assert_eq!(r.outputs[0].name, "q");
+    assert_eq!(r.outputs[1].differing, 0);
 }
 
 #[test]
