@@ -2865,3 +2865,306 @@ ELSE
 END_IF;
 StepTime := t;
 END_FUNCTION_BLOCK
+
+(* F03.BLINK: a pulse generator: Out on for OnTime, off for OffTime, while
+   Enable (warning lamps, horns, lubrication pulses). Starts on; the phase
+   is kept exactly (TIME arithmetic). *)
+FUNCTION_BLOCK RB_Blink
+VAR_INPUT
+    Enable  : BOOL;
+    OnTime  : TIME := T#500ms;
+    OffTime : TIME := T#500ms;
+END_VAR
+VAR_OUTPUT
+    Out    : BOOL;
+    Pulses : UDINT;                   (* on phases since the block started *)
+END_VAR
+VAR
+    cyc     : RB_CycleTime;
+    t       : TIME;
+    running : BOOL;
+END_VAR
+cyc();
+IF NOT Enable THEN
+    Out := FALSE;
+    running := FALSE;
+ELSIF NOT running THEN
+    running := TRUE;
+    Out := TRUE;
+    Pulses := Pulses + 1;
+    t := T#0s;
+ELSE
+    t := t + cyc.Elapsed;
+    IF Out AND t >= OnTime THEN
+        Out := FALSE;
+        t := t - OnTime;
+    ELSIF NOT Out AND t >= OffTime THEN
+        Out := TRUE;
+        Pulses := Pulses + 1;
+        t := t - OffTime;
+    END_IF;
+END_IF;
+END_FUNCTION_BLOCK
+
+(* F06.PWM: time-proportioning output: a controller output of 0 .. 100 %
+   as an on/off signal with a fixed Period (heaters with contactors or
+   solid-state relays, dosing pumps). The duty is taken at the start of
+   each period; pulses shorter than MinPulse are left out (off) or filled
+   up (on for the whole period). ErrorID 1 Period T#0s; Out FALSE. *)
+FUNCTION_BLOCK RB_PWM
+VAR_INPUT
+    In       : REAL;                  (* % *)
+    Period   : TIME := T#2s;
+    MinPulse : TIME := T#0s;
+    Enable   : BOOL := TRUE;
+END_VAR
+VAR_OUTPUT
+    Out     : BOOL;
+    OnTime  : TIME;                   (* on time in this period *)
+    Error   : BOOL;
+    ErrorID : UDINT;
+END_VAR
+VAR
+    cyc     : RB_CycleTime;
+    t       : TIME;
+    running : BOOL;
+    newPeriod : BOOL;
+END_VAR
+cyc();
+Error := Period <= T#0s;
+IF Error THEN
+    ErrorID := UDINT#1;
+ELSE
+    ErrorID := 0;
+END_IF;
+IF Error OR NOT Enable THEN
+    Out := FALSE;
+    running := FALSE;
+    OnTime := T#0s;
+ELSE
+    newPeriod := NOT running;
+    IF running THEN
+        t := t + cyc.Elapsed;
+        IF t >= Period THEN
+            t := t - Period;
+            newPeriod := TRUE;
+        END_IF;
+    ELSE
+        t := T#0s;
+        running := TRUE;
+    END_IF;
+    IF newPeriod THEN
+        OnTime := LREAL_TO_TIME(TIME_TO_LREAL(Period) * REAL_TO_LREAL(LIMIT(0.0, In, 100.0)) / 100.0);
+        IF OnTime < MinPulse THEN
+            OnTime := T#0s;
+        ELSIF Period - OnTime < MinPulse THEN
+            OnTime := Period;
+        END_IF;
+    END_IF;
+    Out := t < OnTime;
+END_IF;
+END_FUNCTION_BLOCK
+
+(* F01.PULSE: a rate and a total from a pulse input (flow meters, energy
+   meters, counting wheels): pulses are counted over a gate time Window;
+   at the end of each window Rate is updated. Factor is the quantity per
+   pulse; Rate is in units per TimeBase. The pulse must stay on and off for
+   at least one PLC cycle each. *)
+FUNCTION_BLOCK RB_PulseRate
+VAR_INPUT
+    Pulse    : BOOL;
+    Factor   : LREAL := 1.0;          (* units per pulse *)
+    Window   : TIME := T#1s;
+    TimeBase : TIME := T#1h;          (* m3/h: T#1h; l/min: T#1m *)
+    Reset    : BOOL;                  (* rising edge: Total := 0 *)
+END_VAR
+VAR_OUTPUT
+    Rate    : LREAL;
+    Total   : LREAL;
+    Pulses  : UDINT;                  (* pulses in the current window *)
+    Error   : BOOL;
+    ErrorID : UDINT;
+END_VAR
+VAR
+    cyc       : RB_CycleTime;
+    edge      : R_TRIG;
+    resetEdge : R_TRIG;
+    t         : TIME;
+END_VAR
+cyc();
+edge(CLK := Pulse);
+resetEdge(CLK := Reset);
+IF resetEdge.Q THEN
+    Total := 0.0;
+END_IF;
+Error := Window <= T#0s;
+IF Error THEN
+    ErrorID := UDINT#1;
+    Rate := 0.0;
+    Pulses := 0;
+    t := T#0s;
+ELSE
+    ErrorID := 0;
+    IF edge.Q THEN
+        Pulses := Pulses + 1;
+        Total := Total + Factor;
+    END_IF;
+    t := t + cyc.Elapsed;
+    IF t >= Window THEN
+        Rate := UDINT_TO_LREAL(Pulses) * Factor * TIME_TO_LREAL(TimeBase) / TIME_TO_LREAL(Window);
+        Pulses := 0;
+        t := t - Window;
+    END_IF;
+END_IF;
+END_FUNCTION_BLOCK
+
+(* F11.TRACK: part tracking on a conveyor with a shift register of 64
+   positions (one per pitch or encoder step): each Shift moves every entry
+   one position on and puts InValue (0: no part, else a part ID or a code
+   such as "reject") into position 1. AtRead is the entry at ReadPos, where
+   an ejector or a station acts; Remove clears it there. *)
+FUNCTION_BLOCK RB_ShiftTrack
+VAR_INPUT
+    Shift   : BOOL;                   (* rising edge: one position on *)
+    InValue : DINT;                   (* entry for position 1 at the shift *)
+    ReadPos : INT := 10;              (* 1 .. 64 *)
+    Remove  : BOOL;                   (* rising edge: clear the entry at ReadPos *)
+    Clear   : BOOL;                   (* rising edge: clear all *)
+END_VAR
+VAR_OUTPUT
+    Positions : ARRAY[1..64] OF DINT;
+    AtRead    : DINT;
+    Occupied  : INT;                  (* non-zero entries *)
+    Error     : BOOL;
+    ErrorID   : UDINT;
+END_VAR
+VAR
+    shiftEdge  : R_TRIG;
+    removeEdge : R_TRIG;
+    clearEdge  : R_TRIG;
+    k          : INT;
+END_VAR
+shiftEdge(CLK := Shift);
+removeEdge(CLK := Remove);
+clearEdge(CLK := Clear);
+Error := ReadPos < 1 OR ReadPos > 64;
+IF clearEdge.Q THEN
+    FOR k := 1 TO 64 DO
+        Positions[k] := 0;
+    END_FOR;
+END_IF;
+IF shiftEdge.Q THEN
+    FOR k := 64 TO 2 BY -1 DO
+        Positions[k] := Positions[k - 1];
+    END_FOR;
+    Positions[1] := InValue;
+END_IF;
+IF Error THEN
+    ErrorID := UDINT#1;
+    AtRead := 0;
+ELSE
+    ErrorID := 0;
+    IF removeEdge.Q THEN
+        Positions[ReadPos] := 0;
+    END_IF;
+    AtRead := Positions[ReadPos];
+END_IF;
+Occupied := 0;
+FOR k := 1 TO 64 DO
+    IF Positions[k] <> 0 THEN
+        Occupied := Occupied + 1;
+    END_IF;
+END_FOR;
+END_FUNCTION_BLOCK
+
+(* F01.VOTE: one measurement from three redundant transmitters: the median
+   of the healthy ones (three), their average (two) or the one left; a
+   transmitter differing from the result by more than MaxDev is flagged.
+   ErrorID 1 no healthy transmitter; Value holds its last good value. *)
+FUNCTION_BLOCK RB_Vote2oo3
+VAR_INPUT
+    A, B, C    : REAL;
+    OkA        : BOOL := TRUE;        (* signal healthy, e.g. NOT RB_Scale.Error *)
+    OkB        : BOOL := TRUE;
+    OkC        : BOOL := TRUE;
+    MaxDev     : REAL := 2.0;
+END_VAR
+VAR_OUTPUT
+    Value   : REAL;
+    Healthy : INT;                    (* transmitters used *)
+    DevA    : BOOL;
+    DevB    : BOOL;
+    DevC    : BOOL;
+    Error   : BOOL;
+    ErrorID : UDINT;
+END_VAR
+VAR
+    sum : REAL;
+END_VAR
+Healthy := BOOL_TO_INT(OkA) + BOOL_TO_INT(OkB) + BOOL_TO_INT(OkC);
+Error := Healthy = 0;
+IF Error THEN
+    ErrorID := UDINT#1;
+ELSE
+    ErrorID := 0;
+    IF Healthy = 3 THEN
+        Value := MAX(MIN(A, B), MIN(MAX(A, B), C));
+    ELSE
+        sum := 0.0;
+        IF OkA THEN sum := sum + A; END_IF;
+        IF OkB THEN sum := sum + B; END_IF;
+        IF OkC THEN sum := sum + C; END_IF;
+        Value := sum / INT_TO_REAL(Healthy);
+    END_IF;
+END_IF;
+DevA := OkA AND NOT Error AND ABS(A - Value) > MaxDev;
+DevB := OkB AND NOT Error AND ABS(B - Value) > MaxDev;
+DevC := OkC AND NOT Error AND ABS(C - Value) > MaxDev;
+END_FUNCTION_BLOCK
+
+(* F02.BYPASS: a maintenance bypass of one condition (an interlock or a
+   permissive), allowed by a key switch and limited in time: Out is the
+   condition, or TRUE while the bypass is active. The bypass ends after
+   MaxTime, on Cancel, or when the key switch is turned back. Not for
+   safety functions. *)
+FUNCTION_BLOCK RB_Bypass
+VAR_INPUT
+    Cond    : BOOL;                   (* the real condition, TRUE = ok *)
+    Request : BOOL;                   (* rising edge: start the bypass *)
+    Permit  : BOOL;                   (* key switch *)
+    Cancel  : BOOL;                   (* rising edge: end it *)
+    MaxTime : TIME := T#30m;
+END_VAR
+VAR_OUTPUT
+    Out       : BOOL;
+    Active    : BOOL;
+    Remaining : TIME;
+    Uses      : UDINT;                (* times the bypass was started *)
+    Expired   : BOOL;                 (* TRUE for one call when MaxTime ran out *)
+END_VAR
+VAR
+    requestEdge : R_TRIG;
+    cancelEdge  : R_TRIG;
+    tActive     : TON;
+END_VAR
+requestEdge(CLK := Request);
+cancelEdge(CLK := Cancel);
+IF requestEdge.Q AND Permit AND NOT Active THEN
+    Active := TRUE;
+    Uses := Uses + 1;
+END_IF;
+IF cancelEdge.Q OR NOT Permit THEN
+    Active := FALSE;
+END_IF;
+tActive(IN := Active, PT := MaxTime);
+Expired := tActive.Q;
+IF tActive.Q THEN
+    Active := FALSE;
+END_IF;
+IF Active THEN
+    Remaining := MaxTime - tActive.ET;
+ELSE
+    Remaining := T#0s;
+END_IF;
+Out := Cond OR Active;
+END_FUNCTION_BLOCK
