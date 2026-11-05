@@ -40,6 +40,14 @@ pub const SPEC: &[(&str, &str)] = &[
         "spec/08-stdlib.md",
         include_str!("../assets/spec/08-stdlib.md"),
     ),
+    (
+        "spec/13-motion.md",
+        include_str!("../assets/spec/13-motion.md"),
+    ),
+    (
+        "spec/14-runtime.md",
+        include_str!("../assets/spec/14-runtime.md"),
+    ),
 ];
 
 /// Explanation of one diagnostic code.

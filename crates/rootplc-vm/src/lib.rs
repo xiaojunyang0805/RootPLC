@@ -1001,6 +1001,13 @@ impl<'p> Vm<'p> {
         self.exec_block(&pou.body, &cx).map(|_| ())
     }
 
+    /// The root holding the global variables, if the project has any
+    /// ([config.global-list]); read them with [`Vm::read_var`] and the
+    /// program's `globals` definition.
+    pub fn globals_root(&self) -> Option<usize> {
+        self.globals
+    }
+
     /// Advance the virtual clock.
     pub fn advance(&mut self, ns: i128) {
         self.now_ns += ns;

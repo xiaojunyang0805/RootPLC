@@ -12,12 +12,14 @@ const USAGE: &str = "usage:
   rootplc test  <file.st|dir>... [--filter TEXT] [--json]
   rootplc test  <file.st|dir>... --mutate [--mutate-limit N] [--min-score P] [--json]   (mutation score of the tests)
   rootplc run   <file.st|dir>... [--program NAME] [--cycles N] [--cycle-ms MS] [--json]
+  rootplc runtime <file.st|dir>... [--program NAME] [--cycle-ms MS] [--cycles N] [--watchdog-ms MS]
+                [--retain FILE] [--status FILE] [--json]   (runtime v0: run cyclically until Ctrl-C)
   rootplc evidence <file.st|dir>... [--out FILE] [--markdown] [--no-mutate] [--min-score P]   (evidence pack for sign-off)
   rootplc explain <code> [--json]
   rootplc examples [words...] [--show ID] [--json]   (verified ST patterns)
   rootplc coverage <file.st|dir>... [--json]
   rootplc libraries [--json]                       (bundled compatibility libraries)
-  check, test, run and coverage take --library NAME[,NAME] (e.g. Tc2_System)       (portable / dialect / dependent / blocked)
+  check, test, run, runtime and coverage take --library NAME[,NAME] (e.g. Tc2_System)       (portable / dialect / dependent / blocked)
   rootplc mcp            (MCP server on stdio, for agent hosts)
   rootplc --version
 
@@ -43,7 +45,8 @@ impl Args {
                 "--json" => a.json = true,
                 "--mutate" | "--markdown" | "--no-mutate" => a.options.push((x, String::new())),
                 "--program" | "--cycles" | "--cycle-ms" | "--filter" | "--name" | "--show"
-                | "--agent" | "--library" | "--mutate-limit" | "--min-score" | "--out" => {
+                | "--agent" | "--library" | "--mutate-limit" | "--min-score" | "--out"
+                | "--watchdog-ms" | "--retain" | "--status" => {
                     let v = it.next().unwrap_or_default();
                     a.options.push((x, v));
                 }
@@ -308,6 +311,50 @@ fn cmd_run(paths: &[PathBuf], args: &Args) -> ExitCode {
     exit(r.ok())
 }
 
+fn cmd_runtime(paths: &[PathBuf], args: &Args) -> ExitCode {
+    use rootplc_runtime::{Config, NoIo, State, SystemClock, ffi, to_json, to_text};
+    let num = |name: &str| args.opt(name).and_then(|v| v.parse::<u64>().ok());
+    let mut config = Config::with_period_ms(num("--cycle-ms").unwrap_or(10));
+    if let Some(ms) = num("--watchdog-ms") {
+        config.watchdog_ns = ms.max(1) * 1_000_000;
+    }
+    config.cycles = num("--cycles");
+    config.retain = args.opt("--retain").map(PathBuf::from);
+    config.status = args.opt("--status").map(PathBuf::from);
+    let check = match load("runtime", paths, args) {
+        Ok(c) => c,
+        Err(code) => return code,
+    };
+    if !check.ok() {
+        print_diagnostics(&check);
+        return ExitCode::from(1);
+    }
+    let stop = ffi::stop_on_interrupt();
+    if !args.json && config.cycles.is_none() {
+        eprintln!(
+            "rootplc runtime: running every {} ms; Ctrl-C stops",
+            config.period_ns / 1_000_000
+        );
+    }
+    let report = match rootplc_driver::runtime::run_runtime(
+        &check,
+        args.opt("--program"),
+        config,
+        NoIo,
+        SystemClock::default(),
+        stop,
+    ) {
+        Ok(r) => r,
+        Err(e) => return io_error("runtime", &e, args.json),
+    };
+    if args.json {
+        println!("{}", to_json(&report));
+    } else {
+        print!("{}", to_text(&report));
+    }
+    exit(!matches!(report.state, State::Fault(_)))
+}
+
 fn cmd_explain(code: Option<&String>, json_out: bool) -> ExitCode {
     let Some(code) = code else {
         return io_error(
@@ -513,7 +560,14 @@ fn main() -> ExitCode {
     let paths: Vec<PathBuf> = rest.iter().map(PathBuf::from).collect();
     if matches!(
         cmd,
-        Some(Command::Check | Command::Test | Command::Run | Command::Coverage | Command::Evidence)
+        Some(
+            Command::Check
+                | Command::Test
+                | Command::Run
+                | Command::Runtime
+                | Command::Coverage
+                | Command::Evidence
+        )
     ) && paths.is_empty()
     {
         eprintln!("rootplc {first}: give one or more .st files or directories\n\n{USAGE}");
@@ -524,6 +578,7 @@ fn main() -> ExitCode {
         Some(Command::Test) => cmd_test(&paths, args.opt("--filter"), &args),
         Some(Command::Libraries) => cmd_libraries(args.json),
         Some(Command::Run) => cmd_run(&paths, &args),
+        Some(Command::Runtime) => cmd_runtime(&paths, &args),
         Some(Command::Explain) => cmd_explain(rest.first(), args.json),
         Some(Command::Init) => cmd_init(rest.first(), args.opt("--name"), args.opt("--agent")),
         Some(Command::Examples) => cmd_examples(rest, &args),

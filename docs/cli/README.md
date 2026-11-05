@@ -6,6 +6,8 @@ rootplc check <file.st|dir>... [--json]
 rootplc test  <file.st|dir>... [--filter TEXT] [--json]
 rootplc test  <file.st|dir>... --mutate [--mutate-limit N] [--min-score P] [--json]
 rootplc run   <file.st|dir>... [--program NAME] [--cycles N] [--cycle-ms MS] [--json]
+rootplc runtime <file.st|dir>... [--program NAME] [--cycle-ms MS] [--cycles N] [--watchdog-ms MS]
+                [--retain FILE] [--status FILE] [--json]
 rootplc evidence <file.st|dir>... [--out FILE] [--markdown] [--no-mutate] [--min-score P]
 rootplc explain <code> [--json]
 rootplc examples [words...] [--show ID] [--json]
@@ -17,7 +19,7 @@ rootplc mcp
 All `.st` files given (directories are searched recursively) form one
 project: names declared in one file are visible in the others.
 
-`check`, `test`, `run` and `coverage` take `--library NAME[,NAME]`
+`check`, `test`, `run`, `runtime` and `coverage` take `--library NAME[,NAME]`
 (repeatable) to activate compatibility libraries, e.g.
 `rootplc check src --library Tc2_System,TwinCAT_BuiltIns` for TwinCAT code.
 
@@ -109,6 +111,33 @@ cycle, so timers behave as on a PLC with that cycle time.
 
 Faults: `DIV_BY_ZERO`, `RANGE` (subrange), `INDEX` (array bounds),
 `NULL_REF`, `WATCHDOG` (more than 10 million statements in one cycle).
+
+## runtime
+
+Runtime v0 (spec/14-runtime.md): runs one PROGRAM cyclically on this
+machine, every `--cycle-ms` (default 10) on real time, until Ctrl-C or
+`--cycles N`. It is demo grade, for study case SC1 on a Linux board and for
+development; it is not certified and has no fieldbus yet.
+
+- Located variables (`AT %IX0.0`, `%QW2`, `%MD4`) are bound to the process
+  image: inputs are copied in before each cycle and outputs out after it.
+  A type that does not fit its address is error RP0205.
+- A fault in a cycle, or a cycle longer than `--watchdog-ms` (default ten
+  periods), stops the program and sets every output to 0 (safe outputs).
+- `--retain FILE` restores the variables of RETAIN sections at start and
+  saves them at stop and once a second (written to a new file, then renamed).
+- `--status FILE` writes the status report below once a second while it
+  runs; the same report is printed when the runtime stops.
+- On Linux with PREEMPT_RT, give it a real-time priority: `chrt -f 80 rootplc runtime ...`.
+
+```json
+{"command":"runtime","state":"stopped","fault":null,"period_us":10000,"cycles":50,
+ "exec_us":{"min":7,"avg":18,"max":55},"jitter_max_us":1290,"overruns":0,"notes":[],
+ "variables":[{"name":"lamp","type":"BOOL","at":"%QX0.0","value":"FALSE"}]}
+```
+
+`state` is `running`, `stopped` or `fault` (with `fault` naming the fault
+and its place). The exit code is 1 after a fault.
 
 ## evidence
 

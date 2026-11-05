@@ -39,9 +39,9 @@ phases exist only as stubs, so that the boundaries are fixed early.
 | `rootplc-sim` | Simulation | 2 | Virtual time, FMI 2/3 plants, simulated EtherCAT slaves, scenarios, replay, trace diff |
 | `rootplc-interchange` | Interchange | 2 | PLCopen XML (IEC 61131-10) and TwinCAT XML import/export |
 | `rootplc-graph` | Interchange | 2 | SFC/LD/FBD canonical text/JSON and the layout model for the read-only renderer |
-| `rootplc-abi` | Runtime | 2-3 | The runtime ABI shared by codegen-c, the Rust runtime and the C shim |
+| `rootplc-abi` | Runtime | 2-3 | The runtime ABI shared by codegen-c, the Rust runtime and the C shim. v0: direct addresses, process-image access, the `Program` trait an engine implements |
 | `rootplc-conformance` | Quality | 0 | Loads `conformance/cases`, checks them against the spec rule IDs and `spec/diagnostics.toml`; later runs them against the compiler |
-| `rootplc-runtime` | Runtime | 3 | PREEMPT_RT scheduler, program loading, force/trace, online change, signed deploy, agent API |
+| `rootplc-runtime` | Runtime | 3 | PREEMPT_RT scheduler, program loading, force/trace, online change, signed deploy, agent API. v0 (spec/14-runtime.md): cyclic task, process image, watchdog with safe outputs, retain, status; the driver plugs the VM in through `rootplc-abi` |
 | `rootplc-fieldbus` | Runtime | 3 | Transport traits; EtherCAT (ethercrab), Modbus, OPC UA, CANopen adapters |
 
 ## Dependency rules

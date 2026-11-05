@@ -123,6 +123,10 @@ pub struct Var {
     /// `fb : FB_X(arg := v)`: values for inputs of FB_X's FB_init (slot in
     /// FB_init, expression in the declaring POU), [variables.init-arguments].
     pub init_args: Vec<(usize, Expr)>,
+    /// `AT %IX0.0`: the direct address in upper case, [variables.located].
+    pub at: Option<String>,
+    /// Declared in a RETAIN section, [runtime.retain].
+    pub retain: bool,
 }
 
 /// A program organisation unit.

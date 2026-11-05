@@ -42,6 +42,8 @@ rootplc check <file.st|dir>... [--json]
 rootplc test  <file.st|dir>... [--filter TEXT] [--json]
 rootplc test  <file.st|dir>... --mutate [--mutate-limit N] [--min-score P] [--json]
 rootplc run   <file.st|dir>... [--program NAME] [--cycles N] [--cycle-ms MS] [--json]
+rootplc runtime <file.st|dir>... [--program NAME] [--cycle-ms MS] [--cycles N] [--watchdog-ms MS]
+                [--retain FILE] [--status FILE] [--json]
 rootplc evidence <file.st|dir>... [--out FILE] [--markdown] [--no-mutate] [--min-score P]
 rootplc explain <code> [--json]
 rootplc examples [words...] [--show ID] [--json]
@@ -53,7 +55,7 @@ rootplc mcp
 All `.st` files given (directories are searched recursively) form one
 project: names declared in one file are visible in the others.
 
-`check`, `test`, `run` and `coverage` take `--library NAME[,NAME]`
+`check`, `test`, `run`, `runtime` and `coverage` take `--library NAME[,NAME]`
 (repeatable) to activate compatibility libraries, e.g.
 `rootplc check src --library Tc2_System,TwinCAT_BuiltIns` for TwinCAT code.
 
@@ -145,6 +147,33 @@ cycle, so timers behave as on a PLC with that cycle time.
 
 Faults: `DIV_BY_ZERO`, `RANGE` (subrange), `INDEX` (array bounds),
 `NULL_REF`, `WATCHDOG` (more than 10 million statements in one cycle).
+
+## runtime
+
+Runtime v0 (spec/14-runtime.md): runs one PROGRAM cyclically on this
+machine, every `--cycle-ms` (default 10) on real time, until Ctrl-C or
+`--cycles N`. It is demo grade, for study case SC1 on a Linux board and for
+development; it is not certified and has no fieldbus yet.
+
+- Located variables (`AT %IX0.0`, `%QW2`, `%MD4`) are bound to the process
+  image: inputs are copied in before each cycle and outputs out after it.
+  A type that does not fit its address is error RP0205.
+- A fault in a cycle, or a cycle longer than `--watchdog-ms` (default ten
+  periods), stops the program and sets every output to 0 (safe outputs).
+- `--retain FILE` restores the variables of RETAIN sections at start and
+  saves them at stop and once a second (written to a new file, then renamed).
+- `--status FILE` writes the status report below once a second while it
+  runs; the same report is printed when the runtime stops.
+- On Linux with PREEMPT_RT, give it a real-time priority: `chrt -f 80 rootplc runtime ...`.
+
+```json
+{"command":"runtime","state":"stopped","fault":null,"period_us":10000,"cycles":50,
+ "exec_us":{"min":7,"avg":18,"max":55},"jitter_max_us":1290,"overruns":0,"notes":[],
+ "variables":[{"name":"lamp","type":"BOOL","at":"%QX0.0","value":"FALSE"}]}
+```
+
+`state` is `running`, `stopped` or `fault` (with `fault` naming the fault
+and its place). The exit code is 1 after a fault.
 
 ## evidence
 
@@ -1453,9 +1482,14 @@ one. A user POU may replace a standard function block (spec/08-stdlib.md).
 
 error: located variable's type does not fit the size of its address
 
-Rule `runtime.image.type` in ``:
+Rule `runtime.image.type` in `spec/14-runtime.md`:
 
-
+**[runtime.image.type]** A located variable's type must fit its size: `X`
+takes `BOOL`; `B` takes `BYTE`, `SINT`, `USINT` or `BOOL`; `W` takes `WORD`,
+`INT` or `UINT`; `D` takes `DWORD`, `DINT`, `UDINT` or `REAL`; `L` takes
+`LWORD`, `LINT`, `ULINT` or `LREAL`. Another type is error RP0205. An
+address with `*` (`%I*`, not yet assigned) cannot run: the runtime refuses
+to start and names the variable.
 
 ## RP0125
 
@@ -2938,3 +2972,202 @@ project declares TwinCAT's task information (`_TaskInfo`, library
 100000), `CycleCount` the number of cycles run before this one and
 `FirstCycle` TRUE in the first cycle only. Other members keep their initial
 values. TEST blocks drive programs themselves and do not fill it.
+
+
+======== Specification: spec/13-motion.md ========
+
+# Motion: single axis (RootMotion)
+
+RootMotion is RootPLC's bundled motion library, activated like any bundled
+library with `--library RootMotion` ([stdlib.compat]). Version 0.1.0 covers
+one axis at a time on a **virtual axis**, so motion programs can be tested
+and mutation-tested in the VM before anything moves. Real drives (EtherCAT,
+CiA 402) use the same blocks later. The function-block names follow the
+industry-standard PLCopen motion names. The behaviour below is RootPLC's
+definition, written for this toolchain; where it simplifies (for example
+homing on a virtual axis), the rule says so.
+
+Safety functions (safe torque off, safe stop) are never part of RootMotion.
+They belong to certified safety hardware.
+
+**[motion.axis]** An axis is a variable of type `AXIS_REF`, passed to every
+block as `VAR_IN_OUT Axis`. The program sets its configuration before use:
+`CycleTime` (seconds per call of `RP_VirtualAxis`, default 0.001),
+`MaxVelocity` (units per second, default 1000), `MaxAcceleration` (the
+machine's limit in units per second², default 0: no limit set), and the
+software limits `LimitsEnabled`, `PositiveLimit` and `NegativeLimit`. The other fields are
+state, written only by RootMotion blocks: `State`, `Homed`, `Position`,
+`Velocity`, `ErrorID` and internal fields for the active command.
+
+**[motion.cycle]** The program calls the function
+`RP_VirtualAxis(Axis := axis)` once per cycle, after the motion blocks of that
+axis. It moves the setpoint by one `CycleTime` and returns TRUE while the axis
+moves. On a virtual axis the actual position equals the setpoint. A block sees
+the effect of the axis cycle at its next call, so a goal reached in cycle *n*
+shows as `Done` in cycle *n + 1*.
+
+**[motion.state]** `Axis.State` is one of `MC_AXIS_STATE#Disabled`,
+`Standstill`, `Homing`, `DiscreteMotion`, `ContinuousMotion`, `Stopping` and
+`ErrorStop`. An axis starts `Disabled`. `MC_Power` moves it between
+`Disabled` and `Standstill`. A position move or a halt makes it
+`DiscreteMotion`, a velocity move `ContinuousMotion`, a stop `Stopping`. A
+software-limit violation makes it `ErrorStop` ([motion.limits]), which only
+`MC_Reset` leaves. `MC_ReadStatus` reports the state as one TRUE output.
+
+**[motion.power]** `MC_Power(Enable, Axis)` with `Enable` TRUE makes a
+`Disabled` axis `Standstill`. With `Enable` FALSE the axis becomes `Disabled`
+at once, its velocity becomes 0, and any active command loses control
+([motion.abort]); an axis in `ErrorStop` stays there. `Status` is TRUE while
+the axis is neither `Disabled` nor in `ErrorStop`; `Error` and `ErrorID`
+report an `ErrorStop`.
+
+**[motion.execute]** Blocks with an `Execute` input start on its rising edge.
+Their results (`Done`, `CommandAborted`, `Error` with `ErrorID`) stay TRUE
+while `Execute` stays TRUE. When `Execute` is already FALSE as a result
+appears, the result shows for one call. A falling edge of `Execute` never
+stops a motion that has started. `Busy` is TRUE while the command runs;
+`Active` is TRUE while it controls the axis.
+
+**[motion.abort]** A new motion command on an axis takes control from the
+command that had it. The older block then reports `CommandAborted` and stops
+being `Busy`. The axis continues from its current position and velocity
+under the new command, without a jump.
+
+**[motion.errors]** A command that cannot start reports `Error` with
+`ErrorID`, and the axis does not change: 1 the axis is `Disabled`, 2 the axis
+is in `ErrorStop`, 3 an invalid parameter (velocity, acceleration or
+deceleration that is zero or negative where it must be positive, or an
+acceleration or deceleration above `Axis.MaxAcceleration` when that is
+set), 4 a
+software limit was reached, 5 the axis is busy (`Stopping`, or moving where
+the command needs `Standstill`).
+
+**[motion.profile]** Position moves follow a trapezoid velocity profile:
+the axis accelerates with `Acceleration`, moves at most at `Velocity` (and
+never faster than `Axis.MaxVelocity`), and decelerates with `Deceleration` so
+that it stops exactly at the target. The velocity never changes by more than
+the allowed acceleration or deceleration times `CycleTime` in one cycle,
+including the last cycle. Positions are integrated with the average of the
+old and new velocity, so a move of distance *s* with peak velocity *v*,
+acceleration *a* and deceleration *d* takes *v/(2a) + s/v + v/(2d)* seconds
+when *v* is reached (to within one cycle), and the axis ends exactly at the
+target.
+
+**[motion.move.absolute]** `MC_MoveAbsolute(Execute, Position, Velocity,
+Acceleration, Deceleration, Axis)` moves the axis to `Position`. `Done`
+when it has stopped there; the axis is then `Standstill`.
+
+**[motion.move.relative]** `MC_MoveRelative(Execute, Distance, Velocity,
+Acceleration, Deceleration, Axis)` moves by `Distance` from the position at
+the rising edge of `Execute`, otherwise as [motion.move.absolute].
+
+**[motion.move.velocity]** `MC_MoveVelocity(Execute, Velocity,
+Acceleration, Deceleration, Direction, Axis)` brings the axis to `Velocity`
+(not negative) in `Direction` (`MC_DIRECTION#Positive` or `Negative`) and
+holds it until another command takes control. `InVelocity` is TRUE while the
+velocity equals the commanded value; it replaces `Done`.
+
+**[motion.stop]** `MC_Stop(Execute, Deceleration, Axis)` brakes the axis to
+velocity 0 with `Deceleration`, aborting the active command. The axis is
+`Stopping`, and no other motion command can start until the stop is `Done`
+and `Execute` is FALSE; the axis is then `Standstill`.
+
+**[motion.halt]** `MC_Halt(Execute, Deceleration, Axis)` brakes like
+`MC_Stop`, but the axis is `DiscreteMotion` while braking, returns to
+`Standstill` when it has stopped, and another command may take control at any
+time.
+
+**[motion.home]** `MC_Home(Execute, Position, Axis)` needs a powered axis in
+`Standstill`. On a virtual axis it sets the position to `Position` at once,
+sets `Axis.Homed` and reports `Done` in the same call. (A real drive runs a
+homing procedure; the result is the same.)
+
+**[motion.reset]** `MC_Reset(Execute, Axis)` takes an axis out of
+`ErrorStop` to `Standstill` and clears `ErrorID`. On an axis without an error
+it does nothing but report `Done`.
+
+**[motion.read]** `MC_ReadActualPosition(Enable, Axis)` gives `Position`
+while `Enable` is TRUE. `MC_ReadStatus(Enable, Axis)` gives one TRUE output
+for the current state ([motion.state]). Both set `Valid` to `Enable`.
+
+**[motion.limits]** With `LimitsEnabled`, a position beyond `PositiveLimit`
+or `NegativeLimit` is never reached: the axis stops at the limit, its
+velocity becomes 0, it enters `ErrorStop` with `ErrorID` 4, and the active
+command reports `Error`.
+
+**[motion.observe]** Every call of `RP_VirtualAxis` reports the axis cycle
+to the toolchain: the axis (the path of its variable), the new velocity,
+the acceleration of this cycle (the change of velocity divided by
+`CycleTime`) and the machine limits `MaxVelocity` and `MaxAcceleration`. A
+cycle that ends in a software-limit stop ([motion.limits]) counts as a hard
+stop, and its acceleration is not counted. The test runner keeps, for each
+TEST block and axis, the number of axis cycles and hard stops, the peak
+absolute velocity and the peak absolute acceleration; the evidence pack
+reports them ([tests.evidence]). RootMotion enables the intrinsic
+`__ROOTPLC_AXIS_CYCLE` for this; it is not part of any vendor interface.
+
+
+======== Specification: spec/14-runtime.md ========
+
+# Runtime v0: one program on a controller
+
+`rootplc runtime` runs one PROGRAM cyclically on a host: a Linux board for
+study case SC1, or a development machine. Version 0 is **demo grade**: it
+runs real machines on a bench, but it is not certified and has no fieldbus
+yet. It uses the same virtual machine as `rootplc test`, so a program
+verified in tests runs unchanged. The runtime sees the program only through
+the runtime ABI (`rootplc-abi`): its variables, their addresses and one call
+per cycle.
+
+**[runtime.cycle]** The runtime starts the program every `--cycle-ms`
+milliseconds (default 10) and runs it to the end once per cycle. Each cycle:
+the I/O driver fills the input image, the input image is copied into the
+located `%I` variables, the program runs once, the located `%Q` variables
+are copied into the output image, and the I/O driver writes the output
+image. Time (`TON`, `TIME()`) advances by the real time between cycle
+starts. The runtime keeps the number of cycles, the execution time of a
+cycle (minimum, average, maximum), the start jitter (how far a cycle starts
+from its planned time) and the number of overruns (a cycle that takes longer
+than the period; the next cycle then starts at once). On Linux with
+PREEMPT_RT, run it under a real-time priority (for example `chrt -f 80`).
+
+**[runtime.image]** The process image has three areas of up to 65,536 bytes
+each: inputs (`%I`), outputs (`%Q`) and memory (`%M`). A located variable
+([variables.located]) of the selected program, or of a global variable list,
+is bound to its address. The size letter fixes the place and the type:
+`X` (or none) one bit, address `byte.bit`; `B` one byte; `W` two bytes; `D`
+four bytes; `L` eight bytes; multi-byte values are little-endian. Memory
+variables are copied into the memory image after each cycle and back before
+the next, so other image users (for example an HMI) see and set them.
+
+**[runtime.image.type]** A located variable's type must fit its size: `X`
+takes `BOOL`; `B` takes `BYTE`, `SINT`, `USINT` or `BOOL`; `W` takes `WORD`,
+`INT` or `UINT`; `D` takes `DWORD`, `DINT`, `UDINT` or `REAL`; `L` takes
+`LWORD`, `LINT`, `ULINT` or `LREAL`. Another type is error RP0205. An
+address with `*` (`%I*`, not yet assigned) cannot run: the runtime refuses
+to start and names the variable.
+
+**[runtime.watchdog]** When a cycle faults (for example a division by zero
+or the step budget, [tests.runner]) or its execution takes longer than the
+watchdog time (`--watchdog-ms`, default ten periods), the runtime stops the
+program, sets every output of the output image to its safe value (all bits
+0: every `%Q` BOOL FALSE, every number 0), writes the output image once
+more, keeps the memory image, and reports state `fault` with the reason.
+The program does not run again until the runtime is restarted.
+
+**[runtime.retain]** With `--retain FILE`, the variables of RETAIN sections
+of the selected program and of global variable lists are restored from the
+file at start when it exists (a variable whose name or type changed keeps
+its initial value and is reported), and saved to it when the runtime stops
+and at most once a second while it runs. The file is written to a new name
+and then renamed, so a power loss leaves the old or the new file, never a
+torn one. Only elementary types are retained in version 0; a structured
+RETAIN variable is reported at start and keeps its initial value.
+
+**[runtime.status]** The runtime reports its state (`running`, `stopped` or
+`fault`, with the fault), the cycle statistics of [runtime.cycle], and the
+values of the program's variables and the located variables, as text or as
+JSON (`--json`) when it stops; with `--status FILE` it also writes that
+report to the file at most once a second while it runs (written to a new
+name and renamed). `--cycles N` stops after N cycles; otherwise the runtime
+runs until it is stopped (Ctrl-C).

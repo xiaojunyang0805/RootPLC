@@ -816,9 +816,14 @@ one. A user POU may replace a standard function block (spec/08-stdlib.md).
 
 error: located variable's type does not fit the size of its address
 
-Rule `runtime.image.type` in ``:
+Rule `runtime.image.type` in `spec/14-runtime.md`:
 
-
+**[runtime.image.type]** A located variable's type must fit its size: `X`
+takes `BOOL`; `B` takes `BYTE`, `SINT`, `USINT` or `BOOL`; `W` takes `WORD`,
+`INT` or `UINT`; `D` takes `DWORD`, `DINT`, `UDINT` or `REAL`; `L` takes
+`LWORD`, `LINT`, `ULINT` or `LREAL`. Another type is error RP0205. An
+address with `*` (`%I*`, not yet assigned) cannot run: the runtime refuses
+to start and names the variable.
 
 ## RP0125
 

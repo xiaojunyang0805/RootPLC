@@ -21,6 +21,7 @@ rootplc-diag.workspace = true
 rootplc-driver.workspace = true
 rootplc-mcp.workspace = true
 rootplc-stdlib.workspace = true
+rootplc-runtime.workspace = true
 
 [lints]
 workspace = true

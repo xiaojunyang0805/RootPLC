@@ -59,6 +59,10 @@ struct Var<'a> {
     constant: bool,
     /// `fb : FB_X(arg := v)`: the FB_init arguments, [variables.init-arguments].
     init_args: Option<&'a Node>,
+    /// `AT %IX0.0`: the direct address, upper case, [variables.located].
+    at: Option<String>,
+    /// Declared in a RETAIN (or TwinCAT PERSISTENT) section, [runtime.retain].
+    retain: bool,
 }
 
 #[derive(Clone)]
@@ -559,6 +563,8 @@ impl<'a> Checker<'a> {
             stat: false,
             constant: false,
             init_args: None,
+            at: None,
+            retain: false,
         };
         let mut vars: Vec<Var<'a>> = inputs.iter().map(|x| var(x, Section::Input)).collect();
         vars.extend(outputs.iter().map(|x| var(x, Section::Output)));
@@ -664,6 +670,8 @@ impl<'a> Checker<'a> {
                 init: inits.next().flatten(),
                 stat: v.stat,
                 init_args: args.next().unwrap_or_default(),
+                at: v.at.clone(),
+                retain: v.retain,
             };
             let kind = match &d.kind {
                 Kind::Pending | Kind::Resolving => ir::DefKind::Unresolved,
@@ -685,6 +693,8 @@ impl<'a> Checker<'a> {
                             init: None,
                             stat: false,
                             init_args: Vec::new(),
+                            at: None,
+                            retain: false,
                         });
                     }
                     ir::DefKind::Pou(ir::Pou {
@@ -1753,9 +1763,13 @@ impl<'a> Checker<'a> {
         self.cur = saved;
         for (file, sec, constant, ns) in self.global_sections.clone() {
             self.cur = file;
+            let retain = self.section_retain(sec);
             for d in self.child_nodes(sec, N::VarDecl) {
                 let start = vars.len();
                 self.var_decl(d, Section::Local, &mut vars);
+                for v in &mut vars[start..] {
+                    v.retain = retain;
+                }
                 for v in &vars[start..] {
                     let value = if constant {
                         v.init
@@ -1933,6 +1947,8 @@ impl<'a> Checker<'a> {
                         stat: false,
                         constant: false,
                         init_args: None,
+                        at: None,
+                        retain: false,
                     });
                 }
             }
@@ -2089,10 +2105,12 @@ impl<'a> Checker<'a> {
                     for d in self.child_nodes(n, N::VarDecl) {
                         self.var_decl(d, section, &mut vars);
                     }
+                    let retain = self.section_retain(n);
                     for v in &mut vars[start..] {
                         v.read_only = read_only;
                         v.stat = stat;
                         v.constant = constant;
+                        v.retain = retain;
                         // [pous.call.in-out]: a STRING parameter takes the
                         // caller's whole text; the caller's length applies
                         // when it is written back
@@ -2123,11 +2141,13 @@ impl<'a> Checker<'a> {
         let (mut spec, mut init) = (None, None);
         let mut before_colon = true;
         let mut init_args = None;
+        let mut at = None;
         for it in &its {
             match *it {
                 Item::Tok(t) if self.tkind(t) == T::Colon => before_colon = false,
                 // x AT %IX0.0: AT is the word before the address, not a name
                 Item::Tok(t) if self.tkind(t) == T::DirectVariable => {
+                    at = Some(self.text(t).to_ascii_uppercase());
                     if names
                         .last()
                         .is_some_and(|&a| self.text(a).eq_ignore_ascii_case("AT"))
@@ -2160,6 +2180,9 @@ impl<'a> Checker<'a> {
         let alias = spec.is_some_and(|s| {
             matches!(self.items(s).first(), Some(Item::Tok(t)) if self.text(*t).eq_ignore_ascii_case("REFERENCE"))
         });
+        if let (Some(addr), Some(&first)) = (&at, names.first()) {
+            self.located_type(addr, &ty, self.tok_span(first));
+        }
         for t in names {
             out.push(Var {
                 name: self.text(t).to_string(),
@@ -2172,8 +2195,54 @@ impl<'a> Checker<'a> {
                 stat: false,
                 constant: false,
                 init_args,
+                at: at.clone(),
+                retain: false,
             });
         }
+    }
+
+    /// [runtime.image.type]: the type of a located variable must fit the
+    /// size letter of its address (`%IX` BOOL, `%IW` WORD/INT/UINT, ...).
+    fn located_type(&mut self, addr: &str, ty: &Ty, span: Span) {
+        let size = addr.chars().nth(2).unwrap_or('X');
+        if size == '*' || matches!(ty, Ty::Unknown) {
+            return;
+        }
+        let size = if size.is_ascii_digit() { 'X' } else { size };
+        let fits: &[Elem] = match size {
+            'X' => &[Elem::Bool],
+            'B' => &[Elem::Byte, Elem::Sint, Elem::Usint, Elem::Bool],
+            'W' => &[Elem::Word, Elem::Int, Elem::Uint],
+            'D' => &[Elem::Dword, Elem::Dint, Elem::Udint, Elem::Real],
+            'L' => &[Elem::Lword, Elem::Lint, Elem::Ulint, Elem::Lreal],
+            _ => return,
+        };
+        let ok = matches!(self.strip(ty), Ty::Elem(e) if fits.contains(&e));
+        if !ok {
+            let allowed: Vec<String> = fits
+                .iter()
+                .map(|e| format!("{e:?}").to_ascii_uppercase())
+                .collect();
+            self.diag(
+                codes::LOCATED_TYPE_MISMATCH,
+                format!(
+                    "the address {addr} holds {}; the variable's type does not fit it",
+                    allowed.join(", ")
+                ),
+                span,
+                Some(format!(
+                    "declare it as {} or use an address of the right size",
+                    allowed[0]
+                )),
+            );
+        }
+    }
+
+    /// A RETAIN (or TwinCAT PERSISTENT) section, [runtime.retain].
+    fn section_retain(&self, sec: &'a Node) -> bool {
+        self.items(sec).iter().take(6).any(|i| {
+            matches!(i, Item::Tok(t) if self.is_kw(*t, "RETAIN") || self.text(*t).eq_ignore_ascii_case("PERSISTENT"))
+        })
     }
 
     /// Initial value given in the declaration of a named type in this file,

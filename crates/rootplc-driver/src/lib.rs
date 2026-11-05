@@ -11,6 +11,7 @@ pub mod explain;
 pub mod init;
 pub mod json;
 pub mod mutate;
+pub mod runtime;
 pub mod sha256;
 
 use std::path::PathBuf;
@@ -28,6 +29,8 @@ pub enum Command {
     Test,
     /// Run the program in the VM.
     Run,
+    /// Run one program cyclically on this machine: runtime v0.
+    Runtime,
     /// Run a simulation scenario.
     Sim,
     /// Formal verification with CBMC.
@@ -60,6 +63,7 @@ impl Command {
         Command::Build,
         Command::Test,
         Command::Run,
+        Command::Runtime,
         Command::Sim,
         Command::Verify,
         Command::Evidence,
@@ -81,6 +85,7 @@ impl Command {
             Command::Build => "build",
             Command::Test => "test",
             Command::Run => "run",
+            Command::Runtime => "runtime",
             Command::Sim => "sim",
             Command::Verify => "verify",
             Command::Evidence => "evidence",
