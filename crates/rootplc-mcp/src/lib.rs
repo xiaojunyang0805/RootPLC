@@ -3,8 +3,8 @@
 //!
 //! Roadmap phase: 1 (stdio in Phase 0 as D1a; HTTP later). See `ARCHITECTURE.md`.
 //!
-//! Tools: `rootplc_check`, `rootplc_test`, `rootplc_run`, `rootplc_evidence`,
-//! `rootplc_explain`, `rootplc_examples`, `rootplc_coverage`. All are read-only: they never
+//! Tools: `rootplc_check`, `rootplc_test`, `rootplc_run`, `rootplc_diff`,
+//! `rootplc_evidence`, `rootplc_explain`, `rootplc_examples`, `rootplc_coverage`. All are read-only: they never
 //! write files and never touch hardware. Results are the same JSON reports
 //! as `rootplc <command> --json`.
 //!
@@ -20,7 +20,7 @@ use std::path::PathBuf;
 use json::Json;
 
 /// Implementation status, reported by `rootplc mcp --version`.
-pub const STATUS: &str = "stdio MCP server: rootplc_check, rootplc_test, rootplc_run, rootplc_evidence, \
+pub const STATUS: &str = "stdio MCP server: rootplc_check, rootplc_test, rootplc_run, rootplc_diff, rootplc_evidence, \
      rootplc_explain, rootplc_examples, rootplc_coverage; resources; prompts";
 
 /// Protocol versions this server speaks, newest first.
@@ -32,7 +32,7 @@ rootplc_explain gives the spec rule for a code), then write TEST blocks and call
 until every test passes. Do not report success while a check error or a failing test remains. \
 Before writing a common pattern (timers, edges, state machines, interlocks), call \
 rootplc_examples for verified code. For an existing code base, call rootplc_coverage first: \
-it says which files RootPLC can take as they are and which use vendor constructs. \
+it says which files RootPLC can take as they are and which use vendor constructs. To check that a function block behaves like another (after a refactoring, or a real block against a RootBlocks catalog block), call rootplc_diff. \
 Pass project files with `paths` (files or directories) or code with `source`. \
 Deployment to real PLCs is not available to agents; a human approves it.";
 
@@ -50,6 +50,7 @@ fn tools() -> String {
 {{"name":"rootplc_check","title":"Check Structured Text","description":"Lex, parse and type-check IEC 61131-3 Structured Text. Returns diagnostics with stable codes (RPnnnn), 1-based positions and fix hints. ok is true when there are no errors.","inputSchema":{{"type":"object","properties":{{{src}}}}},{ro}}},
 {{"name":"rootplc_test","title":"Run TEST blocks","description":"Compile the project and run every TEST ... END_TEST block in the deterministic VM. Assertions: ASSERT_TRUE, ASSERT_FALSE, ASSERT_EQ, ASSERT_NE. Tests may read every variable of an instance (white-box). Returns pass/fail per test with failure locations and run-time faults. With mutate: true, measures how good the tests are instead: every small change to the code (a flipped comparison, AND/OR, TRUE/FALSE, n to n+1, a doubled duration) must make a test fail; returns the mutation score and each surviving change, so you can add a test for it.","inputSchema":{{"type":"object","properties":{{{src},"filter":{{"type":"string","description":"Only tests whose name contains this text."}},"mutate":{{"type":"boolean","default":false,"description":"Run mutation testing (needs all tests passing first)."}},"mutate_limit":{{"type":"integer","minimum":1,"maximum":5000,"default":500}}}}}},{ro}}},
 {{"name":"rootplc_run","title":"Run a program","description":"Compile and run one PROGRAM for a number of PLC cycles in the VM (virtual clock), then return the value of every variable. Use it to inspect behaviour; use rootplc_test for pass/fail evidence.","inputSchema":{{"type":"object","properties":{{{src},"program":{{"type":"string","description":"PROGRAM to run; optional when there is only one."}},"cycles":{{"type":"integer","minimum":1,"maximum":1000000,"default":1}},"cycle_ms":{{"type":"integer","minimum":0,"default":10,"description":"Virtual time per cycle in milliseconds (timers use it)."}}}}}},{ro}}},
+{{"name":"rootplc_diff","title":"Compare a block with a reference","description":"Run two function blocks side by side in the VM, give them the same seeded pseudo-random inputs every cycle and compare their outputs. Inputs and outputs are matched by name; wrap a block with other names in a small adapter FB that has the reference's names. BOOL inputs toggle, numeric inputs jump within a range; other inputs keep their initial value unless set. Returns the verdict (agree / differ / fault), per output the cycles that differed, and the first difference with the inputs of that cycle and the four before, so you can turn it into a TEST. Agreement covers the sampled cycles only.","inputSchema":{{"type":"object","properties":{{{src},"reference":{{"type":"string","description":"The reference FUNCTION_BLOCK, e.g. RB_Motor (with libraries [\"RootBlocks\"])."}},"unit":{{"type":"string","description":"The FUNCTION_BLOCK to compare."}},"cycles":{{"type":"integer","minimum":1,"maximum":1000000,"default":1000}},"cycle_ms":{{"type":"integer","minimum":0,"default":10}},"seed":{{"type":"integer","minimum":0,"default":1}},"set":{{"type":"array","items":{{"type":"string"}},"description":"Inputs held at a value, e.g. [\"Mode=RB_MODE#Auto\", \"Delay=T#2s\"]."}},"ranges":{{"type":"array","items":{{"type":"string"}},"description":"Ranges of numeric inputs, e.g. [\"SP=0..80\"]; default 0..100."}},"toggle":{{"type":"number","minimum":0,"maximum":1,"default":0.1,"description":"Probability that an input changes in a cycle."}},"tolerance":{{"type":"number","minimum":0,"default":0.0001,"description":"Allowed difference of REAL outputs."}}}},"required":["reference","unit"]}},{ro}}},
 {{"name":"rootplc_evidence","title":"Evidence pack for sign-off","description":"Build the evidence pack an engineer reviews before approving a change: input file hashes, check result (IEC clean or not), every test result, the mutation score with surviving changes, and a verdict (verified / not verified with reasons). Deterministic; never signed locally. Call it last, after rootplc_test passes.","inputSchema":{{"type":"object","properties":{{{src},"min_score":{{"type":"number","minimum":0,"maximum":100,"description":"Required mutation score in percent."}},"mutate":{{"type":"boolean","default":true}},"markdown":{{"type":"boolean","default":false,"description":"Return a readable summary instead of JSON."}}}}}},{ro}}},
 {{"name":"rootplc_explain","title":"Explain a diagnostic","description":"Explain a diagnostic code such as RP0103: severity, summary and the text of the spec rule that defines it.","inputSchema":{{"type":"object","properties":{{"code":{{"type":"string","description":"Diagnostic code, e.g. RP0103 or 103."}}}},"required":["code"]}},{ro}}},
 {{"name":"rootplc_examples","title":"Find verified ST patterns","description":"Search a library of Structured Text patterns (edge detection, timers, counters, state machines, interlocks, arrays, structs, test blocks). Every example compiles and passes its TEST blocks in this toolchain version. Adapt them; do not copy names blindly.","inputSchema":{{"type":"object","properties":{{"query":{{"type":"string","description":"Keywords, e.g. 'timer' or 'state machine'. Empty lists every example."}},"id":{{"type":"string","description":"Return this one example, e.g. 'edge-detect'."}}}}}},{ro}}},
@@ -195,6 +196,75 @@ fn call_tool(name: &str, args: &Json) -> String {
             }
             Err(e) => fail("run", &e),
         },
+        "rootplc_diff" => {
+            let strings = |key: &str| -> Vec<String> {
+                args.get(key)
+                    .and_then(Json::as_array)
+                    .map(|v| {
+                        v.iter()
+                            .filter_map(Json::as_str)
+                            .map(str::to_string)
+                            .collect()
+                    })
+                    .unwrap_or_default()
+            };
+            let mut opt = rootplc_driver::diff::DiffOptions {
+                reference: args
+                    .get("reference")
+                    .and_then(Json::as_str)
+                    .unwrap_or_default()
+                    .to_string(),
+                unit: args
+                    .get("unit")
+                    .and_then(Json::as_str)
+                    .unwrap_or_default()
+                    .to_string(),
+                ..rootplc_driver::diff::DiffOptions::default()
+            };
+            if let Some(n) = args.get("cycles").and_then(Json::as_f64) {
+                opt.cycles = n.clamp(1.0, MAX_CYCLES) as u64;
+            }
+            if let Some(n) = args.get("cycle_ms").and_then(Json::as_f64) {
+                opt.cycle_ms = n.max(0.0) as u64;
+            }
+            if let Some(n) = args.get("seed").and_then(Json::as_f64) {
+                opt.seed = n.max(0.0) as u64;
+            }
+            if let Some(n) = args.get("toggle").and_then(Json::as_f64) {
+                opt.toggle = n.clamp(0.0, 1.0);
+            }
+            if let Some(n) = args.get("tolerance").and_then(Json::as_f64) {
+                opt.tolerance = n.max(0.0);
+            }
+            for item in strings("set") {
+                match item.split_once('=') {
+                    Some((n, v)) => opt.set.push((n.trim().into(), v.trim().into())),
+                    None => return fail("diff", &format!("set {item}: write NAME=VALUE")),
+                }
+            }
+            for item in strings("ranges") {
+                let parsed = item.split_once('=').and_then(|(n, rg)| {
+                    let (lo, hi) = rg.split_once("..")?;
+                    Some((
+                        n.trim().to_string(),
+                        lo.trim().parse().ok()?,
+                        hi.trim().parse().ok()?,
+                    ))
+                });
+                match parsed {
+                    Some(rg) => opt.ranges.push(rg),
+                    None => return fail("diff", &format!("ranges {item}: write NAME=LO..HI")),
+                }
+            }
+            match sources(args).and_then(|s| checked(s, args)) {
+                Ok(c) if !c.ok() => tool_result(&rootplc_driver::json::check(&c), true),
+                Ok(c) => match rootplc_driver::diff::diff(&c, &opt) {
+                    Ok(rep) => tool_result(&rootplc_driver::diff::to_json(&rep), false),
+                    Err(e) => fail("diff", &e),
+                },
+                Err(e) => fail("diff", &e),
+            }
+        }
         "rootplc_examples" => {
             let found = match args.get("id").and_then(Json::as_str) {
                 Some(id) => match rootplc_driver::examples::get(id) {
@@ -514,7 +584,7 @@ mod tests {
             .and_then(|x| x.get("tools"))
             .and_then(Json::as_array)
             .expect("tools");
-        assert_eq!(tools.len(), 7);
+        assert_eq!(tools.len(), 8);
         assert_eq!(r.get("id").and_then(Json::as_str), Some("a"));
         let r = call(r#"{"jsonrpc":"2.0","id":2,"method":"nope"}"#);
         assert!(r.get("error").is_some());
@@ -546,6 +616,24 @@ mod tests {
                 .and_then(Json::as_str),
             Some("6")
         );
+
+        let src = r#"{"source":"FUNCTION_BLOCK A VAR_INPUT s, k : BOOL; END_VAR VAR_OUTPUT q : BOOL; END_VAR IF NOT k THEN q := FALSE; ELSIF s THEN q := TRUE; END_IF; END_FUNCTION_BLOCK
+FUNCTION_BLOCK B VAR_INPUT s, k : BOOL; END_VAR VAR_OUTPUT q : BOOL; END_VAR IF s THEN q := TRUE; ELSIF NOT k THEN q := FALSE; END_IF; END_FUNCTION_BLOCK","reference":"A","unit":"B"}"#;
+        let rep = tool("rootplc_diff", src);
+        assert_eq!(rep.get("verdict").and_then(Json::as_str), Some("differ"));
+        assert_eq!(rep.get("ok"), Some(&Json::Bool(false)));
+        let src = src.replace(
+            r#""unit":"B""#,
+            r#""unit":"B","set":["k=TRUE"],"cycles":200"#,
+        );
+        let rep = tool("rootplc_diff", &src);
+        assert_eq!(rep.get("verdict").and_then(Json::as_str), Some("agree"));
+        assert_eq!(rep.get("cycles").and_then(Json::as_f64), Some(200.0));
+        let rep = tool(
+            "rootplc_diff",
+            r#"{"source":"FUNCTION_BLOCK A END_FUNCTION_BLOCK","reference":"A","unit":"Z"}"#,
+        );
+        assert_eq!(rep.get("ok"), Some(&Json::Bool(false)));
 
         let rep = tool("rootplc_explain", r#"{"code":"103"}"#);
         assert_eq!(

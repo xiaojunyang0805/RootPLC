@@ -12,6 +12,9 @@ const USAGE: &str = "usage:
   rootplc test  <file.st|dir>... [--filter TEXT] [--json]
   rootplc test  <file.st|dir>... --mutate [--mutate-limit N] [--min-score P] [--json]   (mutation score of the tests)
   rootplc run   <file.st|dir>... [--program NAME] [--cycles N] [--cycle-ms MS] [--json]
+  rootplc diff  <file.st|dir>... --reference FB --unit FB [--cycles N] [--cycle-ms MS] [--seed N]
+                [--set NAME=VALUE]... [--range NAME=LO..HI]... [--toggle P] [--tolerance T] [--json]
+                (same stimuli to both blocks, outputs compared each cycle; exit 1 when they differ)
   rootplc runtime <file.st|dir>... [--program NAME] [--cycle-ms MS] [--cycles N] [--watchdog-ms MS]
                 [--retain FILE] [--status FILE] [--modbus [ADDR:]PORT] [--deploy DIR] [--json]   (runtime v0)
   rootplc deploy <file.st|dir>... --to DIR [--program NAME]   (request; runs only after approval)
@@ -21,7 +24,7 @@ const USAGE: &str = "usage:
   rootplc examples [words...] [--show ID] [--json]   (verified ST patterns)
   rootplc coverage <file.st|dir>... [--json]
   rootplc libraries [--json]                       (bundled compatibility libraries)
-  check, test, run, runtime and coverage take --library NAME[,NAME] (e.g. Tc2_System)       (portable / dialect / dependent / blocked)
+  check, test, diff, run, runtime and coverage take --library NAME[,NAME] (e.g. Tc2_System)       (portable / dialect / dependent / blocked)
   rootplc mcp            (MCP server on stdio, for agent hosts)
   rootplc --version
 
@@ -50,7 +53,9 @@ impl Args {
                 }
                 "--program" | "--cycles" | "--cycle-ms" | "--filter" | "--name" | "--show"
                 | "--agent" | "--library" | "--mutate-limit" | "--min-score" | "--out"
-                | "--watchdog-ms" | "--retain" | "--status" | "--modbus" | "--deploy" | "--to" => {
+                | "--watchdog-ms" | "--retain" | "--status" | "--modbus" | "--deploy" | "--to"
+                | "--reference" | "--unit" | "--seed" | "--set" | "--range" | "--toggle"
+                | "--tolerance" => {
                     let v = it.next().unwrap_or_default();
                     a.options.push((x, v));
                 }
@@ -313,6 +318,86 @@ fn cmd_run(paths: &[PathBuf], args: &Args) -> ExitCode {
         }
     }
     exit(r.ok())
+}
+
+fn cmd_diff(paths: &[PathBuf], args: &Args) -> ExitCode {
+    use rootplc_driver::diff::{DiffOptions, Verdict, diff, render, to_json};
+    let mut opt = DiffOptions::default();
+    let (Some(reference), Some(unit)) = (args.opt("--reference"), args.opt("--unit")) else {
+        return io_error("diff", "give --reference FB and --unit FB", args.json);
+    };
+    opt.reference = reference.to_string();
+    opt.unit = unit.to_string();
+    macro_rules! num {
+        ($name:literal, $field:ident) => {
+            if let Some(v) = args.opt($name) {
+                match v.parse() {
+                    Ok(x) => opt.$field = x,
+                    Err(_) => {
+                        return io_error(
+                            "diff",
+                            &format!("{}: not a number: {v}", $name),
+                            args.json,
+                        );
+                    }
+                }
+            }
+        };
+    }
+    num!("--cycles", cycles);
+    num!("--cycle-ms", cycle_ms);
+    num!("--seed", seed);
+    num!("--toggle", toggle);
+    num!("--tolerance", tolerance);
+    for s in args.all("--set") {
+        let Some((n, v)) = s.split_once('=') else {
+            return io_error("diff", &format!("--set {s}: write NAME=VALUE"), args.json);
+        };
+        opt.set.push((n.trim().to_string(), v.trim().to_string()));
+    }
+    for s in args.all("--range") {
+        let parsed = s.split_once('=').and_then(|(n, r)| {
+            let (lo, hi) = r.split_once("..")?;
+            Some((
+                n.trim().to_string(),
+                lo.trim().parse().ok()?,
+                hi.trim().parse().ok()?,
+            ))
+        });
+        match parsed {
+            Some(r) => opt.ranges.push(r),
+            None => {
+                return io_error(
+                    "diff",
+                    &format!("--range {s}: write NAME=LO..HI"),
+                    args.json,
+                );
+            }
+        }
+    }
+    let check = match load("diff", paths, args) {
+        Ok(c) => c,
+        Err(code) => return code,
+    };
+    if !check.ok() {
+        if args.json {
+            println!("{}", json::check(&check));
+        } else {
+            print_diagnostics(&check);
+            eprintln!("rootplc diff: the sources do not compile");
+        }
+        return ExitCode::from(2);
+    }
+    let r = match diff(&check, &opt) {
+        Ok(r) => r,
+        Err(e) => return io_error("diff", &e, args.json),
+    };
+    if args.json {
+        println!("{}", to_json(&r));
+    } else {
+        print!("{}", render(&r));
+    }
+    exit(r.verdict == Verdict::Agree)
 }
 
 fn cmd_runtime(paths: &[PathBuf], args: &Args) -> ExitCode {
@@ -681,6 +766,7 @@ fn main() -> ExitCode {
             Command::Check
                 | Command::Test
                 | Command::Run
+                | Command::Diff
                 | Command::Runtime
                 | Command::Deploy
                 | Command::Coverage
@@ -696,6 +782,7 @@ fn main() -> ExitCode {
         Some(Command::Test) => cmd_test(&paths, args.opt("--filter"), &args),
         Some(Command::Libraries) => cmd_libraries(args.json),
         Some(Command::Run) => cmd_run(&paths, &args),
+        Some(Command::Diff) => cmd_diff(&paths, &args),
         Some(Command::Runtime) => cmd_runtime(&paths, &args),
         Some(Command::Deploy) => cmd_deploy(&paths, &args),
         Some(Command::Approve) => cmd_approve(rest.first(), &args),

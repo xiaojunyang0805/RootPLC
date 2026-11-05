@@ -26,6 +26,9 @@ with `rootplc`.
 - Inspect: `rootplc run . --cycles 10 --json` shows variable values.
 - Existing code: `rootplc coverage <dir> --json` says which files are
   portable, which use vendor constructs, and why.
+- Same behaviour? `rootplc diff . --reference OLD --unit NEW --json` runs
+  two function blocks on the same inputs and lists where outputs differ
+  (after a refactoring, or against a RootBlocks block).
 - The MCP server `rootplc mcp` offers the same as tools.
 - Done means: check clean, all tests pass, and a high mutation score.
   Finish with `rootplc evidence . --markdown` and show the verdict.
@@ -42,6 +45,8 @@ rootplc check <file.st|dir>... [--json]
 rootplc test  <file.st|dir>... [--filter TEXT] [--json]
 rootplc test  <file.st|dir>... --mutate [--mutate-limit N] [--min-score P] [--json]
 rootplc run   <file.st|dir>... [--program NAME] [--cycles N] [--cycle-ms MS] [--json]
+rootplc diff  <file.st|dir>... --reference FB --unit FB [--cycles N] [--cycle-ms MS] [--seed N]
+              [--set NAME=VALUE]... [--range NAME=LO..HI]... [--toggle P] [--tolerance T] [--json]
 rootplc runtime <file.st|dir>... [--program NAME] [--cycle-ms MS] [--cycles N] [--watchdog-ms MS]
                 [--retain FILE] [--status FILE] [--modbus [ADDR:]PORT] [--deploy DIR] [--json]
 rootplc deploy <file.st|dir>... --to DIR [--program NAME]
@@ -57,7 +62,7 @@ rootplc mcp
 All `.st` files given (directories are searched recursively) form one
 project: names declared in one file are visible in the others.
 
-`check`, `test`, `run`, `runtime` and `coverage` take `--library NAME[,NAME]`
+`check`, `test`, `diff`, `run`, `runtime` and `coverage` take `--library NAME[,NAME]`
 (repeatable) to activate compatibility libraries, e.g.
 `rootplc check src --library Tc2_System,TwinCAT_BuiltIns` for TwinCAT code.
 
@@ -149,6 +154,36 @@ cycle, so timers behave as on a PLC with that cycle time.
 
 Faults: `DIV_BY_ZERO`, `RANGE` (subrange), `INDEX` (array bounds),
 `NULL_REF`, `WATCHDOG` (more than 10 million statements in one cycle).
+
+## diff
+
+Compares two function blocks ([spec/16-diff.md](../../spec/16-diff.md)):
+both get the same seeded pseudo-random inputs every cycle and their
+outputs are compared. Inputs and outputs are matched by name; give a block
+with other names a small adapter FB with the reference's names. BOOL inputs
+toggle with probability `--toggle` (0.1), numeric inputs jump within
+`--range` (default 0..100), other inputs keep their initial value unless
+`--set` (TRUE, numbers, `T#2s`, `TYPE#Value`). Uses: a refactoring still
+behaves like before; a block from a real project against a RootBlocks block
+(`--library RootBlocks --reference RB_Motor`).
+
+```
+rootplc diff src --library RootBlocks --reference RB_Motor --unit FB_MotorAdapter --set Mode=RB_MODE#Auto
+```
+
+Exit code 0 agree, 1 differ or fault, 2 cannot run. The first difference
+comes with the inputs of that cycle and the four before:
+
+```json
+{"command":"diff","ok":false,"reference":"FB_StopWins","unit":"FB_StartWins","verdict":"differ",
+ "cycles":50,"seed":1,"driven":["Start","StopOk"],"set":[],"held":["Delay"],
+ "missing_inputs":[],"missing_outputs":[],"outputs":[{"name":"Out","differing":14},{"name":"Since","differing":17}],
+ "first":{"cycle":1,"output":"Out","reference":"FALSE","unit":"TRUE",
+ "trace":[{"cycle":1,"inputs":{"Start":"TRUE","StopOk":"FALSE"}}]},"fault":null}
+```
+
+Agreement covers the sampled cycles only: set slow inputs, narrow ranges or
+add TEST blocks for behaviour the stimuli do not reach.
 
 ## runtime
 
@@ -315,8 +350,8 @@ activating one activates the libraries it requires.
 
 Model Context Protocol server on stdio for agent hosts; see
 [agent/mcp/README.md](../../agent/mcp/README.md). Tools: `rootplc_check`,
-`rootplc_test`, `rootplc_run`, `rootplc_explain`, `rootplc_examples`,
-`rootplc_coverage`. Source tools accept `paths`, in-memory `files`, or a
+`rootplc_test`, `rootplc_run`, `rootplc_diff`, `rootplc_evidence`,
+`rootplc_explain`, `rootplc_examples`, `rootplc_coverage`. Source tools accept `paths`, in-memory `files`, or a
 `source` string plus an optional `libraries` list, and return the JSON
 reports above. Resources: the agent
 guide, spec chapters, diagnostic registry and examples (`rootplc://…`).

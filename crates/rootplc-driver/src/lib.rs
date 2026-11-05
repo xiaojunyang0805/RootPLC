@@ -5,6 +5,7 @@
 pub mod agents;
 pub mod coverage;
 pub mod deploy;
+pub mod diff;
 pub mod docs;
 pub mod evidence;
 pub mod examples;
@@ -28,6 +29,8 @@ pub enum Command {
     Build,
     /// Run TEST blocks.
     Test,
+    /// Compare a function block with a reference block ([diff.command]).
+    Diff,
     /// Run the program in the VM.
     Run,
     /// Run one program cyclically on this machine: runtime v0.
@@ -65,6 +68,7 @@ impl Command {
         Command::Check,
         Command::Build,
         Command::Test,
+        Command::Diff,
         Command::Run,
         Command::Runtime,
         Command::Sim,
@@ -88,6 +92,7 @@ impl Command {
             Command::Check => "check",
             Command::Build => "build",
             Command::Test => "test",
+            Command::Diff => "diff",
             Command::Run => "run",
             Command::Runtime => "runtime",
             Command::Sim => "sim",

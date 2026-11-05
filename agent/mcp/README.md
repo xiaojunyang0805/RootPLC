@@ -3,8 +3,9 @@
 Every host runs the same stdio server: `rootplc mcp`. Install `rootplc` first
 (see the README), then add the server to your host. Restart the host afterwards.
 
-The server offers seven read-only tools: `rootplc_check`, `rootplc_test`
-(with `mutate: true` for the mutation score), `rootplc_run`,
+The server offers eight read-only tools: `rootplc_check`, `rootplc_test`
+(with `mutate: true` for the mutation score), `rootplc_run`, `rootplc_diff`
+(does a block behave like a reference block?),
 `rootplc_evidence` (the evidence pack for sign-off), `rootplc_explain`,
 `rootplc_examples` (verified ST patterns) and `rootplc_coverage` (portable /
 dialect / dependent / blocked per file).

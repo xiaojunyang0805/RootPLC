@@ -17,6 +17,9 @@ with `rootplc`.
 - Inspect: `rootplc run . --cycles 10 --json` shows variable values.
 - Existing code: `rootplc coverage <dir> --json` says which files are
   portable, which use vendor constructs, and why.
+- Same behaviour? `rootplc diff . --reference OLD --unit NEW --json` runs
+  two function blocks on the same inputs and lists where outputs differ
+  (after a refactoring, or against a RootBlocks block).
 - The MCP server `rootplc mcp` offers the same as tools.
 - Done means: check clean, all tests pass, and a high mutation score.
   Finish with `rootplc evidence . --markdown` and show the verdict.

@@ -4,7 +4,7 @@ Adds the RootPLC MCP server and two skills to Claude Code.
 
 | Part | What it does |
 |---|---|
-| MCP server `rootplc` | Tools `rootplc_check`, `rootplc_test`, `rootplc_run`, `rootplc_explain`, `rootplc_examples`, `rootplc_coverage`; the spec and examples as resources; prompts `write_and_verify`, `fix_diagnostics`, `port_legacy` |
+| MCP server `rootplc` | Tools `rootplc_check`, `rootplc_test`, `rootplc_run`, `rootplc_diff`, `rootplc_explain`, `rootplc_examples`, `rootplc_coverage`; the spec and examples as resources; prompts `write_and_verify`, `fix_diagnostics`, `port_legacy` |
 | Skill `rootplc-st` | The write, check, test loop for new PLC code |
 | Skill `rootplc-migrate` | Measure, pin and port an existing code base |
 
