@@ -46,6 +46,17 @@ pub struct Input {
     pub sha256: String,
 }
 
+/// One active bundled library of the pack.
+#[derive(Debug, Clone)]
+pub struct LibraryInput {
+    /// Library name, e.g. `RootMotion`.
+    pub name: String,
+    /// Version of the bundled files.
+    pub version: String,
+    /// SHA-256 over the library's source files (name, newline, text each).
+    pub sha256: String,
+}
+
 /// The evidence pack.
 #[derive(Debug, Clone)]
 pub struct Evidence {
@@ -53,6 +64,8 @@ pub struct Evidence {
     pub spec_sha256: String,
     /// Every source file.
     pub inputs: Vec<Input>,
+    /// Active bundled libraries, sorted by name.
+    pub libraries: Vec<LibraryInput>,
     /// Compilation and test results.
     pub tests: TestReport,
     /// Mutation testing, when it was run.
@@ -87,8 +100,32 @@ pub fn spec_sha256() -> String {
     sha256::hex(all.as_bytes())
 }
 
+fn library_inputs(names: &[String]) -> Result<Vec<LibraryInput>, String> {
+    let libs = rootplc_stdlib::compat::resolve(names)
+        .map_err(|name| format!("unknown compatibility library '{name}'"))?;
+    let mut out: Vec<LibraryInput> = libs
+        .iter()
+        .map(|l| {
+            let mut all = String::new();
+            for (file, text) in &l.files {
+                all.push_str(file);
+                all.push('\n');
+                all.push_str(text);
+            }
+            LibraryInput {
+                name: l.name.clone(),
+                version: l.version.clone(),
+                sha256: sha256::hex(all.as_bytes()),
+            }
+        })
+        .collect();
+    out.sort_by(|a, b| a.name.cmp(&b.name));
+    Ok(out)
+}
+
 /// Build the evidence pack for a project ([tests.evidence]).
 pub fn evidence(sources: Vec<(PathBuf, String)>, opts: &Options) -> Result<Evidence, String> {
+    let libraries = library_inputs(&opts.libraries)?;
     let inputs = sources
         .iter()
         .map(|(p, s)| Input {
@@ -135,6 +172,7 @@ pub fn evidence(sources: Vec<(PathBuf, String)>, opts: &Options) -> Result<Evide
     Ok(Evidence {
         spec_sha256: spec_sha256(),
         inputs,
+        libraries,
         tests,
         mutation,
         min_score: opts.min_score,
@@ -157,6 +195,18 @@ pub fn to_json(e: &Evidence) -> String {
                 json_string(&i.path),
                 i.bytes,
                 i.sha256
+            )
+        })
+        .collect();
+    let libraries: Vec<String> = e
+        .libraries
+        .iter()
+        .map(|l| {
+            format!(
+                "{{\"name\":{},\"version\":{},\"sha256\":\"{}\"}}",
+                json_string(&l.name),
+                json_string(&l.version),
+                l.sha256
             )
         })
         .collect();
@@ -213,6 +263,7 @@ pub fn to_json(e: &Evidence) -> String {
         "{{\"format\":\"{FORMAT}\",\
 \"tool\":{{\"name\":\"rootplc\",\"version\":\"{}\",\"spec_sha256\":\"{}\"}},\
 \"inputs\":[{}],\
+\"libraries\":[{}],\
 \"check\":{{\"compiled\":{},\"errors\":{},\"warnings\":{},\"iec_clean\":{}}},\
 \"tests\":{{\"passed\":{},\"failed\":{},\"items\":[{}]}},\
 \"mutation\":{mutation},\
@@ -222,6 +273,7 @@ pub fn to_json(e: &Evidence) -> String {
         env!("CARGO_PKG_VERSION"),
         e.spec_sha256,
         inputs.join(","),
+        libraries.join(","),
         c.ok(),
         c.count(Severity::Error),
         c.count(Severity::Warning),
@@ -259,6 +311,15 @@ pub fn to_markdown(e: &Evidence) -> String {
     s.push_str("## Inputs\n\n| File | Bytes | SHA-256 |\n|---|---:|---|\n");
     for i in &e.inputs {
         s.push_str(&format!("| {} | {} | `{}` |\n", i.path, i.bytes, i.sha256));
+    }
+    if !e.libraries.is_empty() {
+        s.push_str("\n## Libraries\n\n| Library | Version | SHA-256 |\n|---|---|---|\n");
+        for l in &e.libraries {
+            s.push_str(&format!(
+                "| {} | {} | `{}` |\n",
+                l.name, l.version, l.sha256
+            ));
+        }
     }
     let c = &e.tests.check;
     s.push_str(&format!(
@@ -349,6 +410,34 @@ mod tests {
         assert!(a.contains("\"iec_clean\":true"));
         assert!(a.contains("\"score\":1.0000"));
         assert!(a.contains("\"path\":\"src/latch.st\""));
+        assert!(a.contains("\"libraries\":[]"));
+    }
+
+    #[test]
+    fn pack_records_active_libraries() {
+        let src = vec![(
+            PathBuf::from("src/axis.st"),
+            "TEST power_on\nVAR ax : AXIS_REF; pw : MC_Power; END_VAR\n\
+             pw(Enable := TRUE, Axis := ax);\n\
+             ASSERT_TRUE(ax.State = MC_AXIS_STATE#Standstill);\nEND_TEST\n"
+                .to_string(),
+        )];
+        let opts = Options {
+            libraries: vec!["rootmotion".to_string()],
+            mutate: false,
+            ..Options::default()
+        };
+        let e = evidence(src, &opts).expect("pack");
+        assert!(e.verified(), "{:?}", e.reasons);
+        assert_eq!(e.libraries.len(), 1);
+        assert_eq!(e.libraries[0].name, "RootMotion");
+        assert_eq!(e.libraries[0].sha256.len(), 64);
+        let json = to_json(&e);
+        assert!(
+            json.contains("\"libraries\":[{\"name\":\"RootMotion\",\"version\":\"0.1.0\""),
+            "{json}"
+        );
+        assert!(to_markdown(&e).contains("## Libraries"));
     }
 
     #[test]

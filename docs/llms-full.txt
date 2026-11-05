@@ -150,7 +150,8 @@ Faults: `DIV_BY_ZERO`, `RANGE` (subrange), `INDEX` (array bounds),
 
 Writes the evidence pack an engineer reviews before approving a change
 ([tests.evidence]): the tool version and a SHA-256 of its rule set, every
-input file with its SHA-256, the check result (`iec_clean` when there is no
+input file with its SHA-256, the active bundled libraries (`--library`, for
+example RootMotion) with version and SHA-256, the check result (`iec_clean` when there is no
 error and no warning), each test, the mutation score with surviving changes,
 and a verdict. `verified` needs a compiling project, at least one TEST block,
 every test passing and, with `--min-score P`, a mutation score of at least `P`
@@ -168,6 +169,7 @@ $ rootplc evidence src tests --markdown      # a readable summary
 {"format":"rootplc-evidence/0.1",
  "tool":{"name":"rootplc","version":"0.0.1","spec_sha256":"..."},
  "inputs":[{"path":"src/latch.st","bytes":155,"sha256":"..."}],
+ "libraries":[],
  "check":{"compiled":true,"errors":0,"warnings":0,"iec_clean":true},
  "tests":{"passed":3,"failed":0,"items":[{"name":"latch","passed":true}]},
  "mutation":{"score":1.0000,"killed":3,"viable":3,"not_viable":0,"candidates":3,"run":3,"error":null,"survivors":[]},
