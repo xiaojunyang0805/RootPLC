@@ -28,6 +28,16 @@ real block; the adapter is ordinary checked code. Inputs or outputs the
 other block lacks are listed in the report and not used. Blocks with
 `VAR_IN_OUT` cannot be compared (exit code 2).
 
+**[diff.adapter]** Many real blocks keep their I/O as internal variables
+(mapped with `AT %I*` in the vendor tool), which an IEC adapter may not
+write (RP0203). A function block declared with the pragma
+`{attribute 'rootplc.adapter'}` directly before `FUNCTION_BLOCK` is a
+*white-box adapter*: in its body and its methods every variable of another
+block's instance can be read and written, as in a TEST block
+([tests.whitebox]), without RP0130. The declaration itself is warning
+RP0136: this is a RootPLC extension for `rootplc diff` and test harnesses,
+not portable, and never for code that runs a machine.
+
 **[diff.stimuli]** Before each cycle the virtual clock advances by
 `--cycle-ms`, then every driven input gets a value from a pseudo-random
 sequence that depends only on `--seed`, so a run can be repeated: a BOOL

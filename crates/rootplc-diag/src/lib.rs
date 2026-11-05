@@ -223,6 +223,7 @@ pub mod codes {
         VENDOR_LITERAL = 133, Warning;
         VENDOR_SYNTAX = 134, Warning;
         VENDOR_MEANING = 135, Warning;
+        WHITEBOX_ADAPTER = 136, Warning;
     }
 
     /// Severity of a code, if the code exists.

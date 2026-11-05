@@ -22,7 +22,7 @@ An argument of the wrong type is error RP0103 ([types.conversion.implicit]).
 be read and written through `instance.name`, not only its inputs and
 outputs. Tests can therefore check internal state. Outside TEST blocks
 internal variables can only be read, with warning RP0130
-([pous.call.local-read]).
+([pous.call.local-read]), except in a white-box adapter ([diff.adapter]).
 
 **[tests.runner]** `rootplc test` runs every TEST block once, on a fresh
 machine: variables start with their initial values, the virtual clock starts

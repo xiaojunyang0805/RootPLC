@@ -805,6 +805,7 @@ Codes RP00xx are lexical, RP01xx types, RP02xx names and structure, RP03xx synta
 | [RP0127](#rp0127) | warning | integer literal 0 or 1 used as BOOL, or 0 as a reference (not portable) |
 | [RP0128](#rp0128) | warning | duration field after the first out of its range, T#1h90m (not portable) |
 | [RP0129](#rp0129) | warning | enumeration value used as an integer, or an integer stored in an enumeration (not portable) |
+| [RP0136](#rp0136) | warning | white-box adapter: may read and write internal variables of other blocks (RootPLC extension, not portable) |
 | [RP0130](#rp0130) | warning | internal variable of a function block or program read from outside (not portable) |
 | [RP0131](#rp0131) | warning | POU closed by the end of the file instead of its END keyword (CODESYS object export; not portable) |
 
@@ -1662,6 +1663,22 @@ enumeration) may also be assigned to an enumeration variable and arithmetic
 on enumeration values gives a result of the base type; with the attribute
 these stay RP0103, except that a constant equal to one of the type's values
 may be assigned. The value is not checked against the enumeration's values.
+
+## RP0136
+
+warning: white-box adapter: may read and write internal variables of other blocks (RootPLC extension, not portable)
+
+Rule `diff.adapter` in `spec/16-diff.md`:
+
+**[diff.adapter]** Many real blocks keep their I/O as internal variables
+(mapped with `AT %I*` in the vendor tool), which an IEC adapter may not
+write (RP0203). A function block declared with the pragma
+`{attribute 'rootplc.adapter'}` directly before `FUNCTION_BLOCK` is a
+*white-box adapter*: in its body and its methods every variable of another
+block's instance can be read and written, as in a TEST block
+([tests.whitebox]), without RP0130. The declaration itself is warning
+RP0136: this is a RootPLC extension for `rootplc diff` and test harnesses,
+not portable, and never for code that runs a machine.
 
 ## RP0130
 
@@ -2788,7 +2805,7 @@ An argument of the wrong type is error RP0103 ([types.conversion.implicit]).
 be read and written through `instance.name`, not only its inputs and
 outputs. Tests can therefore check internal state. Outside TEST blocks
 internal variables can only be read, with warning RP0130
-([pous.call.local-read]).
+([pous.call.local-read]), except in a white-box adapter ([diff.adapter]).
 
 **[tests.runner]** `rootplc test` runs every TEST block once, on a fresh
 machine: variables start with their initial values, the virtual clock starts
@@ -3417,6 +3434,16 @@ small adapter function block that has the reference's names and calls the
 real block; the adapter is ordinary checked code. Inputs or outputs the
 other block lacks are listed in the report and not used. Blocks with
 `VAR_IN_OUT` cannot be compared (exit code 2).
+
+**[diff.adapter]** Many real blocks keep their I/O as internal variables
+(mapped with `AT %I*` in the vendor tool), which an IEC adapter may not
+write (RP0203). A function block declared with the pragma
+`{attribute 'rootplc.adapter'}` directly before `FUNCTION_BLOCK` is a
+*white-box adapter*: in its body and its methods every variable of another
+block's instance can be read and written, as in a TEST block
+([tests.whitebox]), without RP0130. The declaration itself is warning
+RP0136: this is a RootPLC extension for `rootplc diff` and test harnesses,
+not portable, and never for code that runs a machine.
 
 **[diff.stimuli]** Before each cycle the virtual clock advances by
 `--cycle-ms`, then every driven input gets a value from a pseudo-random

@@ -409,6 +409,13 @@ spec = "types.derived.enum.integer"
 stage = "sema"
 
 [[code]]
+id = "RP0136"
+severity = "warning"
+summary = "white-box adapter: may read and write internal variables of other blocks (RootPLC extension, not portable)"
+spec = "diff.adapter"
+stage = "sema"
+
+[[code]]
 id = "RP0130"
 severity = "warning"
 summary = "internal variable of a function block or program read from outside (not portable)"
