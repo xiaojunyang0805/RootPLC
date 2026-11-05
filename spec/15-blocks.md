@@ -33,7 +33,9 @@ start but does not stop a device that is already running. Both are inputs
 of the block; the logic that computes them belongs to the application.
 
 **[blocks.fault]** A fault latches: the block reports `Error` with a
-non-zero `ErrorID` and puts its outputs in the de-energised state. A rising
+non-zero `ErrorID` and puts its outputs in the safe state its card defines
+(for a device module: de-energised; for a measured value: a substitute
+value, such as the last valid one). A rising
 edge of `Reset` clears the fault; when the cause is still present, the
 fault is detected again. A block never clears its own fault. `ErrorID` 0
 means no error; the other values are listed in the block's card.
