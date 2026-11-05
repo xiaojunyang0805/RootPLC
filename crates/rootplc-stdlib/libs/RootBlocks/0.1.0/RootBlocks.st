@@ -156,3 +156,208 @@ IF NOT Error THEN
     Value := v;
 END_IF;
 END_FUNCTION_BLOCK
+
+(* F04.MOTOR.DOL: a motor started direct on line through one contactor,
+   with running feedback, an overload input and a restart delay.
+   ErrorID 1 no running feedback after a start, 2 running feedback without a
+   command (contactor stuck), 3 overload. Safe state: contactor off. *)
+FUNCTION_BLOCK RB_Motor
+VAR_INPUT
+    Mode         : RB_MODE := RB_MODE#Off;
+    AutoRun      : BOOL;
+    ManRun       : BOOL;
+    Interlock    : BOOL;              (* TRUE: stop now, in every mode *)
+    Permissive   : BOOL := TRUE;      (* FALSE: do not start *)
+    FbRunning    : BOOL;              (* contactor auxiliary contact *)
+    Overload     : BOOL;              (* TRUE: thermal overload tripped *)
+    Feedback     : BOOL := TRUE;      (* FALSE: no running feedback wired *)
+    FeedbackTime : TIME := T#2s;
+    RestartDelay : TIME := T#0s;      (* minimum time off before a start *)
+    Reset        : BOOL;
+END_VAR
+VAR_OUTPUT
+    Run     : BOOL;                   (* contactor output *)
+    Running : BOOL;
+    Error   : BOOL;
+    ErrorID : UDINT;
+    Status  : RB_DEVICE_STATUS;
+END_VAR
+VAR
+    resetEdge : R_TRIG;
+    want      : BOOL;
+    tOff      : TON;
+    tMismatch : TON;
+END_VAR
+resetEdge(CLK := Reset);
+IF resetEdge.Q THEN
+    Error := FALSE;
+    ErrorID := 0;
+END_IF;
+IF Overload AND NOT Error THEN
+    Error := TRUE;
+    ErrorID := UDINT#3;
+END_IF;
+CASE Mode OF
+RB_MODE#Auto:
+    want := AutoRun;
+RB_MODE#Manual:
+    want := ManRun;
+ELSE
+    want := FALSE;
+END_CASE;
+tOff(IN := NOT Run, PT := RestartDelay);
+IF want AND NOT Run AND (NOT Permissive OR NOT tOff.Q) THEN
+    want := FALSE;
+END_IF;
+IF Interlock OR Error THEN
+    want := FALSE;
+END_IF;
+IF want AND NOT Run THEN
+    Status.Starts := Status.Starts + 1;
+END_IF;
+Run := want;
+IF Feedback THEN
+    tMismatch(IN := Run XOR FbRunning, PT := FeedbackTime);
+    IF tMismatch.Q AND NOT Error THEN
+        Error := TRUE;
+        IF Run THEN
+            ErrorID := UDINT#1;
+        ELSE
+            ErrorID := UDINT#2;
+        END_IF;
+    END_IF;
+    Running := FbRunning;
+ELSE
+    tMismatch(IN := FALSE, PT := FeedbackTime);
+    Running := Run;
+END_IF;
+IF Error THEN
+    Run := FALSE;
+END_IF;
+(* the restart delay counts from the moment the contactor drops *)
+tOff(IN := NOT Run, PT := RestartDelay);
+Status.Mode := Mode;
+Status.Commanded := Run;
+Status.Active := Running;
+Status.Error := Error;
+Status.ErrorID := ErrorID;
+END_FUNCTION_BLOCK
+
+(* F04.MOTOR.REV: a reversing motor with two contactors (forward,
+   reverse), never both on, with a dead time between directions.
+   ErrorID 1 no feedback for the commanded direction, 2 feedback without a
+   command, 3 overload, 4 both feedback contacts on. Safe state: both
+   contactors off. *)
+FUNCTION_BLOCK RB_MotorReversing
+VAR_INPUT
+    Mode         : RB_MODE := RB_MODE#Off;
+    AutoFwd      : BOOL;
+    AutoRev      : BOOL;
+    ManFwd       : BOOL;
+    ManRev       : BOOL;
+    Interlock    : BOOL;
+    Permissive   : BOOL := TRUE;
+    FbFwd        : BOOL;
+    FbRev        : BOOL;
+    Overload     : BOOL;
+    Feedback     : BOOL := TRUE;
+    FeedbackTime : TIME := T#2s;
+    ReverseDelay : TIME := T#1s;      (* both contactors off at least this long between directions *)
+    Reset        : BOOL;
+END_VAR
+VAR_OUTPUT
+    RunFwd     : BOOL;
+    RunRev     : BOOL;
+    RunningFwd : BOOL;
+    RunningRev : BOOL;
+    Error      : BOOL;
+    ErrorID    : UDINT;
+    Status     : RB_DEVICE_STATUS;
+END_VAR
+VAR
+    resetEdge : R_TRIG;
+    f         : BOOL;
+    r         : BOOL;
+    tDead     : TON;
+    tFwd      : TON;
+    tRev      : TON;
+    tBoth     : TON;
+END_VAR
+resetEdge(CLK := Reset);
+IF resetEdge.Q THEN
+    Error := FALSE;
+    ErrorID := 0;
+END_IF;
+IF Overload AND NOT Error THEN
+    Error := TRUE;
+    ErrorID := UDINT#3;
+END_IF;
+CASE Mode OF
+RB_MODE#Auto:
+    f := AutoFwd;
+    r := AutoRev;
+RB_MODE#Manual:
+    f := ManFwd;
+    r := ManRev;
+ELSE
+    f := FALSE;
+    r := FALSE;
+END_CASE;
+(* both directions at once: stop *)
+IF f AND r THEN
+    f := FALSE;
+    r := FALSE;
+END_IF;
+tDead(IN := NOT RunFwd AND NOT RunRev, PT := ReverseDelay);
+IF f AND NOT RunFwd AND (NOT Permissive OR NOT tDead.Q) THEN
+    f := FALSE;
+END_IF;
+IF r AND NOT RunRev AND (NOT Permissive OR NOT tDead.Q) THEN
+    r := FALSE;
+END_IF;
+IF Interlock OR Error THEN
+    f := FALSE;
+    r := FALSE;
+END_IF;
+IF (f AND NOT RunFwd) OR (r AND NOT RunRev) THEN
+    Status.Starts := Status.Starts + 1;
+END_IF;
+RunFwd := f;
+RunRev := r;
+IF Feedback THEN
+    tBoth(IN := FbFwd AND FbRev, PT := FeedbackTime);
+    tFwd(IN := RunFwd XOR FbFwd, PT := FeedbackTime);
+    tRev(IN := RunRev XOR FbRev, PT := FeedbackTime);
+    IF NOT Error THEN
+        IF tBoth.Q THEN
+            Error := TRUE;
+            ErrorID := UDINT#4;
+        ELSIF (tFwd.Q AND RunFwd) OR (tRev.Q AND RunRev) THEN
+            Error := TRUE;
+            ErrorID := UDINT#1;
+        ELSIF tFwd.Q OR tRev.Q THEN
+            Error := TRUE;
+            ErrorID := UDINT#2;
+        END_IF;
+    END_IF;
+    RunningFwd := FbFwd AND NOT FbRev;
+    RunningRev := FbRev AND NOT FbFwd;
+ELSE
+    tBoth(IN := FALSE, PT := FeedbackTime);
+    tFwd(IN := FALSE, PT := FeedbackTime);
+    tRev(IN := FALSE, PT := FeedbackTime);
+    RunningFwd := RunFwd;
+    RunningRev := RunRev;
+END_IF;
+IF Error THEN
+    RunFwd := FALSE;
+    RunRev := FALSE;
+END_IF;
+(* the dead time counts from the moment both contactors are off *)
+tDead(IN := NOT RunFwd AND NOT RunRev, PT := ReverseDelay);
+Status.Mode := Mode;
+Status.Commanded := RunFwd OR RunRev;
+Status.Active := RunningFwd OR RunningRev;
+Status.Error := Error;
+Status.ErrorID := ErrorID;
+END_FUNCTION_BLOCK

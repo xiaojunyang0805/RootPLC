@@ -18,7 +18,7 @@ jobs and features exist, never copied. No block is a safety function.
 | F01 | Signal conditioning | [`RB_Scale`](cards/F01.SCALE.md) |
 | F02 | Discrete logic and interlocks | planned |
 | F03 | Timing, counting, scheduling | planned |
-| F04 | Device modules | [`RB_ValveOnOff`](cards/F04.VALVE.ONOFF.md) |
+| F04 | Device modules | [`RB_ValveOnOff`](cards/F04.VALVE.ONOFF.md), [`RB_Motor`](cards/F04.MOTOR.DOL.md), [`RB_MotorReversing`](cards/F04.MOTOR.REV.md) |
 | F05 | Sequencing | planned |
 | F06 | Closed-loop control | planned |
 | F07 | Motion | the RootMotion library (spec/13-motion.md) |

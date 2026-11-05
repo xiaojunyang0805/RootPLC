@@ -5,7 +5,7 @@
 name = "RootBlocks"
 vendor = "RootPLC"
 version = "0.1.0"
-description = "RootBlocks: RB_MODE, RB_DEVICE_STATUS, RB_ValveOnOff (F04 on/off valve with feedback), RB_Scale (F01 linear scaling with range supervision)"
+description = "RootBlocks: RB_MODE, RB_DEVICE_STATUS; F04 RB_ValveOnOff, RB_Motor, RB_MotorReversing; F01 RB_Scale"
 requires = []
 declare_only = []
 intrinsics = []
