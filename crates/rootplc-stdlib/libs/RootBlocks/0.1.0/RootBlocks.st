@@ -2279,3 +2279,271 @@ ELSE
     Out := Enable AND inWindow AND (SHR(Days, startDay - 1) AND BYTE#1) <> BYTE#0;
 END_IF;
 END_FUNCTION_BLOCK
+
+(* F06.CASCADE: cascade control from two RB_PID: the outer (primary) loop
+   sets the set point of the inner (secondary) loop, whose output drives
+   the actuator. Auto with Cascade: both loops in Auto. Auto without
+   Cascade: the inner loop on InnerSP. Manual: Out = ManValue. In Manual
+   and Off the inner set point tracks the inner PV, and whenever the outer
+   loop does not drive the inner set point its output tracks the inner PV,
+   so switching to Auto and to cascade is bumpless. Errors as RB_PID (ErrorID of the
+   inner loop, or 10 + that of the outer loop); Out = OutMin on an error. *)
+FUNCTION_BLOCK RB_Cascade
+VAR_INPUT
+    Mode       : RB_MODE := RB_MODE#Off;
+    Cascade    : BOOL := TRUE;        (* FALSE: inner loop alone on InnerSP *)
+    SP         : REAL;                (* primary set point *)
+    PV         : REAL;                (* primary process value *)
+    InnerSP    : REAL;                (* inner set point without cascade *)
+    InnerPV    : REAL;                (* secondary process value *)
+    KpOuter    : REAL := 1.0;
+    TiOuter    : TIME := T#0s;
+    KpInner    : REAL := 1.0;
+    TiInner    : TIME := T#0s;
+    InnerSPMin : REAL;                (* range of the inner set point *)
+    InnerSPMax : REAL := 100.0;
+    OutMin     : REAL;
+    OutMax     : REAL := 100.0;
+    ManValue   : REAL;
+    Reset      : BOOL;
+END_VAR
+VAR_OUTPUT
+    Out         : REAL;
+    InnerSPUsed : REAL;               (* the inner set point in use *)
+    InCascade   : BOOL;
+    Saturated   : BOOL;               (* the inner loop is at an output limit *)
+    Error       : BOOL;
+    ErrorID     : UDINT;
+END_VAR
+VAR
+    outer     : RB_PID;
+    inner     : RB_PID;
+    outerMode : RB_MODE;
+END_VAR
+InCascade := Mode = RB_MODE#Auto AND Cascade;
+IF InCascade THEN
+    outerMode := RB_MODE#Auto;
+ELSE
+    outerMode := RB_MODE#Manual;
+END_IF;
+outer(Mode := outerMode, SP := SP, PV := PV, Kp := KpOuter, Ti := TiOuter,
+      OutMin := InnerSPMin, OutMax := InnerSPMax, ManValue := InnerPV, Reset := Reset);
+IF InCascade THEN
+    InnerSPUsed := outer.Out;
+ELSIF Mode = RB_MODE#Auto THEN
+    InnerSPUsed := InnerSP;
+ELSE
+    InnerSPUsed := InnerPV;           (* set-point tracking in Manual and Off *)
+END_IF;
+inner(Mode := Mode, SP := InnerSPUsed, PV := InnerPV, Kp := KpInner, Ti := TiInner,
+      OutMin := OutMin, OutMax := OutMax, ManValue := ManValue, Reset := Reset);
+Out := inner.Out;
+Saturated := inner.Saturated;
+Error := inner.Error OR outer.Error;
+IF inner.Error THEN
+    ErrorID := inner.ErrorID;
+ELSIF outer.Error THEN
+    ErrorID := 10 + outer.ErrorID;
+ELSE
+    ErrorID := 0;
+END_IF;
+END_FUNCTION_BLOCK
+
+(* F04.GROUP: duty/standby for up to 4 identical units (pumps, fans,
+   compressors): runs Demand units, choosing the available ones with the
+   fewest run hours, starts at most one unit per StageDelay, replaces a
+   unit that becomes unavailable at once, and stops the one with the most
+   hours when demand falls. Shortfall when not enough units are
+   available. *)
+FUNCTION_BLOCK RB_DutyStandby
+VAR_INPUT
+    Demand     : INT;                 (* units wanted, 0 .. 4 *)
+    Available  : ARRAY[1..4] OF BOOL; (* healthy and in Auto *)
+    Hours      : ARRAY[1..4] OF REAL; (* run hours, e.g. RB_RunHours *)
+    Used       : INT := 4;            (* units fitted, 1 .. 4 *)
+    StageDelay : TIME := T#0s;        (* between two starts *)
+END_VAR
+VAR_OUTPUT
+    Run       : ARRAY[1..4] OF BOOL;  (* AutoRun of each unit *)
+    Running   : INT;
+    Shortfall : BOOL;
+END_VAR
+VAR
+    tStage  : TON;
+    k       : INT;
+    best    : INT;
+    lost    : BOOL;
+    want    : INT;
+    n       : INT;
+END_VAR
+n := LIMIT(1, Used, 4);
+want := LIMIT(0, Demand, n);
+(* a running unit that is no longer available stops; its replacement may
+   start at once *)
+lost := FALSE;
+Running := 0;
+FOR k := 1 TO 4 DO
+    IF Run[k] AND (k > n OR NOT Available[k]) THEN
+        Run[k] := FALSE;
+        lost := TRUE;
+    END_IF;
+    IF Run[k] THEN
+        Running := Running + 1;
+    END_IF;
+END_FOR;
+tStage(IN := TRUE, PT := StageDelay);
+IF Running < want AND (tStage.Q OR lost OR Running = 0) THEN
+    best := 0;
+    FOR k := 1 TO n DO
+        IF Available[k] AND NOT Run[k] THEN
+            IF best = 0 THEN
+                best := k;
+            ELSIF Hours[k] < Hours[best] THEN
+                best := k;
+            END_IF;
+        END_IF;
+    END_FOR;
+    IF best > 0 THEN
+        Run[best] := TRUE;
+        Running := Running + 1;
+        tStage(IN := FALSE, PT := StageDelay);
+        tStage(IN := TRUE, PT := StageDelay);
+    END_IF;
+END_IF;
+WHILE Running > want DO
+    best := 0;
+    FOR k := 1 TO n DO
+        IF Run[k] THEN
+            IF best = 0 THEN
+                best := k;
+            ELSIF Hours[k] > Hours[best] THEN
+                best := k;
+            END_IF;
+        END_IF;
+    END_FOR;
+    Run[best] := FALSE;
+    Running := Running - 1;
+END_WHILE;
+(* units that could still run *)
+best := 0;
+FOR k := 1 TO n DO
+    IF Available[k] THEN
+        best := best + 1;
+    END_IF;
+END_FOR;
+Shortfall := best < want;
+END_FUNCTION_BLOCK
+
+(* F09.TOTAL: a totaliser: integrates a rate (flow, power) over time to a
+   total (volume, energy), with a low-flow cut-off and a batch total with a
+   preset (dosing a quantity). Rate is in units per TimeBase (m3/h with
+   T#1h, kW -> kWh with T#1h, l/min with T#1m). *)
+FUNCTION_BLOCK RB_Totalizer
+VAR_INPUT
+    Rate       : REAL;
+    TimeBase   : TIME := T#1h;
+    LowCut     : REAL;                (* rates at or below this count as 0 *)
+    Hold       : BOOL;                (* TRUE: do not count *)
+    StartBatch : BOOL;                (* rising edge: batch total := 0 *)
+    Preset     : LREAL;               (* batch quantity; 0: none *)
+    Reset      : BOOL;                (* rising edge: total := 0 *)
+END_VAR
+VAR_OUTPUT
+    Total      : LREAL;
+    BatchTotal : LREAL;
+    BatchDone  : BOOL;                (* BatchTotal reached Preset *)
+    Counting   : BOOL;
+END_VAR
+VAR
+    cyc        : RB_CycleTime;
+    batchEdge  : R_TRIG;
+    resetEdge  : R_TRIG;
+    delta      : LREAL;
+    baseSec    : LREAL;
+END_VAR
+cyc();
+batchEdge(CLK := StartBatch);
+resetEdge(CLK := Reset);
+IF resetEdge.Q THEN
+    Total := 0.0;
+END_IF;
+IF batchEdge.Q THEN
+    BatchTotal := 0.0;
+END_IF;
+baseSec := TIME_TO_LREAL(TimeBase) / 1000.0;
+Counting := NOT Hold AND Rate > LowCut AND baseSec > 0.0;
+IF Counting THEN
+    delta := REAL_TO_LREAL(Rate) * cyc.Seconds / baseSec;
+    Total := Total + delta;
+    BatchTotal := BatchTotal + delta;
+END_IF;
+BatchDone := Preset > 0.0 AND BatchTotal >= Preset;
+END_FUNCTION_BLOCK
+
+(* F09.OEE: overall equipment effectiveness of a machine: availability
+   (running time / planned time), performance (ideal cycle time x parts /
+   running time) and quality (good parts / all parts), each 0 .. 1, and
+   their product. Counts from the rising edges of Good and Reject. *)
+FUNCTION_BLOCK RB_OEE
+VAR_INPUT
+    Planned    : BOOL;                (* planned production time *)
+    Running    : BOOL;                (* producing *)
+    Good       : BOOL;                (* rising edge: a good part *)
+    Reject     : BOOL;                (* rising edge: a rejected part *)
+    IdealCycle : TIME := T#1s;        (* ideal time per part *)
+    Reset      : BOOL;                (* rising edge: start a new period *)
+END_VAR
+VAR_OUTPUT
+    Availability : REAL;
+    Performance  : REAL;
+    Quality      : REAL;
+    OEE          : REAL;
+    PlannedTime  : LREAL;             (* s *)
+    RunTime      : LREAL;             (* s *)
+    GoodCount    : UDINT;
+    RejectCount  : UDINT;
+END_VAR
+VAR
+    cyc       : RB_CycleTime;
+    goodEdge  : R_TRIG;
+    rejEdge   : R_TRIG;
+    resetEdge : R_TRIG;
+    parts     : LREAL;
+END_VAR
+cyc();
+goodEdge(CLK := Good);
+rejEdge(CLK := Reject);
+resetEdge(CLK := Reset);
+IF resetEdge.Q THEN
+    PlannedTime := 0.0;
+    RunTime := 0.0;
+    GoodCount := 0;
+    RejectCount := 0;
+END_IF;
+IF Planned THEN
+    PlannedTime := PlannedTime + cyc.Seconds;
+    IF Running THEN
+        RunTime := RunTime + cyc.Seconds;
+    END_IF;
+END_IF;
+IF goodEdge.Q THEN
+    GoodCount := GoodCount + 1;
+END_IF;
+IF rejEdge.Q THEN
+    RejectCount := RejectCount + 1;
+END_IF;
+parts := UDINT_TO_LREAL(GoodCount + RejectCount);
+Availability := 0.0;
+Performance := 0.0;
+Quality := 0.0;
+IF PlannedTime > 0.0 THEN
+    Availability := LREAL_TO_REAL(RunTime / PlannedTime);
+END_IF;
+IF RunTime > 0.0 THEN
+    Performance := LREAL_TO_REAL(MIN(1.0, TIME_TO_LREAL(IdealCycle) / 1000.0 * parts / RunTime));
+END_IF;
+IF parts > 0.0 THEN
+    Quality := LREAL_TO_REAL(UDINT_TO_LREAL(GoodCount) / parts);
+END_IF;
+OEE := Availability * Performance * Quality;
+END_FUNCTION_BLOCK
