@@ -217,7 +217,11 @@ with the fault `UNSUPPORTED`.
 `DINT` expressions with l <= u, otherwise error RP0108. A constant index
 outside the bounds is error RP0109. A run-time index outside the bounds
 raises the fault `INDEX`. `ARRAY[*]` is allowed only for `VAR_IN_OUT`
-parameters.
+parameters. Only an array can be indexed; indexing anything else is error
+RP0103. CODESYS and TwinCAT also index strings (`s[i]`, the byte of
+character i counted from 0) and references ([types.reference]); RootPLC
+does not support these yet and reports them as RP0103, so code that uses
+them is not counted as clean.
 
 **[types.derived.string]** `STRING[n]` and `WSTRING[n]` with 1 <= n <= 65535
 (otherwise RP0108). The CODESYS and TwinCAT spelling `STRING(n)` means the
@@ -231,7 +235,9 @@ warning RP0110.
 reference. Dereferencing `NULL` raises the fault `NULL_REF`. CODESYS
 `POINTER TO T` is read as `REF_TO T` with warning RP0116, and `ADR(x)` as
 `REF(x)` with warning RP0117; pointer arithmetic is not supported (an
-arithmetic operator on a reference is RP0103). `POINTER TO` is not part of
+arithmetic operator on a reference is RP0103, and so is indexing one,
+`p[i]`, which CODESYS and TwinCAT read as the element i places after the
+target). `POINTER TO` is not part of
 the language.
 
 **[types.reference.alias]** CODESYS `REFERENCE TO T` declares an alias,

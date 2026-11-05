@@ -554,7 +554,11 @@ Rule `types.derived.array` in `spec/02-types.md`:
 `DINT` expressions with l <= u, otherwise error RP0108. A constant index
 outside the bounds is error RP0109. A run-time index outside the bounds
 raises the fault `INDEX`. `ARRAY[*]` is allowed only for `VAR_IN_OUT`
-parameters.
+parameters. Only an array can be indexed; indexing anything else is error
+RP0103. CODESYS and TwinCAT also index strings (`s[i]`, the byte of
+character i counted from 0) and references ([types.reference]); RootPLC
+does not support these yet and reports them as RP0103, so code that uses
+them is not counted as clean.
 
 ## RP0109
 
@@ -566,7 +570,11 @@ Rule `types.derived.array` in `spec/02-types.md`:
 `DINT` expressions with l <= u, otherwise error RP0108. A constant index
 outside the bounds is error RP0109. A run-time index outside the bounds
 raises the fault `INDEX`. `ARRAY[*]` is allowed only for `VAR_IN_OUT`
-parameters.
+parameters. Only an array can be indexed; indexing anything else is error
+RP0103. CODESYS and TwinCAT also index strings (`s[i]`, the byte of
+character i counted from 0) and references ([types.reference]); RootPLC
+does not support these yet and reports them as RP0103, so code that uses
+them is not counted as clean.
 
 ## RP0110
 
@@ -592,7 +600,9 @@ Rule `types.reference` in `spec/02-types.md`:
 reference. Dereferencing `NULL` raises the fault `NULL_REF`. CODESYS
 `POINTER TO T` is read as `REF_TO T` with warning RP0116, and `ADR(x)` as
 `REF(x)` with warning RP0117; pointer arithmetic is not supported (an
-arithmetic operator on a reference is RP0103). `POINTER TO` is not part of
+arithmetic operator on a reference is RP0103, and so is indexing one,
+`p[i]`, which CODESYS and TwinCAT read as the element i places after the
+target). `POINTER TO` is not part of
 the language.
 
 ## RP0117
@@ -606,7 +616,9 @@ Rule `types.reference` in `spec/02-types.md`:
 reference. Dereferencing `NULL` raises the fault `NULL_REF`. CODESYS
 `POINTER TO T` is read as `REF_TO T` with warning RP0116, and `ADR(x)` as
 `REF(x)` with warning RP0117; pointer arithmetic is not supported (an
-arithmetic operator on a reference is RP0103). `POINTER TO` is not part of
+arithmetic operator on a reference is RP0103, and so is indexing one,
+`p[i]`, which CODESYS and TwinCAT read as the element i places after the
+target). `POINTER TO` is not part of
 the language.
 
 ## RP0118
