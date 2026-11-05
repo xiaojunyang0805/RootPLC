@@ -17,16 +17,16 @@ jobs and features exist, never copied. No block is a safety function.
 |---|---|---|
 | F01 | Signal conditioning | [`RB_Scale`](cards/F01.SCALE.md), [`RB_FilterPT1`](cards/F01.FILTER.PT1.md), [`RB_MovingAverage`](cards/F01.AVERAGE.md), [`RB_Ramp`](cards/F01.RAMP.md), [`RB_Deadband`](cards/F01.DEADBAND.md), [`RB_Debounce`](cards/F01.DEBOUNCE.md) |
 | F02 | Discrete logic and interlocks | [`RB_StartStop`](cards/F02.STARTSTOP.md), [`RB_Permissives`](cards/F02.PERMISSIVES.md) |
-| F03 | Timing, counting, scheduling | [`RB_CycleTime`](cards/F03.CYCLETIME.md), [`RB_Counter`](cards/F03.COUNTER.md) |
-| F04 | Device modules | [`RB_ValveOnOff`](cards/F04.VALVE.ONOFF.md), [`RB_Motor`](cards/F04.MOTOR.DOL.md), [`RB_MotorReversing`](cards/F04.MOTOR.REV.md), [`RB_Cylinder`](cards/F04.CYLINDER.md), [`RB_Pump`](cards/F04.PUMP.md), [`RB_Drive`](cards/F04.DRIVE.md), [`RB_ValveAnalog`](cards/F04.VALVE.ANALOG.md), [`RB_MotorStarDelta`](cards/F04.MOTOR.STARDELTA.md) |
+| F03 | Timing, counting, scheduling | [`RB_CycleTime`](cards/F03.CYCLETIME.md), [`RB_Counter`](cards/F03.COUNTER.md), [`RB_Schedule`](cards/F03.SCHEDULE.md) |
+| F04 | Device modules | [`RB_ValveOnOff`](cards/F04.VALVE.ONOFF.md), [`RB_Motor`](cards/F04.MOTOR.DOL.md), [`RB_MotorReversing`](cards/F04.MOTOR.REV.md), [`RB_Cylinder`](cards/F04.CYLINDER.md), [`RB_Pump`](cards/F04.PUMP.md), [`RB_Drive`](cards/F04.DRIVE.md), [`RB_ValveAnalog`](cards/F04.VALVE.ANALOG.md), [`RB_MotorStarDelta`](cards/F04.MOTOR.STARDELTA.md), [`RB_MotorTwoSpeed`](cards/F04.MOTOR.2SPEED.md) |
 | F05 | Sequencing | [`RB_StepChain`](cards/F05.STEPS.md), [`RB_Phase`](cards/F05.PHASE.md) |
-| F06 | Closed-loop control | [`RB_PID`](cards/F06.PID.md), [`RB_OnOff`](cards/F06.ONOFF.md), [`RB_SplitRange`](cards/F06.SPLIT.md) |
+| F06 | Closed-loop control | [`RB_PID`](cards/F06.PID.md), [`RB_OnOff`](cards/F06.ONOFF.md), [`RB_SplitRange`](cards/F06.SPLIT.md), [`RB_Ratio`](cards/F06.RATIO.md) |
 | F07 | Motion | the RootMotion library (spec/13-motion.md) |
-| F08 | Alarms and events | [`RB_Alarm`](cards/F08.ALARM.md), [`RB_AlarmSummary`](cards/F08.ALARM.SUMMARY.md) |
+| F08 | Alarms and events | [`RB_Alarm`](cards/F08.ALARM.md), [`RB_AlarmSummary`](cards/F08.ALARM.SUMMARY.md), [`RB_AnalogLimits`](cards/F08.LIMITS.md) |
 | F09 | Supervision and diagnostics | [`RB_RunHours`](cards/F09.RUNHOURS.md), [`RB_Heartbeat`](cards/F09.HEARTBEAT.md) |
 | F10 | Machine modes and states | [`RB_ModeManager`](cards/F10.MODES.md), [`RB_MachineState`](cards/F10.STATE.md) |
 | F11 | Data handling and communication | [`RB_Fifo`](cards/F11.FIFO.md), [`RB_RecipeTable`](cards/F11.RECIPE.md), [`RB_Transfer`](cards/F11.TRANSFER.md) |
-| F12 | Material handling and process patterns | [`RB_ConveyorZone`](cards/F12.ZONE.md), [`RB_Diverter`](cards/F12.DIVERTER.md) |
+| F12 | Material handling and process patterns | [`RB_ConveyorZone`](cards/F12.ZONE.md), [`RB_Diverter`](cards/F12.DIVERTER.md), [`RB_Merge`](cards/F12.MERGE.md) |
 
 How often each family occurs in real code (classifier v1, aggregate only):
 [corpus/BLOCKS_REPORT.md](../corpus/BLOCKS_REPORT.md).

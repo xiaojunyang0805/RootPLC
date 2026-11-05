@@ -2031,3 +2031,251 @@ IF tMove.Q AND NOT Error THEN
 END_IF;
 HoldPart := Error OR (busy AND NOT passing AND NOT inPlace);
 END_FUNCTION_BLOCK
+
+(* F08.LIMITS: four limits on an analog value (high-high, high, low,
+   low-low) with hysteresis, the usual source of process alarms. A limit
+   becomes active beyond its value and clears Hysteresis back inside.
+   ErrorID 1 limits not in order (LL <= L < H <= HH) or negative hysteresis;
+   all outputs FALSE while the settings are wrong (the Error itself is the
+   alarm). *)
+FUNCTION_BLOCK RB_AnalogLimits
+VAR_INPUT
+    Value      : REAL;
+    HH         : REAL := 95.0;
+    H          : REAL := 85.0;
+    L          : REAL := 15.0;
+    LL         : REAL := 5.0;
+    Hysteresis : REAL := 1.0;
+    EnHH       : BOOL := TRUE;
+    EnH        : BOOL := TRUE;
+    EnL        : BOOL := TRUE;
+    EnLL       : BOOL := TRUE;
+END_VAR
+VAR_OUTPUT
+    HiHi    : BOOL;
+    Hi      : BOOL;
+    Lo      : BOOL;
+    LoLo    : BOOL;
+    Error   : BOOL;
+    ErrorID : UDINT;
+END_VAR
+Error := LL > L OR L >= H OR H > HH OR Hysteresis < 0.0;
+IF Error THEN
+    ErrorID := UDINT#1;
+    HiHi := FALSE;
+    Hi := FALSE;
+    Lo := FALSE;
+    LoLo := FALSE;
+ELSE
+    ErrorID := 0;
+    HiHi := EnHH AND (Value > HH OR (HiHi AND Value >= HH - Hysteresis));
+    Hi := EnH AND (Value > H OR (Hi AND Value >= H - Hysteresis));
+    Lo := EnL AND (Value < L OR (Lo AND Value <= L + Hysteresis));
+    LoLo := EnLL AND (Value < LL OR (LoLo AND Value <= LL + Hysteresis));
+END_IF;
+END_FUNCTION_BLOCK
+
+(* F06.RATIO: ratio control set point: SP = Ratio * Wild + Bias, limited to
+   SPMin .. SPMax (blending, burner air/fuel, dosing proportional to a
+   flow). ErrorID 1 SPMin > SPMax; SP is SPMin while the settings are
+   wrong. *)
+FUNCTION_BLOCK RB_Ratio
+VAR_INPUT
+    Wild  : REAL;                     (* the flow that is not controlled *)
+    Ratio : REAL := 1.0;
+    Bias  : REAL;
+    SPMin : REAL;
+    SPMax : REAL := 100.0;
+END_VAR
+VAR_OUTPUT
+    SP      : REAL;                   (* set point for the controlled flow *)
+    Limited : BOOL;                   (* SP is at a limit *)
+    Error   : BOOL;
+    ErrorID : UDINT;
+END_VAR
+VAR
+    raw : REAL;
+END_VAR
+Error := SPMin > SPMax;
+raw := Ratio * Wild + Bias;
+IF Error THEN
+    ErrorID := UDINT#1;
+    SP := SPMin;
+    Limited := TRUE;
+ELSE
+    ErrorID := 0;
+    SP := LIMIT(SPMin, raw, SPMax);
+    Limited := raw < SPMin OR raw > SPMax;
+END_IF;
+END_FUNCTION_BLOCK
+
+(* F04.MOTOR.2SPEED: a two-speed motor (two windings or Dahlander) with a
+   slow and a fast contactor, built on RB_Motor. The two are never on
+   together; a speed change switches both off for Changeover first. Faults
+   as RB_Motor, with FbRunning = either contactor's auxiliary contact.
+   Safe state: both contactors de-energised. *)
+FUNCTION_BLOCK RB_MotorTwoSpeed
+VAR_INPUT
+    Mode         : RB_MODE := RB_MODE#Off;
+    AutoRun      : BOOL;
+    AutoFast     : BOOL;              (* TRUE fast, FALSE slow *)
+    ManRun       : BOOL;
+    ManFast      : BOOL;
+    Interlock    : BOOL;
+    Permissive   : BOOL := TRUE;
+    FbSlow       : BOOL;
+    FbFast       : BOOL;
+    Overload     : BOOL;
+    Feedback     : BOOL := TRUE;
+    FeedbackTime : TIME := T#2s;
+    RestartDelay : TIME := T#0s;
+    Changeover   : TIME := T#500ms;   (* both off between speeds *)
+    Reset        : BOOL;
+END_VAR
+VAR_OUTPUT
+    Slow    : BOOL;                   (* slow contactor *)
+    Fast    : BOOL;                   (* fast contactor *)
+    Running : BOOL;
+    AtFast  : BOOL;                   (* running fast *)
+    Error   : BOOL;
+    ErrorID : UDINT;
+    Status  : RB_DEVICE_STATUS;
+END_VAR
+VAR
+    motor     : RB_Motor;
+    tGap      : TON;
+    wantFast  : BOOL;
+    sel       : BOOL;
+    switching : BOOL;
+END_VAR
+motor(Mode := Mode, AutoRun := AutoRun, ManRun := ManRun, Interlock := Interlock,
+      Permissive := Permissive, FbRunning := FbSlow OR FbFast, Overload := Overload,
+      Feedback := Feedback, FeedbackTime := FeedbackTime, RestartDelay := RestartDelay,
+      Reset := Reset);
+wantFast := (Mode = RB_MODE#Auto AND AutoFast) OR (Mode = RB_MODE#Manual AND ManFast);
+(* stopped, or starting from both off: take the requested speed at once *)
+IF NOT motor.Run OR (NOT Slow AND NOT Fast AND NOT switching) THEN
+    sel := wantFast;
+    switching := FALSE;
+ELSIF wantFast <> sel THEN
+    switching := TRUE;
+END_IF;
+tGap(IN := switching, PT := Changeover);
+IF tGap.Q THEN
+    sel := wantFast;
+    switching := FALSE;
+END_IF;
+Slow := motor.Run AND NOT switching AND NOT sel;
+Fast := motor.Run AND NOT switching AND sel;
+Running := motor.Running;
+AtFast := Fast AND Running;
+Error := motor.Error;
+ErrorID := motor.ErrorID;
+Status := motor.Status;
+END_FUNCTION_BLOCK
+
+(* F12.MERGE: two lanes merging into one. When the line downstream is
+   clear, one waiting lane is released until its part has passed the merge
+   eye; with both waiting the lanes alternate (or A has priority).
+   ErrorID 1 no part passed within Timeout; releases off until Reset (safe
+   state). *)
+FUNCTION_BLOCK RB_Merge
+VAR_INPUT
+    WaitingA  : BOOL;                 (* a part waits in lane A *)
+    WaitingB  : BOOL;
+    Clear     : BOOL;                 (* the line downstream can take a part *)
+    MergeEye  : BOOL;                 (* eye after the merge *)
+    PriorityA : BOOL;                 (* FALSE: alternate *)
+    Timeout   : TIME := T#10s;
+    Reset     : BOOL;
+END_VAR
+VAR_OUTPUT
+    ReleaseA : BOOL;
+    ReleaseB : BOOL;
+    FromA    : UDINT;
+    FromB    : UDINT;
+    Error    : BOOL;
+    ErrorID  : UDINT;
+END_VAR
+VAR
+    resetEdge : R_TRIG;
+    passed    : F_TRIG;
+    tRelease  : TON;
+    lane      : INT;                  (* 0 none, 1 A, 2 B *)
+    last      : INT;
+END_VAR
+resetEdge(CLK := Reset);
+IF resetEdge.Q THEN
+    Error := FALSE;
+    ErrorID := 0;
+    lane := 0;
+END_IF;
+passed(CLK := MergeEye);
+IF passed.Q AND lane <> 0 THEN
+    IF lane = 1 THEN
+        FromA := FromA + 1;
+    ELSE
+        FromB := FromB + 1;
+    END_IF;
+    last := lane;
+    lane := 0;
+END_IF;
+IF lane = 0 AND Clear AND NOT Error THEN
+    IF WaitingA AND (NOT WaitingB OR PriorityA OR last <> 1) THEN
+        lane := 1;
+    ELSIF WaitingB THEN
+        lane := 2;
+    END_IF;
+    (* each release gets its own Timeout *)
+    tRelease(IN := FALSE, PT := Timeout);
+END_IF;
+tRelease(IN := lane <> 0, PT := Timeout);
+IF tRelease.Q AND NOT Error THEN
+    Error := TRUE;
+    ErrorID := UDINT#1;
+    lane := 0;
+END_IF;
+ReleaseA := lane = 1;
+ReleaseB := lane = 2;
+END_FUNCTION_BLOCK
+
+(* F03.SCHEDULE: a weekly time switch: Out between OnTime and OffTime on
+   the selected days (a window past midnight belongs to the day it
+   started). The application supplies the time of day and the weekday from
+   its clock. ErrorID 1 Day outside 1 .. 7; Out FALSE. *)
+FUNCTION_BLOCK RB_Schedule
+VAR_INPUT
+    Now     : TOD;
+    Day     : INT := 1;               (* 1 Monday .. 7 Sunday *)
+    OnTime  : TOD := TOD#06:00:00;
+    OffTime : TOD := TOD#22:00:00;
+    Days    : BYTE := 16#7F;          (* bit d-1 set: day d selected *)
+    Enable  : BOOL := TRUE;
+END_VAR
+VAR_OUTPUT
+    Out     : BOOL;
+    Error   : BOOL;
+    ErrorID : UDINT;
+END_VAR
+VAR
+    startDay : INT;
+    inWindow : BOOL;
+END_VAR
+Error := Day < 1 OR Day > 7;
+startDay := Day;
+IF OnTime <= OffTime THEN
+    inWindow := Now >= OnTime AND Now < OffTime;
+ELSIF Now < OffTime THEN
+    inWindow := TRUE;                        (* after midnight *)
+    startDay := (Day + 5) MOD 7 + 1;         (* the day before *)
+ELSE
+    inWindow := Now >= OnTime;
+END_IF;
+IF Error THEN
+    ErrorID := UDINT#1;
+    Out := FALSE;
+ELSE
+    ErrorID := 0;
+    Out := Enable AND inWindow AND (SHR(Days, startDay - 1) AND BYTE#1) <> BYTE#0;
+END_IF;
+END_FUNCTION_BLOCK
