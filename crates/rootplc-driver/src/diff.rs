@@ -461,6 +461,8 @@ pub fn diff(check: &CheckReport, opt: &DiffOptions) -> Result<DiffReport, String
     let mut changes: Vec<(u64, String, String)> = Vec::new();
     for c in 1..=opt.cycles {
         vm.advance(cycle_ns);
+        // [diff.stimuli]: the task information as for rootplc run
+        vm.begin_cycle(cycle_ns, c - 1);
         for inp in &mut inputs {
             let change = rng.next() < opt.toggle;
             let pick = rng.next();

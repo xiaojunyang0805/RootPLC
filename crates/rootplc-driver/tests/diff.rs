@@ -162,6 +162,31 @@ END_FUNCTION_BLOCK";
 }
 
 #[test]
+fn the_task_information_is_filled() {
+    // a block that reads its task's cycle time (TwinCAT _TaskInfo)
+    let src = "
+FUNCTION_BLOCK FB_TaskRamp
+VAR_INPUT x : BOOL; END_VAR
+VAR_OUTPUT ms : UDINT; n : UDINT; END_VAR
+ms := _TaskInfo[1].CycleTime / 10000;
+n := _TaskInfo[1].CycleCount;
+END_FUNCTION_BLOCK
+FUNCTION_BLOCK FB_Fixed
+VAR_INPUT x : BOOL; END_VAR
+VAR_OUTPUT ms : UDINT; n : UDINT; END_VAR
+VAR c : UDINT; END_VAR
+ms := 20;
+n := c;
+c := c + 1;
+END_FUNCTION_BLOCK";
+    let check = inline(src, &["TwinCAT_BuiltIns"]);
+    let mut o = opts("FB_TaskRamp", "FB_Fixed");
+    o.cycle_ms = 20;
+    let r = diff(&check, &o).expect("diff");
+    assert_eq!(r.verdict, Verdict::Agree, "{}", render(&r));
+}
+
+#[test]
 fn enumeration_values_and_libraries() {
     let src = "
 FUNCTION_BLOCK FB_MyMotor
