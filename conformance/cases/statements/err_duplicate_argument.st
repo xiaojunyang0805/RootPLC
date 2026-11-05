@@ -2,7 +2,7 @@
    expect: error RP0302 *)
 FUNCTION_BLOCK FB_Lamp
 VAR_INPUT
-    on : BOOL;
+    lit : BOOL;
 END_VAR
 END_FUNCTION_BLOCK
 
@@ -10,5 +10,5 @@ PROGRAM P
 VAR
     lamp : FB_Lamp;
 END_VAR
-lamp(on := TRUE, ON := FALSE);
+lamp(lit := TRUE, LIT := FALSE);
 END_PROGRAM

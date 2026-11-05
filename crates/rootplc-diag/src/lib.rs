@@ -187,7 +187,7 @@ pub mod codes {
         MALFORMED_DIRECT_VARIABLE = 16, Error; REAL_WITHOUT_POINT = 17, Warning;
         SYNTAX_ERROR = 201, Error;
         MISSING_END = 202, Error; UNKNOWN_NAME = 203, Error; DUPLICATE_NAME = 204, Error; LOCATED_TYPE_MISMATCH = 205, Error;
-        MISSING_SEMICOLON = 301, Error;
+        MISSING_SEMICOLON = 301, Error; DUPLICATE_ARGUMENT = 302, Error;
         CONSTANT_OVERFLOW = 101, Error;
         LITERAL_OUT_OF_RANGE = 102, Error;
         IMPLICIT_CONVERSION = 103, Error;

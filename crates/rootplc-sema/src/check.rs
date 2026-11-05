@@ -4953,6 +4953,19 @@ impl<'a> Checker<'a> {
 
     fn call(&mut self, callee: &'a Node, list: &'a Node, span: Span) -> V {
         let args = self.args(list);
+        // [statements.call]: each parameter at most once (names without case)
+        let mut seen: Vec<String> = Vec::new();
+        for a in &args {
+            if let Some((n, _)) = a.name {
+                let key = self.text(n).to_ascii_lowercase();
+                if seen.contains(&key) {
+                    let msg = format!("'{}' is given twice in this call", self.text(n));
+                    self.diag(codes::DUPLICATE_ARGUMENT, msg, self.tok_span(n), None);
+                } else {
+                    seen.push(key);
+                }
+            }
+        }
         if callee.kind == N::MemberExpr {
             let its = self.items(callee);
             if let (Some(Item::Node(b)), Some(Item::Tok(m))) =
