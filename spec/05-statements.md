@@ -42,7 +42,8 @@ binding its value, `bExecute :=` (CODESYS and TwinCAT): the output is not
 read, the input keeps its value. A comma may follow the last argument. Both
 are warning RP0134 ([scope.vendor-forms]). A
 `REFERENCE TO T` parameter given a variable of type `T` refers to that
-variable.
+variable. Each parameter is given at most once in a call (names compare
+without case); binding the same parameter again is error RP0302.
 
 **[statements.if]** `IF c THEN … {ELSIF c THEN …} [ELSE …] END_IF`
 evaluates the conditions in order and runs the statements of the first branch

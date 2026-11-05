@@ -734,6 +734,7 @@ Codes RP00xx are lexical, RP01xx types, RP02xx names and structure, RP03xx synta
 | [RP0133](#rp0133) | warning | vendor literal form, not IEC 61131-3 (for example TOD#12:00 without seconds) |
 | [RP0134](#rp0134) | warning | vendor syntax form, not IEC 61131-3 (for example no ';' after END_IF) |
 | [RP0135](#rp0135) | warning | vendor meaning, not IEC 61131-3 (for example a constant expression as a repetition count) |
+| [RP0302](#rp0302) | error | the same parameter is given twice in one call |
 | [RP0301](#rp0301) | error | missing ';' at end of statement or declaration |
 | [RP0101](#rp0101) | error | overflow or division by zero in constant expression |
 | [RP0102](#rp0102) | error | literal out of range for its type |
@@ -1082,6 +1083,27 @@ are warning RP0133, vendor syntax forms RP0134 and vendor meanings RP0135,
 unless a more specific code is named at the rule (for example RP0122 for
 `E.V` or RP0126 for `DWORD + 1`). Vendor library names and operators come
 only from compatibility libraries activated out of band ([stdlib.compat]).
+
+## RP0302
+
+error: the same parameter is given twice in one call
+
+Rule `statements.call` in `spec/05-statements.md`:
+
+**[statements.call]** A call to a function or function-block instance as a
+statement. Arguments are positional, or named with `:=` (input) and `=>`
+(output):
+```
+call_stmt    = variable '(' [ argument { ',' argument } ] ')' ';'
+argument     = [ name ( ':=' | '=>' ) ] expression
+```
+An output binding may leave out the variable, `Done =>`, and an input
+binding its value, `bExecute :=` (CODESYS and TwinCAT): the output is not
+read, the input keeps its value. A comma may follow the last argument. Both
+are warning RP0134 ([scope.vendor-forms]). A
+`REFERENCE TO T` parameter given a variable of type `T` refers to that
+variable. Each parameter is given at most once in a call (names compare
+without case); binding the same parameter again is error RP0302.
 
 ## RP0301
 
@@ -2562,7 +2584,8 @@ binding its value, `bExecute :=` (CODESYS and TwinCAT): the output is not
 read, the input keeps its value. A comma may follow the last argument. Both
 are warning RP0134 ([scope.vendor-forms]). A
 `REFERENCE TO T` parameter given a variable of type `T` refers to that
-variable.
+variable. Each parameter is given at most once in a call (names compare
+without case); binding the same parameter again is error RP0302.
 
 **[statements.if]** `IF c THEN … {ELSIF c THEN …} [ELSE …] END_IF`
 evaluates the conditions in order and runs the statements of the first branch

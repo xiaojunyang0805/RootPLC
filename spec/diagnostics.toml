@@ -171,6 +171,13 @@ spec = "scope.vendor-forms"
 stage = "sema"
 
 [[code]]
+id = "RP0302"
+severity = "error"
+summary = "the same parameter is given twice in one call"
+spec = "statements.call"
+stage = "sema"
+
+[[code]]
 id = "RP0301"
 severity = "error"
 summary = "missing ';' at end of statement or declaration"
