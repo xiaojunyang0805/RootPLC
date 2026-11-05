@@ -37,6 +37,7 @@ with `rootplc`.
 rootplc init  [dir] [--name NAME] [--agent claude|gemini|qwen|cursor|codex|all]
 rootplc check <file.st|dir>... [--json]
 rootplc test  <file.st|dir>... [--filter TEXT] [--json]
+rootplc test  <file.st|dir>... --mutate [--mutate-limit N] [--min-score P] [--json]
 rootplc run   <file.st|dir>... [--program NAME] [--cycles N] [--cycle-ms MS] [--json]
 rootplc explain <code> [--json]
 rootplc examples [words...] [--show ID] [--json]
@@ -100,6 +101,31 @@ execution continues after a failed assertion. A run-time fault ends the test.
 ```json
 {"command":"test","ok":true,"compiled":true,"passed":1,"failed":0,"diagnostics":[],
  "tests":[{"name":"start_latches","passed":true,"failures":[],"fault":null}]}
+```
+
+### test --mutate
+
+Measures whether the tests check the code ([tests.mutation]). Each mutant
+changes one token in a statement (a comparison, `+`/`-`, `AND`/`OR`/`XOR`,
+`TRUE`/`FALSE`, a removed `NOT`, an integer `n` → `n+1`, a doubled
+duration). A mutant is killed when a test fails on it. The score is killed ÷
+viable mutants (mutants that do not compile are not counted). Needs every test
+passing first. Each surviving mutant is listed so a test can be added for it.
+`--mutate-limit N` caps the mutants (default 500); `--min-score P` makes the
+command fail below `P` percent, for CI. The MCP tool `rootplc_test` takes
+`"mutate": true` for the same report.
+
+```
+$ rootplc test src tests --mutate
+SURVIVED src/latch.st:8:31: 'AND' -> 'OR'
+mutation score 67%: 2 of 3 viable mutants killed (0 not viable)
+```
+
+```json
+{"command":"test","mutate":true,"ok":true,"error":null,
+ "baseline":{"compiled":true,"passed":1,"failed":0},"score":0.6667,"min_score":null,
+ "viable":3,"killed":2,"not_viable":0,"candidates":3,"run":3,
+ "survivors":[{"file":"src/latch.st","line":8,"column":31,"original":"AND","replacement":"OR"}]}
 ```
 
 ## run
@@ -2542,6 +2568,30 @@ every test; otherwise no mutant is run and the command reports why. Each
 surviving mutant is reported with its file, line, column, the original token
 and its replacement, so a test can be added for it. With `--min-score P`
 (0–100) the command fails when the score is below `P` percent.
+
+**[tests.evidence]** `rootplc evidence <file.st|dir>...` writes an *evidence
+pack*: one JSON document that records what was verified, so an engineer can
+review and sign off a change. Format `rootplc-evidence/0.1`, with:
+
+- `tool`: name and version, and `spec_sha256`, the SHA-256 of the rule set
+  compiled into the tool (the spec chapters and the diagnostic registry);
+- `inputs`: every source file with its path, size in bytes and SHA-256;
+- `check`: whether the project compiles, the number of errors and warnings,
+  and `iec_clean` (no error and no warning, [scope.vendor-forms]);
+- `tests`: each TEST block with its result ([tests.runner]);
+- `mutation`: the result of [tests.mutation] (score, killed, viable, each
+  survivor), unless `--no-mutate` is given;
+- `verdict`: `verified` when the project compiles, has at least one TEST
+  block, every test passes and, with `--min-score P`, the mutation score is
+  at least `P` percent; otherwise `not verified`, with `reasons`;
+- `signature`: `null`. A pack made by `rootplc` is never signed. A signing
+  service may add a signature that covers the pack with `signature` set to
+  `null`.
+
+The pack contains no time stamp, so the same inputs and the same tool give
+the same pack byte for byte. `--out FILE` writes the pack to a file instead
+of standard output; `--markdown` writes a readable summary instead of JSON.
+The command fails when the verdict is `not verified`.
 
 
 ======== Specification: spec/08-stdlib.md ========

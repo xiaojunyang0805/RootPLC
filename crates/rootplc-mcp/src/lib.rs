@@ -3,8 +3,8 @@
 //!
 //! Roadmap phase: 1 (stdio in Phase 0 as D1a; HTTP later). See `ARCHITECTURE.md`.
 //!
-//! Tools: `rootplc_check`, `rootplc_test`, `rootplc_run`, `rootplc_explain`,
-//! `rootplc_examples`, `rootplc_coverage`. All are read-only: they never
+//! Tools: `rootplc_check`, `rootplc_test`, `rootplc_run`, `rootplc_evidence`,
+//! `rootplc_explain`, `rootplc_examples`, `rootplc_coverage`. All are read-only: they never
 //! write files and never touch hardware. Results are the same JSON reports
 //! as `rootplc <command> --json`.
 //!
@@ -20,7 +20,7 @@ use std::path::PathBuf;
 use json::Json;
 
 /// Implementation status, reported by `rootplc mcp --version`.
-pub const STATUS: &str = "stdio MCP server: rootplc_check, rootplc_test, rootplc_run, \
+pub const STATUS: &str = "stdio MCP server: rootplc_check, rootplc_test, rootplc_run, rootplc_evidence, \
      rootplc_explain, rootplc_examples, rootplc_coverage; resources; prompts";
 
 /// Protocol versions this server speaks, newest first.
@@ -50,6 +50,7 @@ fn tools() -> String {
 {{"name":"rootplc_check","title":"Check Structured Text","description":"Lex, parse and type-check IEC 61131-3 Structured Text. Returns diagnostics with stable codes (RPnnnn), 1-based positions and fix hints. ok is true when there are no errors.","inputSchema":{{"type":"object","properties":{{{src}}}}},{ro}}},
 {{"name":"rootplc_test","title":"Run TEST blocks","description":"Compile the project and run every TEST ... END_TEST block in the deterministic VM. Assertions: ASSERT_TRUE, ASSERT_FALSE, ASSERT_EQ, ASSERT_NE. Tests may read every variable of an instance (white-box). Returns pass/fail per test with failure locations and run-time faults. With mutate: true, measures how good the tests are instead: every small change to the code (a flipped comparison, AND/OR, TRUE/FALSE, n to n+1, a doubled duration) must make a test fail; returns the mutation score and each surviving change, so you can add a test for it.","inputSchema":{{"type":"object","properties":{{{src},"filter":{{"type":"string","description":"Only tests whose name contains this text."}},"mutate":{{"type":"boolean","default":false,"description":"Run mutation testing (needs all tests passing first)."}},"mutate_limit":{{"type":"integer","minimum":1,"maximum":5000,"default":500}}}}}},{ro}}},
 {{"name":"rootplc_run","title":"Run a program","description":"Compile and run one PROGRAM for a number of PLC cycles in the VM (virtual clock), then return the value of every variable. Use it to inspect behaviour; use rootplc_test for pass/fail evidence.","inputSchema":{{"type":"object","properties":{{{src},"program":{{"type":"string","description":"PROGRAM to run; optional when there is only one."}},"cycles":{{"type":"integer","minimum":1,"maximum":1000000,"default":1}},"cycle_ms":{{"type":"integer","minimum":0,"default":10,"description":"Virtual time per cycle in milliseconds (timers use it)."}}}}}},{ro}}},
+{{"name":"rootplc_evidence","title":"Evidence pack for sign-off","description":"Build the evidence pack an engineer reviews before approving a change: input file hashes, check result (IEC clean or not), every test result, the mutation score with surviving changes, and a verdict (verified / not verified with reasons). Deterministic; never signed locally. Call it last, after rootplc_test passes.","inputSchema":{{"type":"object","properties":{{{src},"min_score":{{"type":"number","minimum":0,"maximum":100,"description":"Required mutation score in percent."}},"mutate":{{"type":"boolean","default":true}},"markdown":{{"type":"boolean","default":false,"description":"Return a readable summary instead of JSON."}}}}}},{ro}}},
 {{"name":"rootplc_explain","title":"Explain a diagnostic","description":"Explain a diagnostic code such as RP0103: severity, summary and the text of the spec rule that defines it.","inputSchema":{{"type":"object","properties":{{"code":{{"type":"string","description":"Diagnostic code, e.g. RP0103 or 103."}}}},"required":["code"]}},{ro}}},
 {{"name":"rootplc_examples","title":"Find verified ST patterns","description":"Search a library of Structured Text patterns (edge detection, timers, counters, state machines, interlocks, arrays, structs, test blocks). Every example compiles and passes its TEST blocks in this toolchain version. Adapt them; do not copy names blindly.","inputSchema":{{"type":"object","properties":{{"query":{{"type":"string","description":"Keywords, e.g. 'timer' or 'state machine'. Empty lists every example."}},"id":{{"type":"string","description":"Return this one example, e.g. 'edge-detect'."}}}}}},{ro}}},
 {{"name":"rootplc_coverage","title":"Coverage of a code base","description":"Check every file and classify it: portable (compiles; can be tested now), dialect (uses vendor or IEC ed.3 OOP constructs RootPLC does not support yet; lists them with lines), dependent (fails only because a file it uses fails) or blocked (other errors). Use it before porting or testing existing PLC code.","inputSchema":{{"type":"object","properties":{{{src}}}}},{ro}}}
@@ -159,6 +160,21 @@ fn call_tool(name: &str, args: &Json) -> String {
             }
             Err(e) => fail("test", &e),
         },
+        "rootplc_evidence" => {
+            let opts = rootplc_driver::evidence::Options {
+                libraries: libraries(args),
+                mutate: args.get("mutate").and_then(Json::as_bool) != Some(false),
+                min_score: args.get("min_score").and_then(Json::as_f64),
+                ..rootplc_driver::evidence::Options::default()
+            };
+            match sources(args).and_then(|s| rootplc_driver::evidence::evidence(s, &opts)) {
+                Ok(e) if args.get("markdown").and_then(Json::as_bool) == Some(true) => {
+                    tool_result(&rootplc_driver::evidence::to_markdown(&e), false)
+                }
+                Ok(e) => tool_result(&rootplc_driver::evidence::to_json(&e), false),
+                Err(e) => fail("evidence", &e),
+            }
+        }
         "rootplc_run" => match sources(args).and_then(|s| checked(s, args)) {
             Ok(c) => {
                 let program = args.get("program").and_then(Json::as_str);
@@ -498,7 +514,7 @@ mod tests {
             .and_then(|x| x.get("tools"))
             .and_then(Json::as_array)
             .expect("tools");
-        assert_eq!(tools.len(), 6);
+        assert_eq!(tools.len(), 7);
         assert_eq!(r.get("id").and_then(Json::as_str), Some("a"));
         let r = call(r#"{"jsonrpc":"2.0","id":2,"method":"nope"}"#);
         assert!(r.get("error").is_some());

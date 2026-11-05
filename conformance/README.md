@@ -18,6 +18,7 @@ The file starts with a header comment that states the expected outcome:
 | `run:` | no | Program to execute in the VM and number of cycles |
 | `assert:` | no | Final value of a variable after the run (repeatable) |
 | `mutate:` | no | Expected mutation-testing counts, e.g. `killed=2 viable=3` ([tests.mutation]) |
+| `evidence:` | no | Expected evidence-pack verdict: `verified` or `not verified` ([tests.evidence]) |
 
 The header is an ordinary block comment, so it must not contain `(*` or
 `*)`; comments do not nest ([lexical.comment.nesting]).

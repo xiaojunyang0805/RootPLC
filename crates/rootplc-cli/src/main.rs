@@ -12,6 +12,7 @@ const USAGE: &str = "usage:
   rootplc test  <file.st|dir>... [--filter TEXT] [--json]
   rootplc test  <file.st|dir>... --mutate [--mutate-limit N] [--min-score P] [--json]   (mutation score of the tests)
   rootplc run   <file.st|dir>... [--program NAME] [--cycles N] [--cycle-ms MS] [--json]
+  rootplc evidence <file.st|dir>... [--out FILE] [--markdown] [--no-mutate] [--min-score P]   (evidence pack for sign-off)
   rootplc explain <code> [--json]
   rootplc examples [words...] [--show ID] [--json]   (verified ST patterns)
   rootplc coverage <file.st|dir>... [--json]
@@ -40,9 +41,9 @@ impl Args {
         while let Some(x) = it.next() {
             match x.as_str() {
                 "--json" => a.json = true,
-                "--mutate" => a.options.push((x, String::new())),
+                "--mutate" | "--markdown" | "--no-mutate" => a.options.push((x, String::new())),
                 "--program" | "--cycles" | "--cycle-ms" | "--filter" | "--name" | "--show"
-                | "--agent" | "--library" | "--mutate-limit" | "--min-score" => {
+                | "--agent" | "--library" | "--mutate-limit" | "--min-score" | "--out" => {
                     let v = it.next().unwrap_or_default();
                     a.options.push((x, v));
                 }
@@ -121,6 +122,50 @@ fn cmd_check(paths: &[PathBuf], args: &Args) -> ExitCode {
         );
     }
     exit(r.ok())
+}
+
+fn cmd_evidence(paths: &[PathBuf], args: &Args) -> ExitCode {
+    let sources = match rootplc_driver::read_sources(paths) {
+        Ok(s) => s,
+        Err(e) => return io_error("evidence", &e, false),
+    };
+    let opts = rootplc_driver::evidence::Options {
+        libraries: args.all("--library"),
+        mutate: args.opt("--no-mutate").is_none(),
+        mutate_limit: args
+            .opt("--mutate-limit")
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(rootplc_driver::mutate::DEFAULT_LIMIT),
+        min_score: args.opt("--min-score").and_then(|v| v.parse().ok()),
+    };
+    let e = match rootplc_driver::evidence::evidence(sources, &opts) {
+        Ok(e) => e,
+        Err(msg) => return io_error("evidence", &msg, false),
+    };
+    let text = if args.opt("--markdown").is_some() {
+        rootplc_driver::evidence::to_markdown(&e)
+    } else {
+        rootplc_driver::evidence::to_json(&e)
+            + "
+"
+    };
+    match args.opt("--out") {
+        Some(path) => {
+            if let Err(err) = std::fs::write(path, text) {
+                return io_error("evidence", &format!("{path}: {err}"), false);
+            }
+            eprintln!(
+                "wrote {path}: {}",
+                if e.verified() {
+                    "verified".to_string()
+                } else {
+                    format!("not verified ({})", e.reasons.join("; "))
+                }
+            );
+        }
+        None => print!("{text}"),
+    }
+    exit(e.verified())
 }
 
 fn cmd_mutate(paths: &[PathBuf], filter: Option<&str>, args: &Args) -> ExitCode {
@@ -463,7 +508,7 @@ fn main() -> ExitCode {
     let paths: Vec<PathBuf> = rest.iter().map(PathBuf::from).collect();
     if matches!(
         cmd,
-        Some(Command::Check | Command::Test | Command::Run | Command::Coverage)
+        Some(Command::Check | Command::Test | Command::Run | Command::Coverage | Command::Evidence)
     ) && paths.is_empty()
     {
         eprintln!("rootplc {first}: give one or more .st files or directories\n\n{USAGE}");
@@ -478,6 +523,7 @@ fn main() -> ExitCode {
         Some(Command::Init) => cmd_init(rest.first(), args.opt("--name"), args.opt("--agent")),
         Some(Command::Examples) => cmd_examples(rest, &args),
         Some(Command::Coverage) => cmd_coverage(&paths, &args),
+        Some(Command::Evidence) => cmd_evidence(&paths, &args),
         Some(cmd) => {
             if args.json {
                 println!("{}", json::error(cmd.name(), "not implemented yet"));

@@ -3,9 +3,11 @@
 Every host runs the same stdio server: `rootplc mcp`. Install `rootplc` first
 (see the README), then add the server to your host. Restart the host afterwards.
 
-The server offers six read-only tools: `rootplc_check`, `rootplc_test`,
-`rootplc_run`, `rootplc_explain`, `rootplc_examples` (verified ST patterns)
-and `rootplc_coverage` (portable / dialect / dependent / blocked per file).
+The server offers seven read-only tools: `rootplc_check`, `rootplc_test`
+(with `mutate: true` for the mutation score), `rootplc_run`,
+`rootplc_evidence` (the evidence pack for sign-off), `rootplc_explain`,
+`rootplc_examples` (verified ST patterns) and `rootplc_coverage` (portable /
+dialect / dependent / blocked per file).
 They never write files or touch hardware. It also serves the agent guide, the
 spec chapters, the diagnostic registry and the examples as resources, and the
 prompts `write_and_verify`, `fix_diagnostics` and `port_legacy`.

@@ -106,6 +106,64 @@ fn mutation_counts_match() {
     );
 }
 
+/// Cases with an `evidence:` line: the evidence pack gives that verdict, is
+/// unsigned and is the same on a second run ([tests.evidence]).
+#[test]
+fn evidence_verdicts_match() {
+    let root = rc::repo_root();
+    let mut problems = Vec::new();
+    let cases = rc::load_cases(&root).unwrap_or_default();
+    assert!(
+        cases.iter().any(|c| c.evidence.is_some()),
+        "no evidence: case found"
+    );
+    for c in cases {
+        let Some(want) = &c.evidence else { continue };
+        let opts = rootplc_driver::evidence::Options {
+            libraries: c.libraries.clone(),
+            ..rootplc_driver::evidence::Options::default()
+        };
+        let build =
+            || rootplc_driver::evidence::evidence(vec![(c.path.clone(), c.source.clone())], &opts);
+        match (build(), build()) {
+            (Ok(a), Ok(b)) => {
+                let (ja, jb) = (
+                    rootplc_driver::evidence::to_json(&a),
+                    rootplc_driver::evidence::to_json(&b),
+                );
+                let got = if a.verified() {
+                    "verified"
+                } else {
+                    "not verified"
+                };
+                if got != want {
+                    problems.push(format!(
+                        "{}: evidence: want '{want}', got '{got}' {:?}",
+                        c.path.display(),
+                        a.reasons
+                    ));
+                }
+                if ja != jb || !ja.contains("\"signature\":null") {
+                    problems.push(format!(
+                        "{}: pack not deterministic or not unsigned",
+                        c.path.display()
+                    ));
+                }
+            }
+            (Err(e), _) | (_, Err(e)) => problems.push(format!("{}: {e}", c.path.display())),
+        }
+    }
+    assert!(
+        problems.is_empty(),
+        "evidence stage:
+{}",
+        problems.join(
+            "
+"
+        )
+    );
+}
+
 #[test]
 fn example_tests_pass() {
     assert_clean("example tests", rc::test_examples(&rc::repo_root()));

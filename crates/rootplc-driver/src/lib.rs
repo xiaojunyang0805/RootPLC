@@ -5,11 +5,13 @@
 pub mod agents;
 pub mod coverage;
 pub mod docs;
+pub mod evidence;
 pub mod examples;
 pub mod explain;
 pub mod init;
 pub mod json;
 pub mod mutate;
+pub mod sha256;
 
 use std::path::PathBuf;
 
@@ -30,6 +32,8 @@ pub enum Command {
     Sim,
     /// Formal verification with CBMC.
     Verify,
+    /// Write the evidence pack for sign-off.
+    Evidence,
     /// Explain a diagnostic code.
     Explain,
     /// Search the verified pattern library.
@@ -58,6 +62,7 @@ impl Command {
         Command::Run,
         Command::Sim,
         Command::Verify,
+        Command::Evidence,
         Command::Explain,
         Command::Examples,
         Command::Coverage,
@@ -78,6 +83,7 @@ impl Command {
             Command::Run => "run",
             Command::Sim => "sim",
             Command::Verify => "verify",
+            Command::Evidence => "evidence",
             Command::Explain => "explain",
             Command::Examples => "examples",
             Command::Coverage => "coverage",

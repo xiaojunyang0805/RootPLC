@@ -37,6 +37,9 @@ pub struct Case {
     /// Optional `mutate:` line: expected mutation counts ([tests.mutation]),
     /// e.g. `killed=3 viable=3`.
     pub mutate: Option<String>,
+    /// Optional `evidence:` line: the expected verdict of the evidence pack
+    /// ([tests.evidence]), `verified` or `not verified`.
+    pub evidence: Option<String>,
     /// Full source text.
     pub source: String,
 }
@@ -76,6 +79,7 @@ pub fn parse_case(path: &Path, source: &str) -> Result<Case, String> {
     let (mut spec, mut expect, mut run, mut asserts) = (Vec::new(), None, None, Vec::new());
     let mut libraries = Vec::new();
     let mut mutate = None;
+    let mut evidence = None;
     for line in header.lines().map(str::trim).filter(|l| !l.is_empty()) {
         let (key, value) = line
             .split_once(':')
@@ -105,6 +109,7 @@ pub fn parse_case(path: &Path, source: &str) -> Result<Case, String> {
             "run" => run = Some(value.to_string()),
             "assert" => asserts.push(value.to_string()),
             "mutate" => mutate = Some(value.to_string()),
+            "evidence" => evidence = Some(value.to_string()),
             "libraries" => libraries.extend(
                 value
                     .split([',', ' '])
@@ -128,6 +133,7 @@ pub fn parse_case(path: &Path, source: &str) -> Result<Case, String> {
         asserts,
         libraries,
         mutate,
+        evidence,
         source: source.to_string(),
     })
 }
