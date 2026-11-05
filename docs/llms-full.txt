@@ -3469,7 +3469,8 @@ RP0136: this is a RootPLC extension for `rootplc diff` and test harnesses,
 not portable, and never for code that runs a machine.
 
 **[diff.stimuli]** Before each cycle the virtual clock advances by
-`--cycle-ms`, then every driven input gets a value from a pseudo-random
+`--cycle-ms` and the task information is filled as for `rootplc run`
+([stdlib.compat.taskinfo]: cycle time, cycle count, first cycle), then every driven input gets a value from a pseudo-random
 sequence that depends only on `--seed`, so a run can be repeated: a BOOL
 input changes with probability `--toggle`; an integer or REAL input takes,
 with the same probability, a new value spread evenly over its range
