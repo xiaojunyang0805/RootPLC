@@ -137,7 +137,9 @@ def evaluate(task: Task, host: dict, mode: str, timeout: int, mutate: bool) -> d
         if mutate and g.compiled and own_tests:
             m = mutation_score(st_files(ws / "src"), own_tests)
             mut = {"viable": m.viable, "killed": m.killed, "score": round(m.score, 4)}
-        picked = any(mk in transcript for mk in PICK_MARKERS)
+        # In mode "without" rootplc is not on PATH, so it cannot be used; a
+        # marker there is only the task prompt quoted back (e.g. "`rootplc check`").
+        picked = mode == "with" and any(mk in transcript for mk in PICK_MARKERS)
         return {
             "task": task.id, "host": host["name"], "mode": mode, "seconds": round(seconds, 1),
             "exit_code": code, "picked_rootplc": picked, "own_test_files": len(own_tests),
