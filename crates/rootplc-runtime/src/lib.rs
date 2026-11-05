@@ -267,6 +267,82 @@ pub struct Report {
     pub vars: Vec<VarValue>,
 }
 
+/// Where a source of new programs is asked, once a second at a cycle
+/// boundary ([runtime.deploy]).
+pub trait Updates<P> {
+    /// An approved program to run from the next cycle, if any.
+    fn poll(&mut self) -> Option<P>;
+    /// The outcome of the last program returned by `poll`: the RETAIN
+    /// variables carried over, or why it was rejected.
+    fn outcome(&mut self, result: Result<Vec<String>, String>);
+}
+
+/// No updates: the program never changes.
+pub struct NoUpdates;
+
+impl<P> Updates<P> for NoUpdates {
+    fn poll(&mut self) -> Option<P> {
+        None
+    }
+    fn outcome(&mut self, _: Result<Vec<String>, String>) {}
+}
+
+/// Bindings of one program.
+struct Bound {
+    bindings: Vec<Binding>,
+    retained: Vec<usize>,
+    notes: Vec<String>,
+}
+
+/// Bind the located variables of `program` (growing the image as needed)
+/// and list its elementary RETAIN variables ([runtime.image.type]).
+fn bind<P: Program>(program: &P, image: &mut Image) -> Result<Bound, String> {
+    let mut bindings = Vec::new();
+    let mut problems = Vec::new();
+    for (i, v) in program.vars().iter().enumerate() {
+        let Some(at) = &v.at else { continue };
+        match Address::parse(at) {
+            Ok(addr) if fits(v.kind, addr.size) => {
+                let area = image.area_mut(addr.area);
+                let end = addr.byte + addr.size.bytes();
+                if area.len() < end {
+                    area.resize(end, 0);
+                }
+                bindings.push(Binding {
+                    var: i,
+                    addr,
+                    kind: v.kind,
+                });
+            }
+            Ok(addr) => problems.push(format!(
+                "{} AT {addr}: type {} does not fit the address",
+                v.name, v.type_name
+            )),
+            Err(e) => problems.push(format!("{}: {e}", v.name)),
+        }
+    }
+    if !problems.is_empty() {
+        return Err(format!("cannot run: {}", problems.join("; ")));
+    }
+    let mut notes = Vec::new();
+    let mut retained = Vec::new();
+    for (i, v) in program.vars().iter().enumerate().filter(|(_, v)| v.retain) {
+        if v.kind == Kind::Other {
+            notes.push(format!(
+                "{} ({}) is RETAIN but not elementary; it keeps its initial value",
+                v.name, v.type_name
+            ));
+        } else {
+            retained.push(i);
+        }
+    }
+    Ok(Bound {
+        bindings,
+        retained,
+        notes,
+    })
+}
+
 /// A located variable bound to its place.
 #[derive(Debug, Clone, Copy)]
 struct Binding {
@@ -297,62 +373,60 @@ impl<P: Program, D: IoDriver, C: Clock> Runtime<P, D, C> {
     /// Bind the located variables and restore RETAIN variables. Fails, naming
     /// the variables, when an address is not runnable ([runtime.image.type]).
     pub fn new(program: P, io: D, clock: C, config: Config) -> Result<Self, String> {
-        let mut bindings = Vec::new();
-        let mut problems = Vec::new();
         let mut image = Image::default();
-        for (i, v) in program.vars().iter().enumerate() {
-            let Some(at) = &v.at else { continue };
-            match Address::parse(at) {
-                Ok(addr) if fits(v.kind, addr.size) => {
-                    let area = image.area_mut(addr.area);
-                    let end = addr.byte + addr.size.bytes();
-                    if area.len() < end {
-                        area.resize(end, 0);
-                    }
-                    bindings.push(Binding {
-                        var: i,
-                        addr,
-                        kind: v.kind,
-                    });
-                }
-                Ok(addr) => problems.push(format!(
-                    "{} AT {addr}: type {} does not fit the address",
-                    v.name, v.type_name
-                )),
-                Err(e) => problems.push(format!("{}: {e}", v.name)),
-            }
-        }
-        if !problems.is_empty() {
-            return Err(format!("cannot run: {}", problems.join("; ")));
-        }
-        let mut notes = Vec::new();
-        let mut retained = Vec::new();
-        for (i, v) in program.vars().iter().enumerate().filter(|(_, v)| v.retain) {
-            if v.kind == Kind::Other {
-                notes.push(format!(
-                    "{} ({}) is RETAIN but not elementary; it keeps its initial value",
-                    v.name, v.type_name
-                ));
-            } else {
-                retained.push(i);
-            }
-        }
+        let b = bind(&program, &mut image)?;
         let mut rt = Runtime {
             program,
             io,
             clock,
             config,
             image: Arc::new(Mutex::new(image)),
-            bindings,
+            bindings: b.bindings,
             at_start: Vec::new(),
-            retained,
-            notes,
+            retained: b.retained,
+            notes: b.notes,
             state: State::Running,
             stats: Stats::default(),
             last_save_ns: 0,
         };
         rt.restore();
         Ok(rt)
+    }
+
+    /// [runtime.deploy]: replace the program at a cycle boundary. Binds the
+    /// new program, carries over RETAIN variables with the same name and
+    /// type, and keeps the image. On an error the running program stays.
+    /// Returns the names of the variables carried over.
+    pub fn replace(&mut self, program: P) -> Result<Vec<String>, String> {
+        let image = Arc::clone(&self.image);
+        let mut img = image.lock().unwrap_or_else(|e| e.into_inner());
+        let mut grown = img.clone();
+        let b = bind(&program, &mut grown)?;
+        let mut new = program;
+        let mut carried = Vec::new();
+        for &old in &self.retained {
+            let o = &self.program.vars()[old];
+            let Some(v) = self.program.read(old) else {
+                continue;
+            };
+            let hit = b.retained.iter().copied().find(|&i| {
+                let n = &new.vars()[i];
+                n.name.eq_ignore_ascii_case(&o.name)
+                    && n.type_name.eq_ignore_ascii_case(&o.type_name)
+            });
+            if let Some(i) = hit {
+                if new.write(i, v) {
+                    carried.push(o.name.clone());
+                }
+            }
+        }
+        *img = grown;
+        self.program = new;
+        self.bindings = b.bindings;
+        self.retained = b.retained;
+        self.at_start.clear();
+        self.notes.extend(b.notes);
+        Ok(carried)
     }
 
     /// Add a note to the report (for example where a server listens).
@@ -372,6 +446,12 @@ impl<P: Program, D: IoDriver, C: Clock> Runtime<P, D, C> {
 
     /// Run until `stop` is set, the requested cycles are done, or a fault.
     pub fn run(&mut self, stop: &AtomicBool) -> Report {
+        self.run_with(stop, &mut NoUpdates)
+    }
+
+    /// [`Runtime::run`], asking `updates` for an approved program once a
+    /// second at a cycle boundary ([runtime.deploy]).
+    pub fn run_with(&mut self, stop: &AtomicBool, updates: &mut dyn Updates<P>) -> Report {
         let mut planned = self.clock.now_ns();
         let mut last_start: Option<u64> = None;
         while self.state == State::Running {
@@ -422,6 +502,10 @@ impl<P: Program, D: IoDriver, C: Clock> Runtime<P, D, C> {
             }
             if now.saturating_sub(self.last_save_ns) >= 1_000_000_000 {
                 self.last_save_ns = now;
+                if let Some(p) = updates.poll() {
+                    let r = self.replace(p);
+                    updates.outcome(r);
+                }
                 self.save();
                 self.write_status();
             }
@@ -871,5 +955,37 @@ mod tests {
             err.contains("level AT %IX0.1") && err.contains("out:"),
             "{err}"
         );
+    }
+
+    struct OneSwap(Option<Toy>, Vec<Result<Vec<String>, String>>);
+    impl Updates<Toy> for OneSwap {
+        fn poll(&mut self) -> Option<Toy> {
+            self.0.take()
+        }
+        fn outcome(&mut self, r: Result<Vec<String>, String>) {
+            self.1.push(r);
+        }
+    }
+
+    #[test]
+    fn an_approved_program_replaces_the_running_one_keeping_retain() {
+        let mut cfg = Config::with_period_ms(500);
+        cfg.cycles = Some(6);
+        let mut r = rt(Toy::new(None), 1_000, cfg);
+        let mut next = Toy::new(None);
+        next.vals[2] = Scalar::UInt(1000); // ignored: count comes from the old program
+        let mut up = OneSwap(Some(next), Vec::new());
+        let rep = r.run_with(&AtomicBool::new(false), &mut up);
+        assert_eq!(up.1, vec![Ok(vec!["count".to_string()])]);
+        // swapped after the 2nd cycle (1 s); 6 cycles counted across both programs
+        assert!(
+            rep.vars.iter().any(|v| v.name == "count" && v.value == "6"),
+            "{rep:?}"
+        );
+        // a program that cannot bind is rejected and the old one keeps running
+        let mut bad = Toy::new(None);
+        bad.vars[3].at = Some("%IX0.1".into());
+        assert!(r.replace(bad).is_err());
+        assert_eq!(r.program().vars[3].at.as_deref(), Some("%IW2"));
     }
 }

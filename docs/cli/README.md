@@ -7,7 +7,9 @@ rootplc test  <file.st|dir>... [--filter TEXT] [--json]
 rootplc test  <file.st|dir>... --mutate [--mutate-limit N] [--min-score P] [--json]
 rootplc run   <file.st|dir>... [--program NAME] [--cycles N] [--cycle-ms MS] [--json]
 rootplc runtime <file.st|dir>... [--program NAME] [--cycle-ms MS] [--cycles N] [--watchdog-ms MS]
-                [--retain FILE] [--status FILE] [--modbus [ADDR:]PORT] [--json]
+                [--retain FILE] [--status FILE] [--modbus [ADDR:]PORT] [--deploy DIR] [--json]
+rootplc deploy <file.st|dir>... --to DIR [--program NAME]
+rootplc approve DIR [--rollback]
 rootplc evidence <file.st|dir>... [--out FILE] [--markdown] [--no-mutate] [--min-score P]
 rootplc explain <code> [--json]
 rootplc examples [words...] [--show ID] [--json]
@@ -142,8 +144,38 @@ development; it is not certified and has no fieldbus yet.
  "variables":[{"name":"lamp","type":"BOOL","at":"%QX0.0","value":"FALSE"}]}
 ```
 
+`--deploy DIR` lets approved programs replace the running one (see
+`deploy` below).
+
 `state` is `running`, `stopped` or `fault` (with `fault` naming the fault
 and its place). The exit code is 1 after a fault.
+
+## deploy and approve
+
+A running program changes only with a person's approval
+([runtime.deploy]):
+
+1. `rootplc deploy src tests --to DIR` checks the project and runs its
+   tests. Only when it compiles and every test passes does it write a
+   request to `DIR/pending/<code>`: the sources and a manifest with their
+   SHA-256. The code is the first eight hex digits of the hash. Nothing
+   runs yet.
+2. At the runtime machine a person runs `rootplc approve DIR`: it lists the
+   pending requests and asks for the code, typed at a terminal. It refuses
+   when standard input is not a terminal, so an agent cannot approve its
+   own deployment.
+3. Within a second the runtime (started with `--deploy DIR`) checks the
+   hashes, compiles the program and swaps it in at a cycle boundary.
+   RETAIN variables with the same name and type keep their values; other
+   variables start from their initial values. A request that does not
+   match, compile or bind is rejected and the old program keeps running.
+4. `DIR/audit.log` records every request, approval, swap and rejection
+   (UTC time, event, code, user).
+
+`rootplc approve DIR --rollback` turns the replaced program into a new
+request, approved the same way. Version 0 relies on the SHA-256 and local
+approval; signed artifacts and authenticated remote approval follow in
+runtime v1. The MCP server has no deploy or approve tool.
 
 ## evidence
 

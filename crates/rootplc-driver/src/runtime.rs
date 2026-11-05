@@ -198,18 +198,51 @@ impl Program for VmProgram<'_> {
     }
 }
 
-/// Run runtime v0 on a compiled project until `stop`, the requested cycles
-/// or a fault ([runtime.cycle]).
+/// What `rootplc runtime` runs and serves.
+#[derive(Debug, Clone)]
+pub struct RunOptions<'a> {
+    /// PROGRAM to run (`None`: the only one).
+    pub program: Option<&'a str>,
+    /// Period, watchdog, cycles and files.
+    pub config: Config,
+    /// Modbus TCP address, [runtime.modbus].
+    pub modbus: Option<&'a str>,
+    /// Deploy directory and the libraries deployed programs use,
+    /// [runtime.deploy].
+    pub deploy: Option<(&'a std::path::Path, &'a [String])>,
+}
+
+impl RunOptions<'_> {
+    /// Run the only PROGRAM with `config`, nothing served.
+    pub fn new(config: Config) -> Self {
+        RunOptions {
+            program: None,
+            config,
+            modbus: None,
+            deploy: None,
+        }
+    }
+}
+
+/// Run runtime v0 on a compiled project ([runtime.cycle]).
 pub fn run_runtime<D: IoDriver, C: Clock>(
     check: &CheckReport,
-    program: Option<&str>,
-    config: Config,
+    opts: RunOptions<'_>,
     io: D,
     clock: C,
-    modbus: Option<&str>,
     stop: &AtomicBool,
 ) -> Result<Report, String> {
-    let p = VmProgram::new(check, program, i128::from(config.period_ns))?;
+    let RunOptions {
+        program,
+        config,
+        modbus,
+        deploy,
+    } = opts;
+    // The VM borrows the compiled program while it runs; with deploy, later
+    // programs live as long, so the runtime holds them for the whole run.
+    let check: &'static CheckReport = Box::leak(Box::new(check.clone()));
+    let period = i128::from(config.period_ns);
+    let p = VmProgram::new(check, program, period)?;
     let mut rt = Runtime::new(p, io, clock, config)?;
     if let Some(addr) = modbus {
         // runtime v0 has no I/O driver yet, so Modbus may set the inputs
@@ -217,6 +250,17 @@ pub fn run_runtime<D: IoDriver, C: Clock>(
             .map_err(|e| format!("--modbus {addr}: {e}"))?;
         rt.note(format!("Modbus TCP server on {bound} ([runtime.modbus])"));
         eprintln!("rootplc runtime: Modbus TCP server on {bound}");
+    }
+    if let Some((dir, libraries)) = deploy {
+        std::fs::create_dir_all(dir).map_err(|e| format!("--deploy {}: {e}", dir.display()))?;
+        let cur = crate::deploy::record_current(dir, check, program, libraries)?;
+        rt.note(format!(
+            "deploy directory {} (running {}); approved programs are swapped in ([runtime.deploy])",
+            dir.display(),
+            cur.code
+        ));
+        let mut w = crate::deploy::Watcher::new(dir, period);
+        return Ok(rt.run_with(stop, &mut w));
     }
     Ok(rt.run(stop))
 }
@@ -292,11 +336,9 @@ END_PROGRAM
         cfg.cycles = Some(5);
         let rep = run_runtime(
             &c,
-            None,
-            cfg,
+            RunOptions::new(cfg),
             NoIo,
             SystemClock::default(),
-            None,
             &AtomicBool::new(false),
         )
         .expect("runs");

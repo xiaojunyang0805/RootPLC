@@ -4,6 +4,7 @@
 
 pub mod agents;
 pub mod coverage;
+pub mod deploy;
 pub mod docs;
 pub mod evidence;
 pub mod examples;
@@ -49,6 +50,8 @@ pub enum Command {
     Import,
     /// Deploy to a runtime. Always requires human approval.
     Deploy,
+    /// Approve a deploy request at the runtime (a person at a terminal).
+    Approve,
     /// Read live values from a runtime.
     Monitor,
     /// Record a variable trace from a runtime.
@@ -73,6 +76,7 @@ impl Command {
         Command::Libraries,
         Command::Import,
         Command::Deploy,
+        Command::Approve,
         Command::Monitor,
         Command::Trace,
     ];
@@ -95,6 +99,7 @@ impl Command {
             Command::Libraries => "libraries",
             Command::Import => "import",
             Command::Deploy => "deploy",
+            Command::Approve => "approve",
             Command::Monitor => "monitor",
             Command::Trace => "trace",
         }
@@ -107,7 +112,7 @@ impl Command {
 
     /// Commands that act on real hardware and need human approval.
     pub fn needs_approval(self) -> bool {
-        matches!(self, Command::Deploy)
+        matches!(self, Command::Deploy | Command::Approve)
     }
 }
 

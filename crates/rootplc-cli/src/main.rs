@@ -13,7 +13,9 @@ const USAGE: &str = "usage:
   rootplc test  <file.st|dir>... --mutate [--mutate-limit N] [--min-score P] [--json]   (mutation score of the tests)
   rootplc run   <file.st|dir>... [--program NAME] [--cycles N] [--cycle-ms MS] [--json]
   rootplc runtime <file.st|dir>... [--program NAME] [--cycle-ms MS] [--cycles N] [--watchdog-ms MS]
-                [--retain FILE] [--status FILE] [--modbus [ADDR:]PORT] [--json]   (runtime v0: until Ctrl-C)
+                [--retain FILE] [--status FILE] [--modbus [ADDR:]PORT] [--deploy DIR] [--json]   (runtime v0)
+  rootplc deploy <file.st|dir>... --to DIR [--program NAME]   (request; runs only after approval)
+  rootplc approve DIR [--rollback]          (a person approves at the runtime's terminal)
   rootplc evidence <file.st|dir>... [--out FILE] [--markdown] [--no-mutate] [--min-score P]   (evidence pack for sign-off)
   rootplc explain <code> [--json]
   rootplc examples [words...] [--show ID] [--json]   (verified ST patterns)
@@ -43,10 +45,12 @@ impl Args {
         while let Some(x) = it.next() {
             match x.as_str() {
                 "--json" => a.json = true,
-                "--mutate" | "--markdown" | "--no-mutate" => a.options.push((x, String::new())),
+                "--mutate" | "--markdown" | "--no-mutate" | "--rollback" => {
+                    a.options.push((x, String::new()))
+                }
                 "--program" | "--cycles" | "--cycle-ms" | "--filter" | "--name" | "--show"
                 | "--agent" | "--library" | "--mutate-limit" | "--min-score" | "--out"
-                | "--watchdog-ms" | "--retain" | "--status" | "--modbus" => {
+                | "--watchdog-ms" | "--retain" | "--status" | "--modbus" | "--deploy" | "--to" => {
                     let v = it.next().unwrap_or_default();
                     a.options.push((x, v));
                 }
@@ -329,6 +333,8 @@ fn cmd_runtime(paths: &[PathBuf], args: &Args) -> ExitCode {
         print_diagnostics(&check);
         return ExitCode::from(1);
     }
+    let deploy_dir = args.opt("--deploy").map(PathBuf::from);
+    let libraries = library_list(args);
     let stop = ffi::stop_on_interrupt();
     if !args.json && config.cycles.is_none() {
         eprintln!(
@@ -336,13 +342,17 @@ fn cmd_runtime(paths: &[PathBuf], args: &Args) -> ExitCode {
             config.period_ns / 1_000_000
         );
     }
+    let opts = rootplc_driver::runtime::RunOptions {
+        program: args.opt("--program"),
+        config,
+        modbus: args.opt("--modbus"),
+        deploy: deploy_dir.as_deref().map(|d| (d, libraries.as_slice())),
+    };
     let report = match rootplc_driver::runtime::run_runtime(
         &check,
-        args.opt("--program"),
-        config,
+        opts,
         NoIo,
         SystemClock::default(),
-        args.opt("--modbus"),
         stop,
     ) {
         Ok(r) => r,
@@ -354,6 +364,112 @@ fn cmd_runtime(paths: &[PathBuf], args: &Args) -> ExitCode {
         print!("{}", to_text(&report));
     }
     exit(!matches!(report.state, State::Fault(_)))
+}
+
+/// The `--library` names, split at commas.
+fn library_list(args: &Args) -> Vec<String> {
+    args.all("--library")
+        .iter()
+        .flat_map(|l| l.split(','))
+        .map(|l| l.trim().to_string())
+        .filter(|l| !l.is_empty())
+        .collect()
+}
+
+fn cmd_deploy(paths: &[PathBuf], args: &Args) -> ExitCode {
+    let Some(dir) = args.opt("--to").map(PathBuf::from) else {
+        return io_error(
+            "deploy",
+            "give the runtime's deploy directory with --to DIR",
+            args.json,
+        );
+    };
+    let check = match load("deploy", paths, args) {
+        Ok(c) => c,
+        Err(code) => return code,
+    };
+    print_diagnostics(&check);
+    let tests = rootplc_driver::test_report(check, None);
+    let libraries = library_list(args);
+    match rootplc_driver::deploy::make_request(&dir, &tests, args.opt("--program"), &libraries) {
+        Ok(r) => {
+            println!(
+                "deploy request {} written to {}: {} file(s), {} test(s) passed.",
+                r.code,
+                dir.display(),
+                r.files.len(),
+                r.tests.0
+            );
+            println!(
+                "Nothing runs until a person approves it at the runtime: rootplc approve {}",
+                dir.display()
+            );
+            ExitCode::SUCCESS
+        }
+        Err(e) => io_error("deploy", &e, args.json),
+    }
+}
+
+fn cmd_approve(dir: Option<&String>, args: &Args) -> ExitCode {
+    use rootplc_driver::deploy;
+    use std::io::{BufRead, IsTerminal};
+    let Some(dir) = dir.map(PathBuf::from) else {
+        return io_error("approve", "give the runtime's deploy directory", false);
+    };
+    // [runtime.deploy]: a person approves at a terminal; an agent running
+    // commands without one cannot approve its own deployment
+    if !std::io::stdin().is_terminal() {
+        return io_error(
+            "approve",
+            "approval needs a person at a terminal; standard input is not a terminal",
+            false,
+        );
+    }
+    if args.opt("--rollback").is_some() {
+        if let Err(e) = deploy::rollback_request(&dir) {
+            return io_error("approve", &e, false);
+        }
+    }
+    let pending = deploy::list(&dir, "pending");
+    if pending.is_empty() {
+        println!("no pending deploy requests in {}", dir.display());
+        return ExitCode::SUCCESS;
+    }
+    for r in &pending {
+        let program = if r.program.is_empty() {
+            "(the only PROGRAM)"
+        } else {
+            r.program.as_str()
+        };
+        println!(
+            "request {}  program {program}  tests passed {}",
+            r.code, r.tests.0
+        );
+        for (n, h) in &r.files {
+            println!("    {n}  sha256 {}", &h[..16]);
+        }
+        if let Err(e) = deploy::verify(r) {
+            println!("    WARNING: {e}");
+        }
+    }
+    println!("Type the code of the request to approve (Enter cancels):");
+    let mut line = String::new();
+    let _ = std::io::stdin().lock().read_line(&mut line);
+    let code = line.trim();
+    if code.is_empty() {
+        println!("nothing approved");
+        return ExitCode::SUCCESS;
+    }
+    match deploy::approve(&dir, code) {
+        Ok(r) => {
+            println!(
+                "approved {}; the runtime swaps it in within a second (see audit.log)",
+                r.code
+            );
+            ExitCode::SUCCESS
+        }
+        Err(e) => io_error("approve", &e, false),
+    }
 }
 
 fn cmd_explain(code: Option<&String>, json_out: bool) -> ExitCode {
@@ -566,6 +682,7 @@ fn main() -> ExitCode {
                 | Command::Test
                 | Command::Run
                 | Command::Runtime
+                | Command::Deploy
                 | Command::Coverage
                 | Command::Evidence
         )
@@ -580,6 +697,8 @@ fn main() -> ExitCode {
         Some(Command::Libraries) => cmd_libraries(args.json),
         Some(Command::Run) => cmd_run(&paths, &args),
         Some(Command::Runtime) => cmd_runtime(&paths, &args),
+        Some(Command::Deploy) => cmd_deploy(&paths, &args),
+        Some(Command::Approve) => cmd_approve(rest.first(), &args),
         Some(Command::Explain) => cmd_explain(rest.first(), args.json),
         Some(Command::Init) => cmd_init(rest.first(), args.opt("--name"), args.opt("--agent")),
         Some(Command::Examples) => cmd_examples(rest, &args),
