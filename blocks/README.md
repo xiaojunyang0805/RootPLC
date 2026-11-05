@@ -35,7 +35,18 @@ How often each family occurs in real code (classifier v1, aggregate only):
 
 L1 elementary functions, L2 device modules, L3 equipment functions (several
 devices doing one process job), L4 machine templates (a whole machine from
-L1–L3 blocks). Templates follow once the first families are complete.
+L1–L3 blocks).
+
+## Templates
+
+| Template | Blocks combined |
+|---|---|
+| [Filling station](templates/filling-station/README.md) | mode manager, machine state, scaling, filter, on/off level control, valve, alarm, debounce, step chain, pump, counter |
+
+A template has its logic as a function block, an I/O map (`io_map.st`) for
+`rootplc runtime`, and tests against a simulated plant; `cargo test` checks
+that it compiles cleanly, its tests pass and they kill at least 70% of the
+mutants of its logic.
 
 ## Adding a block
 

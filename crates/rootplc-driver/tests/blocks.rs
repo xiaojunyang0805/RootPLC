@@ -102,3 +102,64 @@ fn block_tests_kill_at_least_90_percent_of_mutants() {
         score * 100.0
     );
 }
+
+/// L4 templates (blocks/templates/<name>/): they compile with RootBlocks
+/// (warnings only in their test files), their tests pass, and the tests
+/// kill at least 70% of the mutants of the template's logic (the I/O map
+/// `io_map.st` is wiring and is checked on the runtime instead).
+#[test]
+fn templates_compile_pass_and_are_mutation_tested() {
+    let Ok(dirs) = std::fs::read_dir(repo().join("blocks/templates")) else {
+        return;
+    };
+    let libs = vec!["RootBlocks".to_string()];
+    let mut seen = 0;
+    for d in dirs.flatten().filter(|d| d.path().is_dir()) {
+        seen += 1;
+        let name = d.file_name().to_string_lossy().to_string();
+        let all = rootplc_driver::read_sources(&[d.path()]).expect("template sources");
+        let is_test = |p: &std::path::Path| p.components().any(|c| c.as_os_str() == "tests");
+        let check = rootplc_driver::check_sources_with(all.clone(), &libs).expect("check");
+        assert!(check.ok(), "{name}: does not compile");
+        for f in check
+            .files
+            .iter()
+            .filter(|f| !f.library && !is_test(&f.path))
+        {
+            assert!(
+                f.diagnostics.is_empty(),
+                "{name}: {} has diagnostics",
+                f.path.display()
+            );
+        }
+        let report = rootplc_driver::test_report(check, None);
+        assert!(
+            !report.outcomes.is_empty() && report.ok(),
+            "{name}: tests fail"
+        );
+        let logic: Vec<_> = all
+            .into_iter()
+            .filter(|(p, _)| p.file_name().is_none_or(|n| n != "io_map.st"))
+            .collect();
+        let m = rootplc_driver::mutate::mutation_report(logic, &libs, None, 1000).expect("mutate");
+        let mine: Vec<_> = m
+            .mutants
+            .iter()
+            .filter(|(mu, _)| !is_test(&mu.path))
+            .collect();
+        let viable = mine
+            .iter()
+            .filter(|(_, o)| *o != rootplc_driver::mutate::Outcome::NotViable)
+            .count();
+        let killed = mine
+            .iter()
+            .filter(|(_, o)| *o == rootplc_driver::mutate::Outcome::Killed)
+            .count();
+        eprintln!("template {name}: {killed} of {viable} mutants killed");
+        assert!(
+            viable > 0 && killed * 10 >= viable * 7,
+            "{name}: {killed} of {viable}"
+        );
+    }
+    assert!(seen > 0, "no templates found");
+}
