@@ -48,7 +48,7 @@ fn tools() -> String {
     format!(
         r#"{{"tools":[
 {{"name":"rootplc_check","title":"Check Structured Text","description":"Lex, parse and type-check IEC 61131-3 Structured Text. Returns diagnostics with stable codes (RPnnnn), 1-based positions and fix hints. ok is true when there are no errors.","inputSchema":{{"type":"object","properties":{{{src}}}}},{ro}}},
-{{"name":"rootplc_test","title":"Run TEST blocks","description":"Compile the project and run every TEST ... END_TEST block in the deterministic VM. Assertions: ASSERT_TRUE, ASSERT_FALSE, ASSERT_EQ, ASSERT_NE. Tests may read every variable of an instance (white-box). Returns pass/fail per test with failure locations and run-time faults. With mutate: true, measures how good the tests are instead: every small change to the code (a flipped comparison, AND/OR, TRUE/FALSE, n to n+1, a doubled duration) must make a test fail; returns the mutation score and each surviving change, so you can add a test for it.","inputSchema":{{"type":"object","properties":{{{src},"filter":{{"type":"string","description":"Only tests whose name contains this text."}},"mutate":{{"type":"boolean","default":false,"description":"Run mutation testing (needs all tests passing first)."}},"mutate_limit":{{"type":"integer","minimum":1,"maximum":5000,"default":500}},"mutate_only":{{"type":"string","description":"Mutate only files whose path contains this text; tests and other files still run."}}}}}},{ro}}},
+{{"name":"rootplc_test","title":"Run TEST blocks","description":"Compile the project and run every TEST ... END_TEST block in the deterministic VM. Assertions: ASSERT_TRUE, ASSERT_FALSE, ASSERT_EQ, ASSERT_NE. Tests may read every variable of an instance (white-box). Returns pass/fail per test with failure locations and run-time faults. With mutate: true, measures how good the tests are instead: every small change to the code (a flipped comparison, AND/OR, TRUE/FALSE, n to n+1, a doubled duration) must make a test fail; returns the mutation score and each surviving change, so you can add a test for it.","inputSchema":{{"type":"object","properties":{{{src},"filter":{{"type":"string","description":"Only tests whose name contains this text."}},"mutate":{{"type":"boolean","default":false,"description":"Run mutation testing (needs all tests passing first)."}},"mutate_limit":{{"type":"integer","minimum":1,"maximum":5000,"default":500}},"mutate_only":{{"type":"string","description":"Mutate only files whose path contains this text; tests and other files still run."}},"slice":{{"type":"boolean","default":false,"description":"Compile only the files the TEST blocks need, so errors in unrelated files do not stop the tests."}}}}}},{ro}}},
 {{"name":"rootplc_run","title":"Run a program","description":"Compile and run one PROGRAM for a number of PLC cycles in the VM (virtual clock), then return the value of every variable. Use it to inspect behaviour; use rootplc_test for pass/fail evidence.","inputSchema":{{"type":"object","properties":{{{src},"program":{{"type":"string","description":"PROGRAM to run; optional when there is only one."}},"cycles":{{"type":"integer","minimum":1,"maximum":1000000,"default":1}},"cycle_ms":{{"type":"integer","minimum":0,"default":10,"description":"Virtual time per cycle in milliseconds (timers use it)."}}}}}},{ro}}},
 {{"name":"rootplc_diff","title":"Compare a block with a reference","description":"Run two function blocks side by side in the VM, give them the same seeded pseudo-random inputs every cycle and compare their outputs. Inputs and outputs are matched by name; wrap a block with other names in a small adapter FB that has the reference's names. BOOL inputs toggle, numeric inputs jump within a range; other inputs keep their initial value unless set. Returns the verdict (agree / differ / fault), per output the cycles that differed, and the first difference with the inputs of that cycle and the four before, so you can turn it into a TEST. Agreement covers the sampled cycles only.","inputSchema":{{"type":"object","properties":{{{src},"reference":{{"type":"string","description":"The reference FUNCTION_BLOCK, e.g. RB_Motor (with libraries [\"RootBlocks\"])."}},"unit":{{"type":"string","description":"The FUNCTION_BLOCK to compare."}},"cycles":{{"type":"integer","minimum":1,"maximum":1000000,"default":1000}},"cycle_ms":{{"type":"integer","minimum":0,"default":10}},"seed":{{"type":"integer","minimum":0,"default":1}},"set":{{"type":"array","items":{{"type":"string"}},"description":"Inputs held at a value, e.g. [\"Mode=RB_MODE#Auto\", \"Delay=T#2s\"]."}},"ranges":{{"type":"array","items":{{"type":"string"}},"description":"Ranges of numeric inputs, e.g. [\"SP=0..80\"]; default 0..100."}},"toggle":{{"type":"number","minimum":0,"maximum":1,"default":0.1,"description":"Probability that an input changes in a cycle."}},"tolerance":{{"type":"number","minimum":0,"default":0.0001,"description":"Allowed difference of REAL outputs."}}}},"required":["reference","unit"]}},{ro}}},
 {{"name":"rootplc_evidence","title":"Evidence pack for sign-off","description":"Build the evidence pack an engineer reviews before approving a change: input file hashes, check result (IEC clean or not), every test result, the mutation score with surviving changes, and a verdict (verified / not verified with reasons). Deterministic; never signed locally. Call it last, after rootplc_test passes.","inputSchema":{{"type":"object","properties":{{{src},"min_score":{{"type":"number","minimum":0,"maximum":100,"description":"Required mutation score in percent."}},"mutate":{{"type":"boolean","default":true}},"markdown":{{"type":"boolean","default":false,"description":"Return a readable summary instead of JSON."}}}}}},{ro}}},
@@ -131,6 +131,15 @@ fn checked(s: Vec<(PathBuf, String)>, args: &Json) -> Result<rootplc_driver::Che
     rootplc_driver::check_sources_with(s, &libraries(args))
 }
 
+/// The `slice` argument ([tests.slice]).
+fn sliced(s: Vec<(PathBuf, String)>, args: &Json) -> Vec<(PathBuf, String)> {
+    if args.get("slice").and_then(Json::as_bool) == Some(true) {
+        rootplc_driver::slice::slice_tests(s).0
+    } else {
+        s
+    }
+}
+
 fn call_tool(name: &str, args: &Json) -> String {
     let fail = |cmd: &str, msg: &str| tool_result(&rootplc_driver::json::error(cmd, msg), true);
     match name {
@@ -146,7 +155,7 @@ fn call_tool(name: &str, args: &Json) -> String {
                 .map_or(rootplc_driver::mutate::DEFAULT_LIMIT, |n| {
                     n.clamp(1.0, 5000.0) as usize
                 });
-            match sources(args).and_then(|s| {
+            match sources(args).map(|s| sliced(s, args)).and_then(|s| {
                 rootplc_driver::mutate::mutation_report_only(
                     s,
                     &libraries(args),
@@ -159,7 +168,10 @@ fn call_tool(name: &str, args: &Json) -> String {
                 Err(e) => fail("test", &e),
             }
         }
-        "rootplc_test" => match sources(args).and_then(|s| checked(s, args)) {
+        "rootplc_test" => match sources(args)
+            .map(|s| sliced(s, args))
+            .and_then(|s| checked(s, args))
+        {
             Ok(c) => {
                 let filter = args.get("filter").and_then(Json::as_str);
                 let r = rootplc_driver::test_report(c, filter);

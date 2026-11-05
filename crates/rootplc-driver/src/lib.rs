@@ -15,6 +15,7 @@ pub mod json;
 pub mod mutate;
 pub mod runtime;
 pub mod sha256;
+pub mod slice;
 
 use std::path::PathBuf;
 

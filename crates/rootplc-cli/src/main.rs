@@ -9,7 +9,7 @@ use std::process::ExitCode;
 const USAGE: &str = "usage:
   rootplc init  [dir] [--name NAME] [--agent claude|gemini|qwen|cursor|codex|all]
   rootplc check <file.st|dir>... [--json]
-  rootplc test  <file.st|dir>... [--filter TEXT] [--json]
+  rootplc test  <file.st|dir>... [--filter TEXT] [--slice] [--json]   (--slice: only the files the tests need)
   rootplc test  <file.st|dir>... --mutate [--mutate-limit N] [--mutate-only TEXT] [--min-score P] [--json]
                 (mutation score of the tests; --mutate-only: mutate only files whose path contains TEXT)
   rootplc run   <file.st|dir>... [--program NAME] [--cycles N] [--cycle-ms MS] [--json]
@@ -49,7 +49,7 @@ impl Args {
         while let Some(x) = it.next() {
             match x.as_str() {
                 "--json" => a.json = true,
-                "--mutate" | "--markdown" | "--no-mutate" | "--rollback" => {
+                "--mutate" | "--markdown" | "--no-mutate" | "--rollback" | "--slice" => {
                     a.options.push((x, String::new()))
                 }
                 "--program" | "--cycles" | "--cycle-ms" | "--filter" | "--name" | "--show"
@@ -192,6 +192,7 @@ fn cmd_mutate(paths: &[PathBuf], filter: Option<&str>, args: &Args) -> ExitCode 
         .and_then(|v| v.parse().ok())
         .unwrap_or(rootplc_driver::mutate::DEFAULT_LIMIT);
     let min_score: Option<f64> = args.opt("--min-score").and_then(|v| v.parse().ok());
+    let sources = sliced(sources, args);
     let r = match rootplc_driver::mutate::mutation_report_only(
         sources,
         &args.all("--library"),
@@ -248,14 +249,34 @@ fn cmd_mutate(paths: &[PathBuf], filter: Option<&str>, args: &Args) -> ExitCode 
     exit(ok)
 }
 
+/// With `--slice`, only the files the TEST blocks need ([tests.slice]).
+fn sliced(sources: Vec<(PathBuf, String)>, args: &Args) -> Vec<(PathBuf, String)> {
+    if args.opt("--slice").is_none() {
+        return sources;
+    }
+    let (kept, left) = rootplc_driver::slice::slice_tests(sources);
+    if !left.is_empty() {
+        eprintln!(
+            "--slice: {} file(s) left out (not needed by the tests)",
+            left.len()
+        );
+    }
+    kept
+}
+
 fn cmd_test(paths: &[PathBuf], filter: Option<&str>, args: &Args) -> ExitCode {
     if args.opt("--mutate").is_some() {
         return cmd_mutate(paths, filter, args);
     }
     let json_out = args.json;
-    let r = match load("test", paths, args) {
+    let sources = match rootplc_driver::read_sources(paths) {
+        Ok(s) => s,
+        Err(e) => return io_error("test", &e, json_out),
+    };
+    let sources = sliced(sources, args);
+    let r = match rootplc_driver::check_sources_with(sources, &args.all("--library")) {
         Ok(c) => rootplc_driver::test_report(c, filter),
-        Err(code) => return code,
+        Err(e) => return io_error("test", &e, json_out),
     };
     if json_out {
         println!("{}", json::test(&r));

@@ -2,16 +2,15 @@
 //! and a reference function block side by side with the same seeded
 //! stimuli and compare their outputs every cycle.
 
-use std::collections::{BTreeSet, HashMap};
 use std::path::PathBuf;
 
 use rootplc_sema::ir::{DefKind, PouKind, Section, Var};
 use rootplc_sema::{Elem, Ty};
-use rootplc_syntax::TokenKind;
 use rootplc_vm::{Value, Vm};
 
 use crate::CheckReport;
 use crate::json::location;
+pub use crate::slice::slice;
 
 /// What to compare and how to drive it.
 #[derive(Debug, Clone)]
@@ -314,117 +313,6 @@ fn same(a: &Value, b: &Value, tolerance: f64) -> bool {
         }
         (x, y) => x == y,
     }
-}
-
-/// Names a file declares and names it uses ([diff.slice]), lower case.
-fn names_of(src: &str) -> (BTreeSet<String>, BTreeSet<String>) {
-    let toks: Vec<_> = rootplc_syntax::lex(src)
-        .tokens
-        .into_iter()
-        .filter(|t| {
-            !matches!(
-                t.kind,
-                TokenKind::Whitespace
-                    | TokenKind::LineComment
-                    | TokenKind::BlockComment
-                    | TokenKind::Pragma
-            )
-        })
-        .collect();
-    let word = |i: usize| toks[i].text(src).to_ascii_lowercase();
-    let is_name = |i: usize| matches!(toks[i].kind, TokenKind::Ident | TokenKind::Keyword);
-    const MODIFIERS: &[&str] = &[
-        "public",
-        "private",
-        "protected",
-        "internal",
-        "abstract",
-        "final",
-    ];
-    let mut declared = BTreeSet::new();
-    let mut used = BTreeSet::new();
-    // TYPE … END_TYPE and VAR_GLOBAL … END_VAR: "name :" declares
-    let mut section = false;
-    for i in 0..toks.len() {
-        let w = word(i);
-        match toks[i].kind {
-            TokenKind::Keyword => match w.as_str() {
-                "function_block" | "function" | "program" | "interface" | "namespace" | "class" => {
-                    let mut j = i + 1;
-                    while j < toks.len() && MODIFIERS.contains(&word(j).as_str()) {
-                        j += 1;
-                    }
-                    if j < toks.len() && is_name(j) {
-                        declared.insert(word(j));
-                    }
-                }
-                "type" | "var_global" => section = true,
-                "end_type" | "end_var" => section = false,
-                // reserved words some vendors accept as names
-                _ => {
-                    used.insert(w);
-                }
-            },
-            TokenKind::Ident => {
-                if section && toks.get(i + 1).is_some_and(|t| t.kind == TokenKind::Colon) {
-                    declared.insert(w.clone());
-                }
-                used.insert(w);
-            }
-            TokenKind::EnumLiteral | TokenKind::TypedLiteral => {
-                if let Some((ty, _)) = w.split_once('#') {
-                    used.insert(ty.to_string());
-                }
-            }
-            _ => {}
-        }
-    }
-    (declared, used)
-}
-
-/// The files `roots` need ([diff.slice]): kept sources and left-out paths.
-pub fn slice(
-    sources: Vec<(PathBuf, String)>,
-    roots: &[&str],
-) -> (Vec<(PathBuf, String)>, Vec<PathBuf>) {
-    let names: Vec<_> = sources.iter().map(|(_, s)| names_of(s)).collect();
-    let mut declares: HashMap<&str, Vec<usize>> = HashMap::new();
-    for (i, (decl, _)) in names.iter().enumerate() {
-        for d in decl {
-            declares.entry(d.as_str()).or_default().push(i);
-        }
-    }
-    let mut keep = vec![false; sources.len()];
-    let mut work: Vec<usize> = Vec::new();
-    for r in roots {
-        let r = r.to_ascii_lowercase();
-        for &i in declares.get(r.as_str()).into_iter().flatten() {
-            if !keep[i] {
-                keep[i] = true;
-                work.push(i);
-            }
-        }
-    }
-    while let Some(i) = work.pop() {
-        for u in &names[i].1 {
-            for &j in declares.get(u.as_str()).into_iter().flatten() {
-                if !keep[j] {
-                    keep[j] = true;
-                    work.push(j);
-                }
-            }
-        }
-    }
-    let mut kept = Vec::new();
-    let mut left = Vec::new();
-    for (i, src) in sources.into_iter().enumerate() {
-        if keep[i] {
-            kept.push(src);
-        } else {
-            left.push(src.0);
-        }
-    }
-    (kept, left)
 }
 
 /// Result of [`diff_sources`].

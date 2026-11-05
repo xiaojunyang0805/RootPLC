@@ -3,7 +3,7 @@
 ```
 rootplc init  [dir] [--name NAME] [--agent claude|gemini|qwen|cursor|codex|all]
 rootplc check <file.st|dir>... [--json]
-rootplc test  <file.st|dir>... [--filter TEXT] [--json]
+rootplc test  <file.st|dir>... [--filter TEXT] [--slice] [--json]
 rootplc test  <file.st|dir>... --mutate [--mutate-limit N] [--mutate-only TEXT] [--min-score P] [--json]
 rootplc run   <file.st|dir>... [--program NAME] [--cycles N] [--cycle-ms MS] [--json]
 rootplc diff  <file.st|dir>... --reference FB --unit FB [--cycles N] [--cycle-ms MS] [--seed N]
@@ -71,6 +71,11 @@ JSON:
 Compiles, then runs every `TEST ... END_TEST` block once in the VM
 (spec/07-test-blocks.md). Failed assertions are listed with their location;
 execution continues after a failed assertion. A run-time fault ends the test.
+
+`--slice` compiles only the files the TEST blocks need (the files with TEST
+blocks and, transitively, the files declaring names they use), so errors in
+unrelated files of a project do not stop the tests; it also applies to
+`--mutate`. The MCP tool takes `"slice": true`.
 
 ```json
 {"command":"test","ok":true,"compiled":true,"passed":1,"failed":0,"diagnostics":[],
