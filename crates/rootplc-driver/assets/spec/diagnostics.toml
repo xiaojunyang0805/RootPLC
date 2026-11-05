@@ -376,7 +376,7 @@ stage = "sema"
 [[code]]
 id = "RP0205"
 severity = "error"
-summary = "located variable's type does not fit the size of its address"
+summary = "a variable other than BOOL at a bit address"
 spec = "runtime.image.type"
 stage = "sema"
 

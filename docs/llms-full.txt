@@ -805,7 +805,7 @@ Codes RP00xx are lexical, RP01xx types, RP02xx names and structure, RP03xx synta
 | [RP0111](#rp0111) | error | unknown type name |
 | [RP0203](#rp0203) | error | unknown name |
 | [RP0204](#rp0204) | error | name declared twice in the same POU |
-| [RP0205](#rp0205) | error | located variable's type does not fit the size of its address |
+| [RP0205](#rp0205) | error | a variable other than BOOL at a bit address |
 | [RP0125](#rp0125) | warning | chained assignment a := b := v (not portable) |
 | [RP0126](#rp0126) | warning | bit string used as a number, or bitwise operator on integers (not portable) |
 | [RP0127](#rp0127) | warning | integer literal 0 or 1 used as BOOL, or 0 as a reference (not portable) |
@@ -1610,16 +1610,24 @@ one. A user POU may replace a standard function block (spec/08-stdlib.md).
 
 ## RP0205
 
-error: located variable's type does not fit the size of its address
+error: a variable other than BOOL at a bit address
 
 Rule `runtime.image.type` in `spec/14-runtime.md`:
 
-**[runtime.image.type]** A located variable's type must fit its size: `X`
-takes `BOOL`; `B` takes `BYTE`, `SINT`, `USINT` or `BOOL`; `W` takes `WORD`,
-`INT` or `UINT`; `D` takes `DWORD`, `DINT`, `UDINT` or `REAL`; `L` takes
-`LWORD`, `LINT`, `ULINT` or `LREAL`. Another type is error RP0205. An
-address with `*` (`%I*`, not yet assigned) cannot run: the runtime refuses
-to start and names the variable.
+**[runtime.image.type]** In IEC 61131-3 a located variable's type fits
+the size letter of its address: `X` takes `BOOL`; `B` takes `BYTE`, `SINT`,
+`USINT` or `BOOL`; `W` takes `WORD`, `INT` or `UINT`; `D` takes `DWORD`,
+`DINT`, `UDINT` or `REAL`; `L` takes `LWORD`, `LINT`, `ULINT` or `LREAL`.
+At a bit address (`X`, or `byte.bit`) another type is error RP0205. At a
+`B`, `W`, `D` or `L` address another type is the TwinCAT reading: the
+number is the byte offset and the variable's type gives the size
+(`x AT %MB20 : REAL` occupies bytes 20 to 23); it is accepted with warning
+RP0135 ([scope.vendor-forms]) and the runtime binds the variable's own
+size from that byte. A located variable of a type that is not elementary
+(a string, array or structure) compiles, but version 0 cannot bind it: the
+runtime refuses to start and names it. An address with `*` (`%I*`, not yet
+assigned) cannot run either: the runtime refuses to start and names the
+variable.
 
 ## RP0125
 
@@ -3305,12 +3313,20 @@ bytes. Multi-byte values are little-endian. Memory
 variables are copied into the memory image after each cycle and back before
 the next, so other image users (for example an HMI) see and set them.
 
-**[runtime.image.type]** A located variable's type must fit its size: `X`
-takes `BOOL`; `B` takes `BYTE`, `SINT`, `USINT` or `BOOL`; `W` takes `WORD`,
-`INT` or `UINT`; `D` takes `DWORD`, `DINT`, `UDINT` or `REAL`; `L` takes
-`LWORD`, `LINT`, `ULINT` or `LREAL`. Another type is error RP0205. An
-address with `*` (`%I*`, not yet assigned) cannot run: the runtime refuses
-to start and names the variable.
+**[runtime.image.type]** In IEC 61131-3 a located variable's type fits
+the size letter of its address: `X` takes `BOOL`; `B` takes `BYTE`, `SINT`,
+`USINT` or `BOOL`; `W` takes `WORD`, `INT` or `UINT`; `D` takes `DWORD`,
+`DINT`, `UDINT` or `REAL`; `L` takes `LWORD`, `LINT`, `ULINT` or `LREAL`.
+At a bit address (`X`, or `byte.bit`) another type is error RP0205. At a
+`B`, `W`, `D` or `L` address another type is the TwinCAT reading: the
+number is the byte offset and the variable's type gives the size
+(`x AT %MB20 : REAL` occupies bytes 20 to 23); it is accepted with warning
+RP0135 ([scope.vendor-forms]) and the runtime binds the variable's own
+size from that byte. A located variable of a type that is not elementary
+(a string, array or structure) compiles, but version 0 cannot bind it: the
+runtime refuses to start and names it. An address with `*` (`%I*`, not yet
+assigned) cannot run either: the runtime refuses to start and names the
+variable.
 
 **[runtime.watchdog]** When a cycle faults (for example a division by zero
 or the step budget, [tests.runner]) or its execution takes longer than the

@@ -31,12 +31,20 @@ bytes. Multi-byte values are little-endian. Memory
 variables are copied into the memory image after each cycle and back before
 the next, so other image users (for example an HMI) see and set them.
 
-**[runtime.image.type]** A located variable's type must fit its size: `X`
-takes `BOOL`; `B` takes `BYTE`, `SINT`, `USINT` or `BOOL`; `W` takes `WORD`,
-`INT` or `UINT`; `D` takes `DWORD`, `DINT`, `UDINT` or `REAL`; `L` takes
-`LWORD`, `LINT`, `ULINT` or `LREAL`. Another type is error RP0205. An
-address with `*` (`%I*`, not yet assigned) cannot run: the runtime refuses
-to start and names the variable.
+**[runtime.image.type]** In IEC 61131-3 a located variable's type fits
+the size letter of its address: `X` takes `BOOL`; `B` takes `BYTE`, `SINT`,
+`USINT` or `BOOL`; `W` takes `WORD`, `INT` or `UINT`; `D` takes `DWORD`,
+`DINT`, `UDINT` or `REAL`; `L` takes `LWORD`, `LINT`, `ULINT` or `LREAL`.
+At a bit address (`X`, or `byte.bit`) another type is error RP0205. At a
+`B`, `W`, `D` or `L` address another type is the TwinCAT reading: the
+number is the byte offset and the variable's type gives the size
+(`x AT %MB20 : REAL` occupies bytes 20 to 23); it is accepted with warning
+RP0135 ([scope.vendor-forms]) and the runtime binds the variable's own
+size from that byte. A located variable of a type that is not elementary
+(a string, array or structure) compiles, but version 0 cannot bind it: the
+runtime refuses to start and names it. An address with `*` (`%I*`, not yet
+assigned) cannot run either: the runtime refuses to start and names the
+variable.
 
 **[runtime.watchdog]** When a cycle faults (for example a division by zero
 or the step budget, [tests.runner]) or its execution takes longer than the
