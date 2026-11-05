@@ -1339,3 +1339,142 @@ END_IF;
 Done := Count >= Preset;
 Remaining := Preset - MIN(Count, Preset);
 END_FUNCTION_BLOCK
+
+(* F12.ZONE: a zone of a zero-pressure accumulation conveyor with one photo
+   eye at its end. A part moves on while the next zone is free and waits at
+   the end otherwise. ErrorID 1 jam (a part being handed on does not leave
+   the photo eye within JamTime). Safe state: zone motor off. *)
+FUNCTION_BLOCK RB_ConveyorZone
+VAR_INPUT
+    Enable          : BOOL;            (* the line runs *)
+    PartAtEnd       : BOOL;            (* photo eye at the zone end *)
+    DownstreamFree  : BOOL;            (* the next zone can take a part *)
+    UpstreamFeeding : BOOL;            (* the previous zone hands a part on *)
+    SleepTime       : TIME := T#0s;    (* empty and not fed this long: stop; T#0s: never *)
+    JamTime         : TIME := T#5s;    (* T#0s: no jam supervision *)
+    Reset           : BOOL;
+END_VAR
+VAR_OUTPUT
+    Run      : BOOL;                   (* zone motor *)
+    Occupied : BOOL;
+    Free     : BOOL;                   (* this zone can take a part *)
+    Feeding  : BOOL;                   (* handing a part to the next zone *)
+    Count    : UDINT;                  (* parts handed on *)
+    Error    : BOOL;
+    ErrorID  : UDINT;
+END_VAR
+VAR
+    resetEdge : R_TRIG;
+    leaving   : F_TRIG;
+    tIdle     : TON;
+    tJam      : TON;
+    awake     : BOOL;
+END_VAR
+resetEdge(CLK := Reset);
+IF resetEdge.Q THEN
+    Error := FALSE;
+    ErrorID := 0;
+END_IF;
+tIdle(IN := NOT UpstreamFeeding AND NOT PartAtEnd, PT := SleepTime);
+awake := SleepTime = T#0s OR NOT tIdle.Q;
+Feeding := Enable AND NOT Error AND PartAtEnd AND DownstreamFree;
+tJam(IN := Feeding AND JamTime > T#0s, PT := JamTime);
+IF tJam.Q AND NOT Error THEN
+    Error := TRUE;
+    ErrorID := UDINT#1;
+    Feeding := FALSE;
+END_IF;
+leaving(CLK := PartAtEnd);
+IF leaving.Q AND Run THEN
+    Count := Count + 1;
+END_IF;
+Run := Enable AND NOT Error AND (Feeding OR (NOT PartAtEnd AND awake));
+Occupied := PartAtEnd;
+Free := Enable AND NOT Error AND NOT PartAtEnd;
+END_FUNCTION_BLOCK
+
+(* F09.RUNHOURS: run hours, starts and a maintenance interval. The
+   application keeps the values over a restart with Preset / Load (for
+   example from RETAIN variables). *)
+FUNCTION_BLOCK RB_RunHours
+VAR_INPUT
+    Running      : BOOL;
+    Interval     : LREAL := 0.0;       (* hours between services; 0: none *)
+    ServiceDone  : BOOL;               (* rising edge: a service was done *)
+    Load         : BOOL;               (* rising edge: take the preset values *)
+    PresetHours  : LREAL;
+    PresetStarts : UDINT;
+    PresetSince  : LREAL;              (* hours since the last service *)
+END_VAR
+VAR_OUTPUT
+    Hours          : LREAL;
+    Starts         : UDINT;
+    SinceService   : LREAL;
+    MaintenanceDue : BOOL;
+END_VAR
+VAR
+    cyc       : RB_CycleTime;
+    eRun      : R_TRIG;
+    eService  : R_TRIG;
+    eLoad     : R_TRIG;
+    wasRunning : BOOL;
+END_VAR
+cyc();
+eRun(CLK := Running);
+eService(CLK := ServiceDone);
+eLoad(CLK := Load);
+IF eLoad.Q THEN
+    Hours := PresetHours;
+    Starts := PresetStarts;
+    SinceService := PresetSince;
+END_IF;
+(* the time since the previous call counts when the device was running then *)
+IF wasRunning THEN
+    Hours := Hours + cyc.Seconds / 3600.0;
+    SinceService := SinceService + cyc.Seconds / 3600.0;
+END_IF;
+IF eRun.Q THEN
+    Starts := Starts + 1;
+END_IF;
+IF eService.Q THEN
+    SinceService := 0.0;
+END_IF;
+wasRunning := Running;
+MaintenanceDue := Interval > 0.0 AND SinceService >= Interval;
+END_FUNCTION_BLOCK
+
+(* F09.HEARTBEAT: a toggling heartbeat to a partner (SCADA, another PLC)
+   and supervision of the partner's heartbeat. *)
+FUNCTION_BLOCK RB_Heartbeat
+VAR_INPUT
+    PartnerBeat : BOOL;                (* the partner's toggling signal *)
+    Period      : TIME := T#1s;        (* own heartbeat half-period *)
+    Timeout     : TIME := T#5s;        (* no change this long: link lost *)
+END_VAR
+VAR_OUTPUT
+    Beat      : BOOL;                  (* own toggling signal *)
+    Alive     : BOOL;                  (* the partner's beat changed within Timeout *)
+    LostCount : UDINT;
+END_VAR
+VAR
+    tBeat   : TON;
+    tSilent : TON;
+    last     : BOOL;
+    wasAlive : BOOL;
+END_VAR
+tBeat(IN := TRUE, PT := Period);
+IF tBeat.Q THEN
+    Beat := NOT Beat;
+    tBeat(IN := FALSE, PT := Period);
+    tBeat(IN := TRUE, PT := Period);
+END_IF;
+(* a change resets the silence timer, which then times from this call *)
+tSilent(IN := PartnerBeat = last, PT := Timeout);
+last := PartnerBeat;
+tSilent(IN := TRUE, PT := Timeout);
+Alive := NOT tSilent.Q;
+IF wasAlive AND NOT Alive THEN
+    LostCount := LostCount + 1;
+END_IF;
+wasAlive := Alive;
+END_FUNCTION_BLOCK

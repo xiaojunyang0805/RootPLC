@@ -23,10 +23,10 @@ jobs and features exist, never copied. No block is a safety function.
 | F06 | Closed-loop control | [`RB_PID`](cards/F06.PID.md), [`RB_OnOff`](cards/F06.ONOFF.md) |
 | F07 | Motion | the RootMotion library (spec/13-motion.md) |
 | F08 | Alarms and events | [`RB_Alarm`](cards/F08.ALARM.md) |
-| F09 | Supervision and diagnostics | planned |
+| F09 | Supervision and diagnostics | [`RB_RunHours`](cards/F09.RUNHOURS.md), [`RB_Heartbeat`](cards/F09.HEARTBEAT.md) |
 | F10 | Machine modes and states | [`RB_ModeManager`](cards/F10.MODES.md), [`RB_MachineState`](cards/F10.STATE.md) |
 | F11 | Data handling and communication | planned |
-| F12 | Material handling and process patterns | planned |
+| F12 | Material handling and process patterns | [`RB_ConveyorZone`](cards/F12.ZONE.md) |
 
 How often each family occurs in real code (classifier v1, aggregate only):
 [corpus/BLOCKS_REPORT.md](../corpus/BLOCKS_REPORT.md).
