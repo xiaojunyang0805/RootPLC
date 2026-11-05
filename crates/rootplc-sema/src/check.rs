@@ -4967,7 +4967,29 @@ impl<'a> Checker<'a> {
                 let e = ExprKind::Index(Box::new(base.ir()), idx.into_iter().map(V::ir).collect());
                 V::with(*elem, span, e)
             }
-            _ => V::unknown(span),
+            Ty::Unknown => V::unknown(span),
+            // [types.reference]: indexing a reference is pointer arithmetic
+            Ty::Ref(_) => {
+                let msg = "indexing a reference is pointer arithmetic (a CODESYS / TwinCAT form), which RootPLC does not support; index an array".to_string();
+                self.diag(codes::IMPLICIT_CONVERSION, msg, span, None);
+                V::unknown(span)
+            }
+            other @ Ty::Str { .. } => {
+                let msg = format!(
+                    "indexing a {} (byte access) is a CODESYS / TwinCAT form RootPLC does not support yet; only an array can be indexed",
+                    self.ty_name(&other)
+                );
+                self.diag(codes::IMPLICIT_CONVERSION, msg, span, None);
+                V::unknown(span)
+            }
+            other => {
+                let msg = format!(
+                    "only an array can be indexed, found {}",
+                    self.ty_name(&other)
+                );
+                self.diag(codes::IMPLICIT_CONVERSION, msg, span, None);
+                V::unknown(span)
+            }
         }
     }
 
