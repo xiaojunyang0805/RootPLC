@@ -1,0 +1,14 @@
+# RootPLC's own library of typical PLC blocks (spec/15-blocks.md), organised
+# in job families; each block has a card in blocks/cards/. Written by RootPLC
+# (clean-room); real code is studied for which jobs and features exist, never
+# copied.
+name = "RootBlocks"
+vendor = "RootPLC"
+version = "0.1.0"
+description = "RootBlocks: RB_MODE, RB_DEVICE_STATUS, RB_ValveOnOff (F04 on/off valve with feedback), RB_Scale (F01 linear scaling with range supervision)"
+requires = []
+declare_only = []
+intrinsics = []
+references = [
+  "spec/15-blocks.md and blocks/cards/ (RootPLC's own conventions and block definitions; no external source code)",
+]

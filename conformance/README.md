@@ -68,3 +68,4 @@ Implemented stages: **lex**, **parse**, **sema** and **exec**.
 | `cases/properties/` | 09-properties |
 | `cases/motion/` | 13-motion (cases set `libraries: RootMotion`) |
 | `cases/runtime/` | 14-runtime |
+| `cases/blocks/` | 15-blocks (block test suites; cases set `libraries: RootBlocks`) |

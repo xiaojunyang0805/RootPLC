@@ -104,6 +104,13 @@ const BUNDLED: &[(&str, &[(&str, &str)])] = &[
             include_str!("../libs/RootMotion/0.1.0/RootMotion.st"),
         )],
     ),
+    (
+        include_str!("../libs/RootBlocks/library.toml"),
+        &[(
+            "RootBlocks.st",
+            include_str!("../libs/RootBlocks/0.1.0/RootBlocks.st"),
+        )],
+    ),
 ];
 
 /// A string value or a list of strings from the small TOML subset the
