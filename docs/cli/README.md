@@ -115,12 +115,12 @@ Faults: `DIV_BY_ZERO`, `RANGE` (subrange), `INDEX` (array bounds),
 Writes the evidence pack an engineer reviews before approving a change
 ([tests.evidence]): the tool version and a SHA-256 of its rule set, every
 input file with its SHA-256, the active bundled libraries (`--library`, for
-example RootMotion) with version and SHA-256, the check result (`iec_clean` when there is no
-error and no warning), each test, for motion code the peak velocity and
-acceleration of every axis against its machine limits, the mutation score with
-surviving changes,
-and a verdict. `verified` needs a compiling project, at least one TEST block,
-every test passing, every axis within its limits and, with `--min-score P`, a mutation score of at least `P`
+example RootMotion) with version and SHA-256, the check result (`iec_clean`
+when there is no error and no warning), each test, for motion code the peak
+velocity and acceleration of every axis against its machine limits, the
+mutation score with surviving changes, and a verdict. `verified` needs a
+compiling project, at least one TEST block, every test passing, every axis
+within its limits and, with `--min-score P`, a mutation score of at least `P`
 percent. The pack has no time stamp, so the same inputs give the same pack; a
 local pack is never signed (`"signature": null`). The command fails when the
 verdict is `not verified`. The MCP tool is `rootplc_evidence`.
