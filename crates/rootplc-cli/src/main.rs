@@ -21,7 +21,7 @@ const USAGE: &str = "usage:
   rootplc sim   <file.st|dir>... --scenario FILE [--trace OUT.csv] [--compare OLD.csv] [--json]
                 (programs and plant models on the virtual clock; expectations; CSV trace)
   rootplc runtime <file.st|dir>... [--program NAME] [--cycle-ms MS] [--cycles N] [--watchdog-ms MS]
-                [--retain FILE] [--status FILE] [--modbus [ADDR:]PORT] [--deploy DIR] [--json]   (runtime v0)
+                [--retain FILE] [--status FILE] [--modbus [ADDR:]PORT] [--deploy DIR] [--engine vm|c] [--json]   (runtime v0)
   rootplc deploy <file.st|dir>... --to DIR [--program NAME]   (request; runs only after approval)
   rootplc approve DIR [--rollback]          (a person approves at the runtime's terminal)
   rootplc evidence <file.st|dir>... [--out FILE] [--markdown] [--no-mutate] [--min-score P]   (evidence pack for sign-off)
@@ -62,7 +62,7 @@ impl Args {
                 | "--out" | "--watchdog-ms" | "--retain" | "--status" | "--modbus" | "--deploy"
                 | "--to" | "--reference" | "--unit" | "--seed" | "--set" | "--range"
                 | "--toggle" | "--tolerance" | "--scenario" | "--trace" | "--compare"
-                | "--target" => {
+                | "--target" | "--engine" => {
                     let v = it.next().unwrap_or_default();
                     a.options.push((x, v));
                 }
@@ -563,11 +563,23 @@ fn cmd_runtime(paths: &[PathBuf], args: &Args) -> ExitCode {
             config.period_ns / 1_000_000
         );
     }
+    let engine = match args.opt("--engine") {
+        None | Some("vm") => rootplc_driver::runtime::Engine::Vm,
+        Some("c") => rootplc_driver::runtime::Engine::C,
+        Some(e) => {
+            return io_error(
+                "runtime",
+                &format!("--engine {e}: write vm or c"),
+                args.json,
+            );
+        }
+    };
     let opts = rootplc_driver::runtime::RunOptions {
         program: args.opt("--program"),
         config,
         modbus: args.opt("--modbus"),
         deploy: deploy_dir.as_deref().map(|d| (d, libraries.as_slice())),
+        engine,
     };
     let report = match rootplc_driver::runtime::run_runtime(
         &check,

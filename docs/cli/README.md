@@ -216,6 +216,13 @@ machine, every `--cycle-ms` (default 10) on real time, until Ctrl-C or
 `--cycles N`. It is demo grade, for study case SC1 on a Linux board and for
 development; it is not certified and has no fieldbus yet.
 
+- `--engine c` runs the program compiled to native code instead of the VM
+  ([runtime.engine]): `rootplc` translates it with `build --target c`,
+  compiles a shared library with the host's C compiler (cc, gcc, clang, or
+  MSVC on Windows; `ROOTPLC_CC` to choose) and runs it with the same image,
+  retain, status and Modbus. Deployment (`--deploy`) stays on the VM.
+  Without Rust on the target, the C runtime in `runtime-c/` runs the same
+  file.
 - Located variables (`AT %IX0.0`, `%QW2`, `%MD4`) are bound to the process
   image: inputs are copied in before each cycle and outputs out after it.
   A non-BOOL variable at a bit address is error RP0205; another type at a

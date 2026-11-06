@@ -210,6 +210,18 @@ pub struct RunOptions<'a> {
     /// Deploy directory and the libraries deployed programs use,
     /// [runtime.deploy].
     pub deploy: Option<(&'a std::path::Path, &'a [String])>,
+    /// The engine: the VM, or the program compiled to C ([runtime.engine]).
+    pub engine: Engine,
+}
+
+/// What runs the program ([runtime.engine]).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Engine {
+    /// The virtual machine.
+    #[default]
+    Vm,
+    /// The program translated to C and compiled to a shared library.
+    C,
 }
 
 impl RunOptions<'_> {
@@ -220,8 +232,25 @@ impl RunOptions<'_> {
             config,
             modbus: None,
             deploy: None,
+            engine: Engine::Vm,
         }
     }
+}
+
+static ENGINE_RUNS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+fn serve_modbus<P: Program, D: IoDriver, C: Clock>(
+    rt: &mut Runtime<P, D, C>,
+    modbus: Option<&str>,
+) -> Result<(), String> {
+    if let Some(addr) = modbus {
+        // runtime v0 has no I/O driver yet, so Modbus may set the inputs
+        let bound = rootplc_runtime::modbus::serve(addr, std::sync::Arc::clone(&rt.image), true)
+            .map_err(|e| format!("--modbus {addr}: {e}"))?;
+        rt.note(format!("Modbus TCP server on {bound} ([runtime.modbus])"));
+        eprintln!("rootplc runtime: Modbus TCP server on {bound}");
+    }
+    Ok(())
 }
 
 /// Run runtime v0 on a compiled project ([runtime.cycle]).
@@ -237,20 +266,31 @@ pub fn run_runtime<D: IoDriver, C: Clock>(
         config,
         modbus,
         deploy,
+        engine,
     } = opts;
+    if engine == Engine::C {
+        if deploy.is_some() {
+            return Err("approval-gated deployment runs on the VM engine in version 0".into());
+        }
+        let dir = std::env::temp_dir().join(format!(
+            "rootplc-engine-{}-{}",
+            std::process::id(),
+            ENGINE_RUNS.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+        ));
+        let lib = crate::native::build_shared(check, program, &dir)?;
+        let p = rootplc_runtime::native::NativeProgram::load(&lib)?;
+        let mut rt = Runtime::new(p, io, clock, config)?;
+        rt.note(format!("C engine: {} ([runtime.engine])", lib.display()));
+        serve_modbus(&mut rt, modbus)?;
+        return Ok(rt.run(stop));
+    }
     // The VM borrows the compiled program while it runs; with deploy, later
     // programs live as long, so the runtime holds them for the whole run.
     let check: &'static CheckReport = Box::leak(Box::new(check.clone()));
     let period = i128::from(config.period_ns);
     let p = VmProgram::new(check, program, period)?;
     let mut rt = Runtime::new(p, io, clock, config)?;
-    if let Some(addr) = modbus {
-        // runtime v0 has no I/O driver yet, so Modbus may set the inputs
-        let bound = rootplc_runtime::modbus::serve(addr, std::sync::Arc::clone(&rt.image), true)
-            .map_err(|e| format!("--modbus {addr}: {e}"))?;
-        rt.note(format!("Modbus TCP server on {bound} ([runtime.modbus])"));
-        eprintln!("rootplc runtime: Modbus TCP server on {bound}");
-    }
+    serve_modbus(&mut rt, modbus)?;
     if let Some((dir, libraries)) = deploy {
         std::fs::create_dir_all(dir).map_err(|e| format!("--deploy {}: {e}", dir.display()))?;
         let cur = crate::deploy::record_current(dir, check, program, libraries)?;

@@ -15,6 +15,7 @@ pub mod ide;
 pub mod init;
 pub mod json;
 pub mod mutate;
+pub mod native;
 pub mod runtime;
 pub mod sha256;
 pub mod sim;

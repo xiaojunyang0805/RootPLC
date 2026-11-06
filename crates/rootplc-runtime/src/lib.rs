@@ -17,9 +17,13 @@ use std::time::{Duration, Instant};
 use rootplc_abi::{Address, Area, Kind, MAX_AREA, Program, Scalar, bindable, load, store_n, width};
 
 pub mod modbus;
+/// The C engine ([runtime.engine]): FFI to a compiled program; with `ffi`
+/// the only places where `unsafe` may appear in this crate.
+#[allow(unsafe_code)]
+pub mod native;
 
-/// FFI and hardware access. The only place where `unsafe` may appear in this
-/// crate; every block needs a `// SAFETY:` comment and a Kani proof or justification.
+/// FFI and hardware access. With `native`, the only places where `unsafe`
+/// may appear in this crate; every block needs a `// SAFETY:` comment and a Kani proof or justification.
 #[allow(unsafe_code)]
 pub mod ffi {
     use std::sync::atomic::{AtomicBool, Ordering};

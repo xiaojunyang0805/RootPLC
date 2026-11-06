@@ -70,7 +70,7 @@ Command reference: [docs/cli](docs/cli/README.md).
 | `examples/` | Example PLC projects, each compiled and tested in CI |
 | `blocks/` | RootBlocks catalog: block cards and machine templates |
 | `corpus/` | Tools and manifest for the public real-world PLC code corpus (no code stored) |
-| `runtime-c/` | Thin C runtime shim for MCU/RTOS targets (Phase 4) |
+| `runtime-c/` | C runtime for programs compiled with `build --target c` (POSIX port; MCU/RTOS ports later) |
 | `web/playground/` | Browser playground (VM in Wasm) |
 
 ## Licence
