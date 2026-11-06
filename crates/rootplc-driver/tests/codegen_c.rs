@@ -146,7 +146,7 @@ fn elem(prog: &Program, t: &Ty) -> Option<Elem> {
 /// Flatten VM values the way the generated main prints them.
 fn flatten(
     prog: &Program,
-    out: &mut BTreeMap<String, (Elem, Value)>,
+    out: &mut BTreeMap<String, (Option<Elem>, Value)>,
     name: &str,
     v: &Value,
     t: &Ty,
@@ -156,7 +156,11 @@ fn flatten(
         return;
     }
     if let Some(e) = elem(prog, t) {
-        out.insert(name.to_string(), (e, v.clone()));
+        out.insert(name.to_string(), (Some(e), v.clone()));
+        return;
+    }
+    if matches!(t, Ty::Str { .. }) {
+        out.insert(name.to_string(), (None, v.clone()));
         return;
     }
     let t = match t {
@@ -197,7 +201,26 @@ fn flatten(
     }
 }
 
-fn same(e: Elem, v: &Value, c: &str) -> bool {
+/// A string as the generated main prints it ([build.c.file]).
+fn escaped(s: &str) -> String {
+    let mut out = String::new();
+    for ch in s.chars() {
+        match ch {
+            '$' => out.push_str("$$"),
+            c if c as u32 == 10 => out.push_str("$N"),
+            c if c as u32 == 13 => out.push_str("$R"),
+            c if c as u32 == 9 => out.push_str("$T"),
+            c if (c as u32) < 32 || c as u32 == 127 => out.push_str(&format!("${:02X}", c as u32)),
+            c => out.push(c),
+        }
+    }
+    out
+}
+
+fn same(e: Option<Elem>, v: &Value, c: &str) -> bool {
+    let Some(e) = e else {
+        return matches!(v, Value::Str(s) if escaped(s) == c);
+    };
     match (e, v) {
         (Elem::Bool, Value::Bool(b)) => c == if *b { "TRUE" } else { "FALSE" },
         (Elem::Real, Value::Real(x)) => c
@@ -353,14 +376,14 @@ fn c_back_end_matches_the_vm() {
 
 #[test]
 fn unsupported_constructs_name_their_place() {
-    let src = "PROGRAM P\nVAR s : STRING; END_VAR\ns := 'x';\nEND_PROGRAM\n";
+    let src = "PROGRAM P\nVAR x : INT; r : REF_TO INT; END_VAR\nr := REF(x);\nEND_PROGRAM\n";
     let check =
         rootplc_driver::check_sources_with(vec![("p.st".into(), src.into())], &[]).expect("check");
     let r = rootplc_driver::build::build_c(check, None).expect("build");
     let u = r.unsupported.as_ref().expect("unsupported");
     // declarations carry no position in the IR: the POU's first statement
     assert_eq!((u.file.as_str(), u.line), ("p.st", 3));
-    assert!(u.construct.contains("STRING"), "{}", u.construct);
+    assert!(u.construct.contains("reference"), "{}", u.construct);
     assert!(!r.ok());
 }
 

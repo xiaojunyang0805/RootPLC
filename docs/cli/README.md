@@ -170,7 +170,8 @@ INDEX, RANGE). Entry points: `rootplc_init()`, `rootplc_cycle(cycle_ns)`
 variable (`./prog 100 10`: 100 cycles of 10 ms). Checked in CI against the
 VM on every conformance case it supports; builds with gcc, clang and MSVC.
 
-Not yet in v0: STRING, references, VAR_IN_OUT, methods, interfaces,
+Strings are supported (as code points, like the VM). Not yet in v0:
+references, VAR_IN_OUT, methods, interfaces,
 inheritance, FB_init, located and RETAIN variables; such a program gives
 exit code 2 and the first construct with its location.
 
