@@ -87,8 +87,95 @@ impl MutationReport {
     }
 }
 
+/// Enumeration types declared in TYPE sections: upper-case type name and
+/// its value names in declaration order.
+pub type Enums = Vec<(String, Vec<String>)>;
+
+/// The enumeration types declared in `sources` ([tests.mutation]).
+pub fn enums_of<'s>(sources: impl IntoIterator<Item = &'s str>) -> Enums {
+    let mut out = Vec::new();
+    for source in sources {
+        let t: Vec<_> = lex(source)
+            .tokens
+            .into_iter()
+            .filter(|t| !t.kind.is_trivia() && t.kind != TokenKind::Pragma)
+            .collect();
+        let mut in_type = false;
+        let mut i = 0;
+        while i < t.len() {
+            let up = t[i].text(source).to_ascii_uppercase();
+            match up.as_str() {
+                "TYPE" => in_type = true,
+                "END_TYPE" => in_type = false,
+                _ => {}
+            }
+            // Name : ( A [:= n], B, ... )
+            if in_type
+                && t[i].kind == TokenKind::Ident
+                && t.get(i + 1).is_some_and(|x| x.kind == TokenKind::Colon)
+                && t.get(i + 2).is_some_and(|x| x.kind == TokenKind::LParen)
+                && t.get(i + 3).is_some_and(|x| x.kind == TokenKind::Ident)
+            {
+                let mut values = Vec::new();
+                let mut j = i + 3;
+                let mut depth = 1;
+                let mut expect_name = true;
+                while j < t.len() && depth > 0 {
+                    match t[j].kind {
+                        TokenKind::LParen => depth += 1,
+                        TokenKind::RParen => depth -= 1,
+                        TokenKind::Comma if depth == 1 => {
+                            expect_name = true;
+                            j += 1;
+                            continue;
+                        }
+                        TokenKind::Ident if depth == 1 && expect_name => {
+                            values.push(t[j].text(source).to_string());
+                        }
+                        _ => {}
+                    }
+                    expect_name = false;
+                    j += 1;
+                }
+                if values.len() > 1 {
+                    out.push((t[i].text(source).to_ascii_uppercase(), values));
+                }
+                i = j;
+                continue;
+            }
+            i += 1;
+        }
+    }
+    out
+}
+
+/// The next value after `value` in `ty` (any type when `ty` is None, if
+/// exactly one type has the value).
+fn next_enum(enums: &Enums, ty: Option<&str>, value: &str) -> Option<String> {
+    let mut found = enums.iter().filter_map(|(t, vs)| {
+        if ty.is_some_and(|ty| !ty.eq_ignore_ascii_case(t)) {
+            return None;
+        }
+        let k = vs.iter().position(|v| v.eq_ignore_ascii_case(value))?;
+        Some(vs[(k + 1) % vs.len()].clone())
+    });
+    let first = found.next()?;
+    found.next().is_none().then_some(first)
+}
+
 /// Every mutant of one source text, in source order ([tests.mutation]).
 pub fn mutants_of(file: usize, path: &std::path::Path, source: &str) -> Vec<Mutant> {
+    mutants_with(file, path, source, &Vec::new())
+}
+
+/// [`mutants_of`] with the project's enumeration types, for the
+/// enumeration-value operator.
+pub fn mutants_with(
+    file: usize,
+    path: &std::path::Path,
+    source: &str,
+    enums: &Enums,
+) -> Vec<Mutant> {
     let tokens: Vec<_> = lex(source)
         .tokens
         .into_iter()
@@ -151,8 +238,29 @@ pub fn mutants_of(file: usize, path: &std::path::Path, source: &str) -> Vec<Muta
                 "TRUE" => Some("FALSE".into()),
                 "FALSE" => Some("TRUE".into()),
                 "NOT" => Some(String::new()),
-                _ => None,
+                _ => {
+                    let after_dot = prev.is_some_and(|p| p.kind == TokenKind::Dot);
+                    let before_dot = tokens.get(i + 1).is_some_and(|n| n.kind == TokenKind::Dot);
+                    if after_dot {
+                        // T.V: only when T is an enumeration type
+                        let ty = i.checked_sub(2).map(|j| tokens[j].text(source));
+                        ty.and_then(|ty| {
+                            enums
+                                .iter()
+                                .any(|(t, _)| t.eq_ignore_ascii_case(ty))
+                                .then(|| next_enum(enums, Some(ty), text))
+                                .flatten()
+                        })
+                    } else if before_dot || t.kind == TokenKind::Keyword {
+                        None
+                    } else {
+                        next_enum(enums, None, text)
+                    }
+                }
             },
+            TokenKind::EnumLiteral => text
+                .split_once('#')
+                .and_then(|(ty, v)| next_enum(enums, Some(ty), v).map(|n| format!("{ty}#{n}"))),
             TokenKind::Integer => decimal_plus_one(text),
             TokenKind::Duration => doubled_duration(text),
             _ => None,
@@ -250,11 +358,12 @@ pub fn mutation_report_only(
                 .contains(&t.replace('\\', "/"))
         })
     };
+    let enums = enums_of(sources.iter().map(|(_, s)| s.as_str()));
     let all: Vec<Mutant> = sources
         .iter()
         .enumerate()
         .filter(|(_, (p, _))| selected(p))
-        .flat_map(|(i, (p, s))| mutants_of(i, p, s))
+        .flat_map(|(i, (p, s))| mutants_with(i, p, s, &enums))
         .collect();
     report.candidates = all.len();
     let chosen: Vec<Mutant> = all.into_iter().take(limit).collect();
@@ -335,6 +444,45 @@ mod tests {
                 ("1".into(), "2".into()),
             ]
         );
+    }
+
+    #[test]
+    fn enumeration_values_step_to_the_next() {
+        let types = "TYPE E_Step : (IDLE, RUN := 5, DONE); E_Other : (A, B); END_TYPE";
+        let enums = enums_of([types]);
+        assert_eq!(
+            enums,
+            [
+                (
+                    "E_STEP".to_string(),
+                    vec!["IDLE".into(), "RUN".into(), "DONE".into()]
+                ),
+                ("E_OTHER".to_string(), vec!["A".into(), "B".into()])
+            ]
+        );
+        let src = "PROGRAM P VAR s : E_Step; END_VAR
+CASE s OF
+E_Step.IDLE: s := E_Step#RUN;
+DONE: s := IDLE;
+END_CASE;
+END_PROGRAM";
+        let got: Vec<(String, String)> = mutants_with(0, std::path::Path::new("p.st"), src, &enums)
+            .into_iter()
+            .map(|m| (m.original, m.replacement))
+            .collect();
+        assert_eq!(
+            got,
+            [
+                ("IDLE".into(), "RUN".into()),
+                ("E_Step#RUN".into(), "E_Step#DONE".into()),
+                ("DONE".into(), "IDLE".into()),
+                ("IDLE".into(), "RUN".into())
+            ]
+        );
+        // a value in two types is left alone when bare
+        let two = enums_of(["TYPE X : (A, B); Y : (B, C); END_TYPE"]);
+        assert_eq!(next_enum(&two, None, "B"), None);
+        assert_eq!(next_enum(&two, Some("Y"), "B").as_deref(), Some("C"));
     }
 
     #[test]
