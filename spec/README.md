@@ -18,6 +18,11 @@ conformance case in `../conformance/` refers to it by that ID.
 - [10-graphical-text](10-graphical-text.md): SFC, LD and FBD canonical text/JSON forms
 - [11-diagnostics](11-diagnostics.md): Diagnostic code registry: every code, meaning, example, fix
 - [12-project-manifest](12-project-manifest.md): rootplc.toml project manifest
+- [13-motion](13-motion.md): Motion: PLCopen-style single-axis blocks, virtual axes, motion tests
+- [14-runtime](14-runtime.md): Runtime v0: cyclic task, process image, watchdog, retain, approval-gated deploy
+- [15-blocks](15-blocks.md): Block catalog conventions (RootBlocks): interface rules, cards, tests
+- [16-diff](16-diff.md): Differential verification: does a block behave like a reference?
+- [17-simulation](17-simulation.md): Simulation: scenarios, plant programs, traces and trace comparison
 
 ## Profiles (Phase 3+)
 - [profile/agent-ready.md](profile/agent-ready.md): Agent-Ready PLC Profile (runtime ABI, agent API, device description)

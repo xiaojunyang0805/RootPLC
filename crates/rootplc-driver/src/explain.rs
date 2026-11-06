@@ -53,6 +53,7 @@ pub const SPEC: &[(&str, &str)] = &[
         include_str!("../assets/spec/15-blocks.md"),
     ),
     ("spec/16-diff.md", include_str!("../assets/spec/16-diff.md")),
+    ("spec/17-simulation.md", include_str!("../assets/spec/17-simulation.md")),
 ];
 
 /// Explanation of one diagnostic code.
