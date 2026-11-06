@@ -5,7 +5,8 @@
 ## Docs
 - [Getting started](guide/getting-started.md)
 - [Everything in one file](llms-full.txt): guide, CLI, verified examples, diagnostics, spec
-- [CLI reference](cli/README.md): check, test, run, explain, examples, coverage, init, mcp; JSON output
+- [CLI reference](cli/README.md): check, test (mutation, slice), run, diff, evidence, runtime, deploy, explain, examples, coverage, libraries, init, mcp; JSON output
+- [RootBlocks catalog](../blocks/README.md): 61 verified blocks in 12 job families and 6 machine templates (`--library RootBlocks`)
 - [Agent hosts (MCP)](../agent/mcp/README.md)
 - [Skill: writing ST with rootplc](../agent/skills/rootplc-st/SKILL.md)
 - [Skill: porting existing PLC code](../agent/skills/rootplc-migrate/SKILL.md)

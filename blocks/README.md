@@ -11,6 +11,13 @@ writing every job again. The conventions all blocks share are in
 Blocks are RootPLC's own code. Real projects are studied to learn which
 jobs and features exist, never copied. No block is a safety function.
 
+Blocks are also checked against real code: blocks from public projects are
+classified to a catalog block and compared with it by `rootplc diff` (same
+seeded inputs, outputs compared every cycle), and their behaviour is pinned
+by tests. This has found defects in the catalog itself (fixed: `RB_PID`
+anti-windup, `RB_Phase` command priority), gaps that became blocks
+(`RB_Light`) and a recurring real-code defect that became warning RP0304.
+
 ## Families
 
 | ID | Family | Blocks |

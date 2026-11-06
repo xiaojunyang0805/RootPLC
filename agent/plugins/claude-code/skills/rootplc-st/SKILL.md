@@ -6,8 +6,8 @@ description: Write, check and test IEC 61131-3 Structured Text (PLC code) with t
 # Writing PLC code with rootplc
 
 Use the MCP tools (`rootplc_check`, `rootplc_test`, `rootplc_run`,
-`rootplc_explain`, `rootplc_examples`, `rootplc_coverage`) when available;
-otherwise the same commands with `--json`.
+`rootplc_diff`, `rootplc_evidence`, `rootplc_explain`, `rootplc_examples`,
+`rootplc_coverage`) when available; otherwise the same commands with `--json`.
 
 ## Loop
 
@@ -16,7 +16,11 @@ otherwise the same commands with `--json`.
 2. Common pattern (timer, edge, counter, state machine, interlock)? Call
    `rootplc_examples` (or `rootplc examples <words>`) first: every example
    compiles and passes its tests in this toolchain version.
-3. Write ST in `src/`. Write `TEST ... END_TEST` blocks in `tests/`.
+3. Write ST in `src/`. Write `TEST ... END_TEST` blocks in `tests/`. For a
+   typical job (motor, valve, PID, step chain, alarm, conveyor zone …) use a
+   verified RootBlocks block (`--library RootBlocks`, cards in `blocks/`)
+   instead of writing it again; `rootplc diff` checks that your own block
+   behaves like one.
 4. `rootplc check . --json` until `ok` is true. Fix every diagnostic. Each has
    a stable code (RPnnnn), a 1-based line and column, and often a `hint`.
    `rootplc explain <code>` quotes the spec rule.
@@ -42,6 +46,9 @@ otherwise the same commands with `--json`.
 - Keywords and type names cannot be names (`on`, `time`, `dt`, `string` are reserved).
 - Every statement ends with `;`.
 - Standard blocks: TON, TOF, TP, R_TRIG, F_TRIG, CTU, CTD, CTUD, SR, RS.
+- A TON that times one CASE step must be called with `IN := FALSE` before
+  the step changes (or every cycle outside the CASE), otherwise it fires
+  early next time: warning RP0304.
 
 ## Tests
 
