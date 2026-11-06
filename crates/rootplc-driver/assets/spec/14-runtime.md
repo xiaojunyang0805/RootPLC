@@ -46,6 +46,17 @@ runtime refuses to start and names it. An address with `*` (`%I*`, not yet
 assigned) cannot run either: the runtime refuses to start and names the
 variable.
 
+**[runtime.engine]** By default the runtime runs the program in the
+virtual machine. With `--engine c` it translates the program to C
+([build.c.command]), compiles it to a shared library with the host's C
+compiler (`cc`, `gcc` or `clang`, or `ROOTPLC_CC`; on Windows also MSVC)
+and runs that instead: the same variables, image binding, retain, status,
+Modbus and watchdog, at native speed. The C engine computes what the VM
+computes ([build.c.semantics]). It stops at start with a message when the
+program uses a construct the C back end does not support, or when no C
+compiler is found. Approval-gated deployment ([runtime.deploy]) uses the
+VM in version 0.
+
 **[runtime.watchdog]** When a cycle faults (for example a division by zero
 or the step budget, [tests.runner]) or its execution takes longer than the
 watchdog time (`--watchdog-ms`, default ten periods), the runtime stops the

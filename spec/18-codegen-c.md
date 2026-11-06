@@ -82,10 +82,11 @@ and `TIME()`; references (`REF_TO`, `REF()`, `^`, NULL, comparisons for
 equality; C pointers) and VAR_IN_OUT parameters of functions and function
 blocks, copied in before the call and back after it as in the VM
 ([pous.call.in-out]); the object-oriented features ([build.c.oop]).
-Only the global variables the program uses are emitted. Not yet: `REF()`
-of a VAR_IN_OUT parameter (the VM reaches the caller's variable), indexing
-a reference `p[i]`, `__NEW`, located variables, RETAIN, VAR_STAT, UNION,
-compatibility-library intrinsics and TEST blocks (tests run in the VM).
+Only the global variables the program uses are emitted, and those with an
+address or in a RETAIN section. Not yet: `REF()` of a VAR_IN_OUT parameter
+(the VM reaches the caller's variable), indexing a reference `p[i]`,
+`__NEW`, VAR_STAT, UNION, compatibility-library intrinsics and TEST blocks
+(tests run in the VM).
 
 **[build.c.oop]** Methods, properties and actions run in a frame of their
 own with a pointer to the instance (`THIS`). Every function-block and
@@ -104,3 +105,32 @@ FALSE and the declaration's arguments ([pous.oop.fb-init],
 [variables.init-arguments]); a fault in it is reported by the first cycle.
 An instance may have an initial value for its inputs (`fb : FB_X := (in :=
 5)`).
+
+**[build.c.abi]** For a runtime the file also defines (non-static, and
+exported from a shared library when compiled with `-DROOTPLC_SHARED`):
+
+- `rootplc_vars` and `rootplc_nvars`: the variable table of the runtime ABI
+  (spec/14-runtime.md), the program's variables then the global variables
+  emitted, each with its name, kind (0 other, 1 BOOL, 2 signed integer,
+  3 unsigned integer or bit string, 4 REAL, 5 LREAL), size in bytes, type
+  name, direct address text (`%IX0.0`, or NULL), RETAIN flag and a pointer
+  to its storage (a BOOL is one byte, 0 or 1; numbers in the C types of
+  [build.c.file]);
+- `int rootplc_step(int64_t elapsed_ns)`: advance the clock by the time
+  since the previous cycle started (0 for the first), then run one cycle;
+  it returns 0 or the fault code, like the VM engine's cycle;
+- `uint32_t rootplc_abi_version(void)`, the ABI version (0).
+
+Located and RETAIN variables are ordinary storage in the C file: binding
+them to the process image and keeping them is the runtime's job.
+
+**[build.c.shim]** `runtime-c/` is a C99 runtime for the generated file,
+for targets without a Rust runtime: `rootplc_rt.c` binds the located
+variables of the table to a process image ([runtime.image]: inputs,
+outputs and memory, byte offsets, little-endian, the variable's own size at
+a byte address), and `rootplc_rt_cycle` copies inputs in, steps the
+program and copies outputs and memory out; after a fault it sets the output
+image to 0 (safe outputs, [runtime.watchdog]) and the program stops. A port
+supplies the clock, the sleep until the next cycle and the I/O;
+`ports/posix` runs cyclically on Linux (and other POSIX systems) with the
+image kept in memory.
