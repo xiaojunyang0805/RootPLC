@@ -53,8 +53,9 @@ evaluated left to right in the VM; in C their order is unspecified, so a
 call whose arguments have side effects on each other may differ.
 
 **[build.c.faults]** Division or modulo by zero (`DIV_BY_ZERO`, code 1),
-an array index outside its bounds (`INDEX`, code 2) and a value outside a
-subrange (`RANGE`, code 3) stop the cycle as in the VM. The statement limit
+an array index outside its bounds (`INDEX`, code 2), a value outside a
+subrange (`RANGE`, code 3) and dereferencing NULL (`NULL_REF`, code 4)
+stop the cycle as in the VM. The statement limit
 of the VM (`WATCHDOG`) is not modelled; a runtime uses its own watchdog.
 
 **[build.c.strings]** STRING and WSTRING values are sequences of
@@ -77,7 +78,12 @@ the operators; the standard function blocks TON, TOF, TP, R_TRIG, F_TRIG,
 CTU, CTD, CTUD, SR and RS; the standard functions ABS, SQRT, LN, LOG, EXP,
 SIN, COS, TAN, ASIN, ACOS, ATAN, EXPT, TRUNC, MIN, MAX, LIMIT, SEL, MUX,
 MOVE, SHL, SHR, ROL, ROR, the type conversions between elementary types
-and `TIME()`. Not yet: references and pointers,
-VAR_IN_OUT, methods, interfaces, inheritance, FB_init, located variables,
-RETAIN, compatibility-library intrinsics and TEST blocks (tests run in the
+and `TIME()`; references (`REF_TO`, `REF()`, `^`, NULL, comparisons for
+equality; C pointers) and VAR_IN_OUT parameters of functions and function
+blocks, copied in before the call and back after it as in the VM
+([pous.call.in-out]). Only the global variables the program uses are
+emitted. Not yet: `REF()` of a VAR_IN_OUT parameter (the VM reaches the
+caller's variable), indexing a reference `p[i]`, `__NEW`, methods,
+interfaces, inheritance, FB_init, located variables, RETAIN, VAR_STAT,
+UNION, compatibility-library intrinsics and TEST blocks (tests run in the
 VM).
