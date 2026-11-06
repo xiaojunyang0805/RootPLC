@@ -21,8 +21,9 @@ program or variable, a value that does not fit, or a project that does not
 compile).
 
 **[sim.scenario]** A scenario is a text file, one statement per line;
-blank lines and lines starting with `#` are ignored; keywords are
-case-insensitive:
+blank lines and lines starting with `#` are ignored, and so is the rest of
+a line after a space followed by `#` (a value cannot contain ` #`);
+keywords are case-insensitive:
 
 ```
 programs PRG_Plant PRG_Main        # run in this order every cycle (required)
