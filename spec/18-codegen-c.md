@@ -81,9 +81,26 @@ MOVE, SHL, SHR, ROL, ROR, the type conversions between elementary types
 and `TIME()`; references (`REF_TO`, `REF()`, `^`, NULL, comparisons for
 equality; C pointers) and VAR_IN_OUT parameters of functions and function
 blocks, copied in before the call and back after it as in the VM
-([pous.call.in-out]). Only the global variables the program uses are
-emitted. Not yet: `REF()` of a VAR_IN_OUT parameter (the VM reaches the
-caller's variable), indexing a reference `p[i]`, `__NEW`, methods,
-interfaces, inheritance, FB_init, located variables, RETAIN, VAR_STAT,
-UNION, compatibility-library intrinsics and TEST blocks (tests run in the
-VM).
+([pous.call.in-out]); the object-oriented features ([build.c.oop]).
+Only the global variables the program uses are emitted. Not yet: `REF()`
+of a VAR_IN_OUT parameter (the VM reaches the caller's variable), indexing
+a reference `p[i]`, `__NEW`, located variables, RETAIN, VAR_STAT, UNION,
+compatibility-library intrinsics and TEST blocks (tests run in the VM).
+
+**[build.c.oop]** Methods, properties and actions run in a frame of their
+own with a pointer to the instance (`THIS`). Every function-block and
+program instance carries the number of its block as a hidden first member,
+and a derived block's structure begins with its base block's members, so a
+pointer to a derived instance is also a pointer to its base. A method
+called with dispatch ([pous.oop.override]), a method called through an
+interface ([pous.oop.interface-ref]) and a block body called through a
+reference run the method or body of the instance's own block, chosen by
+that number among the blocks the program uses; `SUPER^.M()` runs the named
+method itself. An interface value is a pointer to the instance; calling a
+method through NULL is the fault `NULL_REF`. At start-up, and for the
+instances among the local variables of a function or method on each call,
+FB_init runs inner instances first with `bInitRetains` TRUE, `bInCopyCode`
+FALSE and the declaration's arguments ([pous.oop.fb-init],
+[variables.init-arguments]); a fault in it is reported by the first cycle.
+An instance may have an initial value for its inputs (`fb : FB_X := (in :=
+5)`).
