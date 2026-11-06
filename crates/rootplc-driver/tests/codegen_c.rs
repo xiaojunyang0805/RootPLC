@@ -382,14 +382,14 @@ fn c_back_end_matches_the_vm() {
 
 #[test]
 fn unsupported_constructs_name_their_place() {
-    let src = "FUNCTION_BLOCK FB_C\nVAR n : INT; END_VAR\nMETHOD Inc\nn := n + 1;\nEND_METHOD\nEND_FUNCTION_BLOCK\nPROGRAM P\nVAR c : FB_C; END_VAR\nc.Inc();\nEND_PROGRAM\n";
+    let src = "PROGRAM P\nVAR n : INT; b AT %IX0.0 : BOOL; END_VAR\nn := n + 1;\nEND_PROGRAM\n";
     let check =
         rootplc_driver::check_sources_with(vec![("p.st".into(), src.into())], &[]).expect("check");
     let r = rootplc_driver::build::build_c(check, None).expect("build");
     let u = r.unsupported.as_ref().expect("unsupported");
     // declarations carry no position in the IR: the POU's first statement
-    assert_eq!((u.file.as_str(), u.line), ("p.st", 9));
-    assert!(u.construct.contains("method"), "{}", u.construct);
+    assert_eq!((u.file.as_str(), u.line), ("p.st", 3));
+    assert!(u.construct.contains("located"), "{}", u.construct);
     assert!(!r.ok());
 }
 

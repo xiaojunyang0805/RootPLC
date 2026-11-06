@@ -1,4 +1,4 @@
-(* spec: [build.c.command] [build.c.file] [build.c.semantics] [build.c.faults] [build.c.subset]
+(* spec: [build.c.command] [build.c.file] [build.c.semantics] [build.c.faults] [build.c.subset] [build.c.oop]
    expect: ok
    run: PRG_Main cycles=5
    assert: n = 5
