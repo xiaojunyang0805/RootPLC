@@ -31,6 +31,7 @@ const USAGE: &str = "usage:
   rootplc libraries [--json]                       (bundled compatibility libraries)
   check, test, diff, run, sim, runtime and coverage take --library NAME[,NAME] (e.g. Tc2_System)       (portable / dialect / dependent / blocked)
   rootplc mcp            (MCP server on stdio, for agent hosts)
+  rootplc lsp            (Language Server Protocol on stdio, for editors)
   rootplc --version
 
 exit codes: 0 ok, 1 errors / failed tests / fault, 2 usage or I/O error";
@@ -887,6 +888,12 @@ fn main() -> ExitCode {
         return ExitCode::from(2);
     };
     let rest = &args.positional[1..];
+    if first == "lsp" {
+        return match rootplc_mcp::lsp::serve_stdio() {
+            Ok(()) => ExitCode::SUCCESS,
+            Err(e) => io_error("lsp", &e.to_string(), false),
+        };
+    }
     if first == "mcp" {
         return match rootplc_mcp::serve_stdio() {
             Ok(()) => ExitCode::SUCCESS,

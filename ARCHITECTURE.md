@@ -32,7 +32,7 @@ phases exist only as stubs, so that the boundaries are fixed early.
 | `rootplc-testing` | Verification | 1 | `TEST ... END_TEST` blocks, runner, JSON results |
 | `rootplc-driver` | Orchestration | 1 | Project model (`rootplc.toml`) and the implementation of every command. The CLI and MCP call only this crate |
 | `rootplc-cli` (package `rootplc`) | Front door | 1 | The `rootplc` binary: argument parsing and output formatting only. `rootplc mcp` starts the MCP server |
-| `rootplc-mcp` | Front door | 1 | MCP server (stdio and HTTP), exposing driver commands as tools |
+| `rootplc-mcp` | Front door | 1 | MCP server (stdio and HTTP), exposing driver commands as tools; the language server for editors (`rootplc lsp`, protocol only: features in `rootplc-driver::ide`) |
 | `rootplc-wasm` | Front door | 1 | Wasm bindings for the browser playground |
 | `rootplc-codegen-c` | Back end | 2 | Typed IR to portable C99 against `rootplc-abi` |
 | `rootplc-verify` | Verification | 2 | Properties from ST pragmas, CBMC run on generated C, counterexample traces |

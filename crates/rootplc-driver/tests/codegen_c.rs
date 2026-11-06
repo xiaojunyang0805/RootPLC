@@ -25,11 +25,17 @@ fn find_cc() -> Option<Cc> {
     if let Ok(cc) = std::env::var("ROOTPLC_CC") {
         return Some(Cc { wsl: false, cc });
     }
+    // the compile-and-run script needs a POSIX shell
+    let sh = Command::new("sh")
+        .args(["-c", "true"])
+        .output()
+        .is_ok_and(|o| o.status.success());
     for cc in ["gcc", "cc", "clang"] {
-        if Command::new(cc)
-            .arg("--version")
-            .output()
-            .is_ok_and(|o| o.status.success())
+        if sh
+            && Command::new(cc)
+                .arg("--version")
+                .output()
+                .is_ok_and(|o| o.status.success())
         {
             return Some(Cc {
                 wsl: false,

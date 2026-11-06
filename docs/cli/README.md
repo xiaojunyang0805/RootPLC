@@ -371,6 +371,16 @@ activating one activates the libraries it requires.
  "version":"1.0.0","description":"…","declare_only":["GETCPUCOUNTER","MEMCPY","MEMMOVE"],"references":["…"]}]}
 ```
 
+## lsp
+
+`rootplc lsp` is a Language Server Protocol server on stdio for editors
+([spec/19-lsp.md](../../spec/19-lsp.md)): the diagnostics of `rootplc check`
+while typing (with code, range and hint), hover (the spec rule behind a
+diagnostic, or a name's declaration), go to definition and the outline of a
+document. `initializationOptions: {"libraries": [...]}` activates
+compatibility libraries. VS Code: [editors/vscode](../../editors/vscode/README.md);
+any other LSP client can start `rootplc lsp` directly.
+
 ## mcp
 
 Model Context Protocol server on stdio for agent hosts; see

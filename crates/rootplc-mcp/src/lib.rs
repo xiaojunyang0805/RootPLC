@@ -13,6 +13,7 @@
 //! standard workflows (write and verify, fix diagnostics, port legacy code).
 
 pub mod json;
+pub mod lsp;
 
 use std::io::{BufRead, Write};
 use std::path::PathBuf;

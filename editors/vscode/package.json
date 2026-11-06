@@ -1,0 +1,51 @@
+{
+  "name": "rootplc-st",
+  "displayName": "RootPLC Structured Text",
+  "description": "IEC 61131-3 Structured Text with the rootplc language server: diagnostics with stable codes and fix hints, hover with the spec rule, go to definition, outline.",
+  "version": "0.0.1",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/xiaojunyang0805/RootPLC"
+  },
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": ["Programming Languages", "Linters"],
+  "keywords": ["PLC", "IEC 61131-3", "Structured Text", "TwinCAT", "CODESYS"],
+  "main": "./extension.js",
+  "activationEvents": [],
+  "contributes": {
+    "languages": [
+      {
+        "id": "iec-st",
+        "aliases": ["IEC 61131-3 Structured Text", "Structured Text", "st"],
+        "extensions": [".st", ".iecst"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "iec-st",
+        "scopeName": "source.iec-st",
+        "path": "./syntaxes/iec-st.tmLanguage.json"
+      }
+    ],
+    "configuration": {
+      "title": "RootPLC",
+      "properties": {
+        "rootplc.path": {
+          "type": "string",
+          "default": "rootplc",
+          "description": "The rootplc executable (a name on PATH or a full path)."
+        },
+        "rootplc.libraries": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "description": "Compatibility libraries to activate, e.g. [\"Tc2_System\", \"TwinCAT_BuiltIns\"] for TwinCAT code (like --library)."
+        }
+      }
+    }
+  }
+}

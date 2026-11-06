@@ -7,7 +7,8 @@ write, compile, test, simulate, verify and deploy PLC programs. Apache-2.0.
 > testing), `run`, `diff`, `sim` (controller and plant models on the virtual
 > clock), `build --target c` (portable C99, checked against the VM),
 > `evidence`, `explain`, `examples`, `coverage`, `libraries`, the MCP server,
-> runtime v0 and approval-gated `deploy` work. `verify` and `import` come
+> the language server for editors (`lsp`, with a VS Code extension), runtime
+> v0 and approval-gated `deploy` work. `verify` and `import` come
 > later. The language spec and
 > conformance suite are the ground truth.
 
@@ -64,6 +65,7 @@ Command reference: [docs/cli](docs/cli/README.md).
 | `bench/` | PLC-Agent-Bench task format and tasks |
 | `eval/` | Agent evaluation harness (pick rate, success rate) |
 | `agent/` | SKILL.md set, AGENTS.md template, MCP configs, host plugins |
+| `editors/` | Editor support: the VS Code extension for `rootplc lsp` |
 | `docs/` | Agent-readable docs (`.md` only, `llms.txt`) |
 | `examples/` | Example PLC projects, each compiled and tested in CI |
 | `blocks/` | RootBlocks catalog: block cards and machine templates |

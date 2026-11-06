@@ -11,6 +11,7 @@ pub mod docs;
 pub mod evidence;
 pub mod examples;
 pub mod explain;
+pub mod ide;
 pub mod init;
 pub mod json;
 pub mod mutate;
