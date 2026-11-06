@@ -1195,6 +1195,12 @@ impl<'p> Vm<'p> {
         match s {
             Stmt::Assign(t, v) => {
                 let val = self.eval(v, cx)?;
+                if let ExprKind::Index(b, idx) = &t.kind {
+                    if matches!(self.strip(&b.ty), Ty::Str { .. }) {
+                        self.store_str_byte(b, idx, val, t.span, cx)?;
+                        return Ok(Flow::Normal);
+                    }
+                }
                 let loc = self.place(t, cx)?;
                 self.store(&loc, val, &t.ty, t.span)?;
             }
@@ -1306,6 +1312,9 @@ impl<'p> Vm<'p> {
             }
             ExprKind::Index(b, idx) => {
                 let static_ty = self.strip(&b.ty);
+                if matches!(static_ty, Ty::Ref(_)) {
+                    return self.ref_index(b, idx, e.span, cx);
+                }
                 if !matches!(static_ty, Ty::Array { .. }) {
                     return Err(self.fault(FaultKind::Unsupported, e.span, "indexing a non-array"));
                 }
@@ -1357,7 +1366,120 @@ impl<'p> Vm<'p> {
         }
     }
 
+    /// `p[i]` on a reference ([types.reference], CODESYS / TwinCAT): the
+    /// element `i` places after the target, inside the same array.
+    fn ref_index(&mut self, b: &Expr, idx: &[Expr], span: Span, cx: &Ctx) -> R<Loc> {
+        let Value::Ref(Some(l)) = self.eval(b, cx)? else {
+            return Err(self.fault(FaultKind::NullRef, span, "indexing a NULL reference"));
+        };
+        let i = match idx.first() {
+            Some(ie) => int(&self.eval(ie, cx)?),
+            None => 0,
+        };
+        if i == 0 {
+            return Ok(l);
+        }
+        let leaves = |vm: &Self| {
+            vm.fault(
+                FaultKind::Index,
+                span,
+                format!("pointer index {i} leaves the array the reference points into"),
+            )
+        };
+        let Some((&last, parent_path)) = l.path.split_last() else {
+            return Err(leaves(self));
+        };
+        let parent = Loc {
+            root: l.root,
+            path: parent_path.to_vec(),
+        };
+        let target = i128::from(last) + i;
+        let ok = match self.get(&parent, span)? {
+            Value::Agg(xs) => usize::try_from(target)
+                .ok()
+                .filter(|&t| t < xs.len())
+                .is_some_and(|t| {
+                    std::mem::discriminant(&xs[last as usize]) == std::mem::discriminant(&xs[t])
+                }),
+            _ => false,
+        };
+        if !ok {
+            return Err(leaves(self));
+        }
+        Ok(parent.child(target as usize))
+    }
+
+    /// `s[i]` on a string ([types.derived.array], CODESYS / TwinCAT): the code
+    /// of character `i` counted from 0; 0 at and after the end.
+    fn str_byte(&mut self, b: &Expr, idx: &[Expr], span: Span, cx: &Ctx) -> R<Value> {
+        let (wide, cap) = match self.strip(&b.ty) {
+            Ty::Str { wide, len } => (wide, i128::from(len)),
+            _ => (false, 0),
+        };
+        let s = match self.eval(b, cx)? {
+            Value::Str(s) => s,
+            _ => String::new(),
+        };
+        let i = match idx.first() {
+            Some(ie) => int(&self.eval(ie, cx)?),
+            None => 0,
+        };
+        if i < 0 || i > cap {
+            return Err(self.fault(
+                FaultKind::Index,
+                span,
+                format!("character index {i} is outside 0..{cap}"),
+            ));
+        }
+        let code = s.chars().nth(i as usize).map_or(0, u32::from);
+        let mask = if wide { 0xFFFF } else { 0xFF };
+        Ok(Value::Int(i128::from(code & mask)))
+    }
+
+    /// Assignment to `s[i]` on a string: replaces character `i`; at the end
+    /// of the string it appends one; a 0 cuts the string there.
+    fn store_str_byte(&mut self, b: &Expr, idx: &[Expr], v: Value, span: Span, cx: &Ctx) -> R<()> {
+        let cap = match self.strip(&b.ty) {
+            Ty::Str { len, .. } => i128::from(len),
+            _ => 0,
+        };
+        let i = match idx.first() {
+            Some(ie) => int(&self.eval(ie, cx)?),
+            None => 0,
+        };
+        if i < 0 || i >= cap {
+            return Err(self.fault(
+                FaultKind::Index,
+                span,
+                format!("character index {i} is outside 0..{}", cap - 1),
+            ));
+        }
+        let loc = self.place(b, cx)?;
+        let mut chars: Vec<char> = match self.get(&loc, span)? {
+            Value::Str(s) => s.chars().collect(),
+            _ => Vec::new(),
+        };
+        let code = int(&v);
+        let i = i as usize;
+        if code == 0 {
+            chars.truncate(i.min(chars.len()));
+        } else if let Some(c) = char::from_u32(code as u32) {
+            if i < chars.len() {
+                chars[i] = c;
+            } else if i == chars.len() {
+                chars.push(c);
+            }
+        }
+        let text: String = chars.into_iter().collect();
+        self.store(&loc, Value::Str(text), &b.ty.clone(), span)
+    }
+
     fn eval(&mut self, e: &Expr, cx: &Ctx) -> R<Value> {
+        if let ExprKind::Index(b, idx) = &e.kind {
+            if matches!(self.strip(&b.ty), Ty::Str { .. }) {
+                return self.str_byte(b, idx, e.span, cx);
+            }
+        }
         match &e.kind {
             ExprKind::Const(c) => Ok(const_value(c)),
             ExprKind::Null => Ok(Value::Ref(None)),

@@ -4969,18 +4969,21 @@ impl<'a> Checker<'a> {
             }
             Ty::Unknown => V::unknown(span),
             // [types.reference]: indexing a reference is pointer arithmetic
-            Ty::Ref(_) => {
-                let msg = "indexing a reference is pointer arithmetic (a CODESYS / TwinCAT form), which RootPLC does not support; index an array".to_string();
-                self.diag(codes::IMPLICIT_CONVERSION, msg, span, None);
-                V::unknown(span)
+            Ty::Ref(target) => {
+                let msg = "p[i] on a reference is the CODESYS / TwinCAT pointer index (the element i places after the target); IEC 61131-3 indexes only arrays".to_string();
+                self.diag(codes::VENDOR_MEANING, msg, span, None);
+                let e = ExprKind::Index(Box::new(base.ir()), idx.into_iter().map(V::ir).collect());
+                V::with(*target, span, e)
             }
-            other @ Ty::Str { .. } => {
+            other @ Ty::Str { wide, .. } => {
                 let msg = format!(
-                    "indexing a {} (byte access) is a CODESYS / TwinCAT form RootPLC does not support yet; only an array can be indexed",
+                    "s[i] on a {} is the CODESYS / TwinCAT character access (code of character i, counted from 0); IEC 61131-3 indexes only arrays",
                     self.ty_name(&other)
                 );
-                self.diag(codes::IMPLICIT_CONVERSION, msg, span, None);
-                V::unknown(span)
+                self.diag(codes::VENDOR_MEANING, msg, span, None);
+                let elem = if wide { Elem::Word } else { Elem::Byte };
+                let e = ExprKind::Index(Box::new(base.ir()), idx.into_iter().map(V::ir).collect());
+                V::with(Ty::Elem(elem), span, e)
             }
             other => {
                 let msg = format!(
