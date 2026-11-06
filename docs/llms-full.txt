@@ -197,6 +197,27 @@ comes with the inputs of that cycle and the four before:
 Agreement covers the sampled cycles only: set slow inputs, narrow ranges or
 add TEST blocks for behaviour the stimuli do not reach.
 
+## build
+
+`rootplc build . --target c --out DIR` translates the program into one
+portable C99 file, `DIR/rootplc_program.c`
+([spec/18-codegen-c.md](../../spec/18-codegen-c.md)). It computes what the
+VM computes: same values after every cycle, same faults (DIV_BY_ZERO,
+INDEX, RANGE). Entry points: `rootplc_init()`, `rootplc_cycle(cycle_ns)`
+(returns 0 or a fault code) and the clock `rootplc_now_ns`. Compiled with
+`-DROOTPLC_MAIN`, the file has a `main` that runs N cycles and prints every
+variable (`./prog 100 10`: 100 cycles of 10 ms). Checked in CI against the
+VM on every conformance case it supports; builds with gcc, clang and MSVC.
+
+Not yet in v0: STRING, references, VAR_IN_OUT, methods, interfaces,
+inheritance, FB_init, located and RETAIN variables; such a program gives
+exit code 2 and the first construct with its location.
+
+```json
+{"command":"build","ok":true,"target":"c","program":"PRG_TrafficLight",
+ "out":"out/rootplc_program.c","diagnostics":[],"unsupported":null}
+```
+
 ## sim
 
 Runs one or more programs as one task on the virtual clock, driven by a
@@ -3787,3 +3808,77 @@ always compare equal.
 **[sim.limits]** v0 runs one task (no task priorities or intervals per
 program), has no FMI plants or simulated fieldbus devices (spec Phase 2,
 G2) and records values after each cycle only.
+
+
+======== Specification: spec/18-codegen-c.md ========
+
+# Native code: Structured Text to C
+
+`rootplc build --target c` translates a checked project into one portable
+C99 file. The C code computes what the VM computes: the same values after
+every cycle and the same faults. It is the path to native execution on a
+controller, to MCU targets through the C runtime shim and to model checking
+with CBMC (spec Phase 2). The VM stays the reference: the C back end is
+checked by running the same programs both ways and comparing every variable
+after every cycle.
+
+**[build.c.command]** `rootplc build <file.st|dir>... --target c --out DIR`
+loads the sources (with `--library` as for `check`), compiles them and
+writes `DIR/rootplc_program.c`. `--program NAME` chooses the PROGRAM when
+the project has several. The exit code is 0 when the file was written, 1
+when the project does not compile, 2 when the program uses a construct the
+C back end does not support yet ([build.c.subset]); the report names the
+first such construct and its location. `--json` gives one object with the
+fields `command` ("build"), `ok`, `target` ("c"), `program`, `out`,
+`diagnostics` and `unsupported` (null or `{file, line, column, construct}`).
+
+**[build.c.file]** The file is self-contained: it includes only the C
+standard headers `stdint.h`, `string.h`, `math.h`, `setjmp.h` and, for the
+main function, `stdio.h` and `stdlib.h`. It defines one C structure per
+structure type, function block and program (members in declaration order,
+named `v_` followed by the declared name), a body function per POU, and
+three entry points:
+
+- `void rootplc_init(void)` sets every variable to its initial value;
+- `int rootplc_cycle(int64_t cycle_ns)` runs one cycle of the program
+  and then advances the clock by `cycle_ns`; it returns 0, or the fault
+  code ([build.c.faults]) when the cycle stopped with a fault;
+- `int64_t rootplc_now_ns` is the clock read by timers and `TIME()`.
+
+Compiled with `-DROOTPLC_MAIN`, the file also has a `main(argc, argv)`:
+`program CYCLES CYCLE_MS` runs that many cycles and prints every
+elementary variable of the program, one per line, as `name=value`
+(`TRUE`/`FALSE`; integers, durations and dates as decimal integers in
+their units; REAL with `%.9g` and LREAL with `%.17g`, which read back
+exactly), then `cycles=N`, and `fault=KIND` when a cycle stopped with a
+fault (exit code 1).
+
+**[build.c.semantics]** The generated code follows the VM (spec/02-types.md,
+spec/05-statements.md, [stdlib.fbs]): integer results wrap to their type (two's
+complement), REAL arithmetic is computed in double precision and rounded to
+single precision, real-to-integer conversion rounds half away from zero and
+saturates (NaN gives 0), FOR evaluates its end and step once and stores the
+next value with the control variable's type, CASE takes the first branch
+whose labels contain the value, function inputs that are not given take
+their initial value, and the standard function blocks keep the same state
+as in the VM. Timers read `rootplc_now_ns`. Arguments of a call are
+evaluated left to right in the VM; in C their order is unspecified, so a
+call whose arguments have side effects on each other may differ.
+
+**[build.c.faults]** Division or modulo by zero (`DIV_BY_ZERO`, code 1),
+an array index outside its bounds (`INDEX`, code 2) and a value outside a
+subrange (`RANGE`, code 3) stop the cycle as in the VM. The statement limit
+of the VM (`WATCHDOG`) is not modelled; a runtime uses its own watchdog.
+
+**[build.c.subset]** v0 supports: elementary types except strings,
+enumerations, subranges, aliases, arrays with fixed bounds, structures;
+programs, functions (inputs and outputs) and function blocks (inputs,
+outputs, locals, nested instances); global variables; every statement;
+the operators; the standard function blocks TON, TOF, TP, R_TRIG, F_TRIG,
+CTU, CTD, CTUD, SR and RS; the standard functions ABS, SQRT, LN, LOG, EXP,
+SIN, COS, TAN, ASIN, ACOS, ATAN, EXPT, TRUNC, MIN, MAX, LIMIT, SEL, MUX,
+MOVE, SHL, SHR, ROL, ROR, the type conversions between elementary types
+and `TIME()`. Not yet: STRING and WSTRING, references and pointers,
+VAR_IN_OUT, methods, interfaces, inheritance, FB_init, located variables,
+RETAIN, compatibility-library intrinsics and TEST blocks (tests run in the
+VM).

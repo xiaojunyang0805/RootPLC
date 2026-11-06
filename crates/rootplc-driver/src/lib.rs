@@ -3,6 +3,7 @@
 //! Roadmap phase: 1. See `ARCHITECTURE.md`.
 
 pub mod agents;
+pub mod build;
 pub mod coverage;
 pub mod deploy;
 pub mod diff;

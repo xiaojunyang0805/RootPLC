@@ -4,9 +4,11 @@ An open, agent-first IEC 61131-3 toolchain and runtime. AI agents use it to
 write, compile, test, simulate, verify and deploy PLC programs. Apache-2.0.
 
 > Status: **Phase 0, early preview.** `init`, `check`, `test` (with mutation
-> testing), `run`, `diff`, `evidence`, `explain`, `examples`, `coverage`,
-> `libraries`, the MCP server, runtime v0 and approval-gated `deploy` work.
-> `build`, `sim`, `verify` and `import` come later. The language spec and
+> testing), `run`, `diff`, `sim` (controller and plant models on the virtual
+> clock), `build --target c` (portable C99, checked against the VM),
+> `evidence`, `explain`, `examples`, `coverage`, `libraries`, the MCP server,
+> runtime v0 and approval-gated `deploy` work. `verify` and `import` come
+> later. The language spec and
 > conformance suite are the ground truth.
 
 **RootBlocks**, the bundled block catalog: 61 verified blocks for typical PLC

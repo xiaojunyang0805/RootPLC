@@ -17,6 +17,7 @@ rootplc-testing.workspace = true
 rootplc-stdlib.workspace = true
 rootplc-abi.workspace = true
 rootplc-runtime.workspace = true
+rootplc-codegen-c.workspace = true
 
 [lints]
 workspace = true

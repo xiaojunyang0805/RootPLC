@@ -21,7 +21,6 @@ version = "0.0.1"
 name = "rootplc-codegen-c"
 version = "0.0.1"
 dependencies = [
- "rootplc-abi",
  "rootplc-sema",
 ]
 
@@ -46,6 +45,7 @@ name = "rootplc-driver"
 version = "0.0.1"
 dependencies = [
  "rootplc-abi",
+ "rootplc-codegen-c",
  "rootplc-diag",
  "rootplc-runtime",
  "rootplc-sema",

@@ -16,6 +16,8 @@ const USAGE: &str = "usage:
   rootplc diff  <file.st|dir>... --reference FB --unit FB [--cycles N] [--cycle-ms MS] [--seed N]
                 [--set NAME=VALUE]... [--range NAME=LO..HI]... [--toggle P] [--tolerance T] [--json]
                 (same stimuli to both blocks, outputs compared each cycle; exit 1 when they differ)
+  rootplc build <file.st|dir>... --target c --out DIR [--program NAME] [--json]
+                (one portable C99 file that computes what the VM computes)
   rootplc sim   <file.st|dir>... --scenario FILE [--trace OUT.csv] [--compare OLD.csv] [--json]
                 (programs and plant models on the virtual clock; expectations; CSV trace)
   rootplc runtime <file.st|dir>... [--program NAME] [--cycle-ms MS] [--cycles N] [--watchdog-ms MS]
@@ -58,7 +60,8 @@ impl Args {
                 | "--agent" | "--library" | "--mutate-limit" | "--mutate-only" | "--min-score"
                 | "--out" | "--watchdog-ms" | "--retain" | "--status" | "--modbus" | "--deploy"
                 | "--to" | "--reference" | "--unit" | "--seed" | "--set" | "--range"
-                | "--toggle" | "--tolerance" | "--scenario" | "--trace" | "--compare" => {
+                | "--toggle" | "--tolerance" | "--scenario" | "--trace" | "--compare"
+                | "--target" => {
                     let v = it.next().unwrap_or_default();
                     a.options.push((x, v));
                 }
@@ -426,6 +429,61 @@ fn cmd_diff(paths: &[PathBuf], args: &Args) -> ExitCode {
         print!("{}", render(&r));
     }
     exit(r.verdict == Verdict::Agree)
+}
+
+/// `rootplc build --target c` ([build.c.command]).
+fn cmd_build(paths: &[PathBuf], args: &Args) -> ExitCode {
+    use rootplc_driver::build::{build_c, to_json};
+    match args.opt("--target") {
+        Some("c") => {}
+        Some(t) => {
+            return io_error(
+                "build",
+                &format!("unknown target '{t}' (only c so far)"),
+                args.json,
+            );
+        }
+        None => return io_error("build", "give --target c", args.json),
+    }
+    let Some(out) = args.opt("--out") else {
+        return io_error("build", "give --out DIR", args.json);
+    };
+    let check = match load("build", paths, args) {
+        Ok(c) => c,
+        Err(code) => return code,
+    };
+    let r = match build_c(check, args.opt("--program")) {
+        Ok(r) => r,
+        Err(e) => return io_error("build", &e, args.json),
+    };
+    let file = PathBuf::from(out).join("rootplc_program.c");
+    if let Some(code) = &r.code {
+        if let Err(e) = std::fs::create_dir_all(out).and_then(|()| std::fs::write(&file, code)) {
+            return io_error("build", &format!("{}: {e}", file.display()), args.json);
+        }
+    }
+    if args.json {
+        println!("{}", to_json(&r, &file.display().to_string()));
+    } else {
+        print_diagnostics(&r.check);
+        if !r.check.ok() {
+            eprintln!("rootplc build: the project does not compile");
+        } else if let Some(u) = &r.unsupported {
+            println!(
+                "{}:{}:{}: not supported by the C back end yet: {}",
+                u.file, u.line, u.column, u.construct
+            );
+        } else {
+            println!("{}: wrote {}", r.program, file.display());
+        }
+    }
+    if !r.check.ok() {
+        ExitCode::from(1)
+    } else if r.unsupported.is_some() {
+        ExitCode::from(2)
+    } else {
+        ExitCode::SUCCESS
+    }
 }
 
 /// `rootplc sim` ([sim.command]).
@@ -845,6 +903,7 @@ fn main() -> ExitCode {
                 | Command::Run
                 | Command::Diff
                 | Command::Sim
+                | Command::Build
                 | Command::Runtime
                 | Command::Deploy
                 | Command::Coverage
@@ -862,6 +921,7 @@ fn main() -> ExitCode {
         Some(Command::Run) => cmd_run(&paths, &args),
         Some(Command::Diff) => cmd_diff(&paths, &args),
         Some(Command::Sim) => cmd_sim(&paths, &args),
+        Some(Command::Build) => cmd_build(&paths, &args),
         Some(Command::Runtime) => cmd_runtime(&paths, &args),
         Some(Command::Deploy) => cmd_deploy(&paths, &args),
         Some(Command::Approve) => cmd_approve(rest.first(), &args),

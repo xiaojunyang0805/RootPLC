@@ -158,6 +158,27 @@ comes with the inputs of that cycle and the four before:
 Agreement covers the sampled cycles only: set slow inputs, narrow ranges or
 add TEST blocks for behaviour the stimuli do not reach.
 
+## build
+
+`rootplc build . --target c --out DIR` translates the program into one
+portable C99 file, `DIR/rootplc_program.c`
+([spec/18-codegen-c.md](../../spec/18-codegen-c.md)). It computes what the
+VM computes: same values after every cycle, same faults (DIV_BY_ZERO,
+INDEX, RANGE). Entry points: `rootplc_init()`, `rootplc_cycle(cycle_ns)`
+(returns 0 or a fault code) and the clock `rootplc_now_ns`. Compiled with
+`-DROOTPLC_MAIN`, the file has a `main` that runs N cycles and prints every
+variable (`./prog 100 10`: 100 cycles of 10 ms). Checked in CI against the
+VM on every conformance case it supports; builds with gcc, clang and MSVC.
+
+Not yet in v0: STRING, references, VAR_IN_OUT, methods, interfaces,
+inheritance, FB_init, located and RETAIN variables; such a program gives
+exit code 2 and the first construct with its location.
+
+```json
+{"command":"build","ok":true,"target":"c","program":"PRG_TrafficLight",
+ "out":"out/rootplc_program.c","diagnostics":[],"unsupported":null}
+```
+
 ## sim
 
 Runs one or more programs as one task on the virtual clock, driven by a
