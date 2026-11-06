@@ -36,7 +36,8 @@ Compiled with `-DROOTPLC_MAIN`, the file also has a `main(argc, argv)`:
 elementary variable of the program, one per line, as `name=value`
 (`TRUE`/`FALSE`; integers, durations and dates as decimal integers in
 their units; REAL with `%.9g` and LREAL with `%.17g`, which read back
-exactly), then `cycles=N`, and `fault=KIND` when a cycle stopped with a
+exactly; strings in UTF-8 with `$` written `$$` and control characters
+as `$N`, `$R`, `$T` or `$hh`), then `cycles=N`, and `fault=KIND` when a cycle stopped with a
 fault (exit code 1).
 
 **[build.c.semantics]** The generated code follows the VM (spec/02-types.md,
@@ -56,15 +57,27 @@ an array index outside its bounds (`INDEX`, code 2) and a value outside a
 subrange (`RANGE`, code 3) stop the cycle as in the VM. The statement limit
 of the VM (`WATCHDOG`) is not modelled; a runtime uses its own watchdog.
 
-**[build.c.subset]** v0 supports: elementary types except strings,
-enumerations, subranges, aliases, arrays with fixed bounds, structures;
+**[build.c.strings]** STRING and WSTRING values are sequences of
+characters (Unicode code points), as in the VM: lengths, positions and
+truncation count characters. Every string is stored with the capacity of
+the longest string the program declares or writes (at least 16), and a
+value stored in a `STRING[n]` is cut to `n` characters. The string
+functions LEN, FIND, CONCAT, LEFT, RIGHT, MID, INSERT, DELETE and REPLACE,
+comparisons (character by character), conversions from a string to an
+integer (the number the text spells, else 0) or a CHAR (its first
+character), and conversions to a string from integers, BOOL, CHAR, TIME
+and LTIME are supported. Not yet: REAL, dates, times of day and
+enumerations as text, and character access `s[i]`.
+
+**[build.c.subset]** v0 supports: elementary types, strings
+([build.c.strings]), enumerations, subranges, aliases, arrays with fixed bounds, structures;
 programs, functions (inputs and outputs) and function blocks (inputs,
 outputs, locals, nested instances); global variables; every statement;
 the operators; the standard function blocks TON, TOF, TP, R_TRIG, F_TRIG,
 CTU, CTD, CTUD, SR and RS; the standard functions ABS, SQRT, LN, LOG, EXP,
 SIN, COS, TAN, ASIN, ACOS, ATAN, EXPT, TRUNC, MIN, MAX, LIMIT, SEL, MUX,
 MOVE, SHL, SHR, ROL, ROR, the type conversions between elementary types
-and `TIME()`. Not yet: STRING and WSTRING, references and pointers,
+and `TIME()`. Not yet: references and pointers,
 VAR_IN_OUT, methods, interfaces, inheritance, FB_init, located variables,
 RETAIN, compatibility-library intrinsics and TEST blocks (tests run in the
 VM).
