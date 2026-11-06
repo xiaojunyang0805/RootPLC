@@ -138,3 +138,43 @@ END_PROGRAM
     assert_eq!(var("first"), "FALSE");
     assert_eq!(var("seen_first"), "TRUE");
 }
+
+#[test]
+fn adslog_messages_appear_in_the_run() {
+    let src = "PROGRAM P
+VAR n : DINT; END_VAR
+n := n + 1;
+ADSLOGSTR(ADSLOG_MSGTYPE_HINT, 'Valve %s open', 'V1');
+ADSLOGDINT(ADSLOG_MSGTYPE_WARN, 'Count %d', n);
+ADSLOGLREAL(ADSLOG_MSGTYPE_ERROR, 'no placeholder', 2.5);
+END_PROGRAM
+";
+    let check = rootplc_driver::check_sources_with(
+        vec![("p.st".into(), src.to_string())],
+        &["Tc2_System".to_string()],
+    )
+    .expect("library resolves");
+    assert!(check.ok(), "program checks");
+    let run = rootplc_driver::run_report(check, Some("P"), 2, 10_000_000).expect("runs");
+    assert!(run.fault.is_none());
+    let got: Vec<(u64, u32, &str)> = run
+        .log
+        .iter()
+        .map(|l| (l.cycle, l.mask, l.text.as_str()))
+        .collect();
+    assert_eq!(
+        got,
+        [
+            (0, 1, "Valve V1 open"),
+            (0, 2, "Count 1"),
+            (0, 4, "no placeholder"),
+            (1, 1, "Valve V1 open"),
+            (1, 2, "Count 2"),
+            (1, 4, "no placeholder"),
+        ]
+    );
+    assert!(
+        rootplc_driver::json::run(&run)
+            .contains(r#""log":[{"cycle":0,"mask":1,"message":"Valve V1 open"}"#)
+    );
+}

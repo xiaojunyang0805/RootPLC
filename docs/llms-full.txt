@@ -156,8 +156,13 @@ cycle, so timers behave as on a PLC with that cycle time.
 
 ```json
 {"command":"run","ok":true,"program":"PRG_Main","cycles":3,"fault":null,
- "diagnostics":[],"variables":{"start":"FALSE","running":"FALSE"}}
+ "diagnostics":[],"variables":{"start":"FALSE","running":"FALSE"},"tests":[],"log":[]}
 ```
+
+`tests` holds the results of a TcUnit suite; `log` the messages TwinCAT code
+writes with `ADSLOGSTR`, `ADSLOGDINT` and `ADSLOGLREAL` (library
+`Tc2_System`), each with its cycle, message-type mask and text; text output
+prints them as `log <cycle> <mask>: <message>`.
 
 Faults: `DIV_BY_ZERO`, `RANGE` (subrange), `INDEX` (array bounds),
 `NULL_REF`, `WATCHDOG` (more than 10 million statements in one cycle).
@@ -201,7 +206,9 @@ development; it is not certified and has no fieldbus yet.
 
 - Located variables (`AT %IX0.0`, `%QW2`, `%MD4`) are bound to the process
   image: inputs are copied in before each cycle and outputs out after it.
-  A type that does not fit its address is error RP0205.
+  A non-BOOL variable at a bit address is error RP0205; another type at a
+  byte, word or double-word address is TwinCAT's byte-offset reading
+  (warning RP0135).
 - A fault in a cycle, or a cycle longer than `--watchdog-ms` (default ten
   periods), stops the program and sets every output to 0 (safe outputs).
 - `--retain FILE` restores the variables of RETAIN sections at start and
@@ -350,7 +357,7 @@ activating one activates the libraries it requires.
 
 ```json
 {"command":"libraries","ok":true,"libraries":[{"name":"Tc2_System","vendor":"Beckhoff Automation GmbH",
- "version":"1.0.0","description":"…","declare_only":["ADSLOGSTR","ADSLOGDINT","ADSLOGLREAL"],"references":["…"]}]}
+ "version":"1.0.0","description":"…","declare_only":["GETCPUCOUNTER","MEMCPY","MEMMOVE"],"references":["…"]}]}
 ```
 
 ## mcp
@@ -1417,8 +1424,8 @@ warning: call of a library function that RootPLC declares but does not implement
 Rule `stdlib.compat.declare-only` in `spec/08-stdlib.md`:
 
 **[stdlib.compat.declare-only]** A library function RootPLC can declare but
-not reproduce faithfully (for example one that writes to the vendor's event
-log) is declared only. A call is warning RP0120; executing it stops with the
+not reproduce faithfully (for example one that copies raw memory) is
+declared only. A call is warning RP0120; executing it stops with the
 fault `UNSUPPORTED`, so a run never continues with behaviour RootPLC cannot
 guarantee. For a declared-only function block this holds for a call of the
 block itself, for its methods (also those a derived block inherits and
@@ -3149,14 +3156,26 @@ members count one byte each (TwinCAT packs them into shared bytes; this is
 not modelled yet).
 
 **[stdlib.compat.declare-only]** A library function RootPLC can declare but
-not reproduce faithfully (for example one that writes to the vendor's event
-log) is declared only. A call is warning RP0120; executing it stops with the
+not reproduce faithfully (for example one that copies raw memory) is
+declared only. A call is warning RP0120; executing it stops with the
 fault `UNSUPPORTED`, so a run never continues with behaviour RootPLC cannot
 guarantee. For a declared-only function block this holds for a call of the
 block itself, for its methods (also those a derived block inherits and
 does not override) and for reading or writing its properties; a library can
 also mark a single method as declared only. Declaring instances, passing
 them and assigning them to interfaces needs no implementation.
+
+**[stdlib.compat.log]** `Tc2_System`'s `ADSLOGSTR`, `ADSLOGDINT` and
+`ADSLOGLREAL` record their message instead of writing to the TwinCAT event
+log. The first `%s`, `%d` or `%f` respectively in the format text is replaced
+by the argument (a DINT in decimal, an LREAL as `LREAL_TO_STRING` writes it,
+which may differ from TwinCAT's number format), and the functions return 0.
+`rootplc run` reports each message with the cycle it was written in (from 0)
+and its message-type mask (JSON field `log`; text lines `log <cycle>
+<mask>: <message>`); a message box (`ADSLOG_MSGTYPE_MSGBOX`) is recorded like
+any other message. TEST blocks and `rootplc diff` run the functions without
+reporting the messages. The library enables the intrinsic `__ROOTPLC_LOG`
+for this; it is not part of any vendor interface.
 
 **[stdlib.compat.unit]** The library `TcUnit` provides the API of TcUnit,
 the open-source unit-test framework for TwinCAT 3, written from its public

@@ -348,6 +348,8 @@ pub struct RunReport {
     /// Test results reported by a unit-test library (TcUnit) while the
     /// program ran, [stdlib.compat.unit].
     pub tests: Vec<rootplc_vm::UnitResult>,
+    /// Messages written with ADSLOG, [stdlib.compat.log].
+    pub log: Vec<rootplc_vm::LogEntry>,
 }
 
 impl RunReport {
@@ -383,6 +385,7 @@ pub fn run_report(
             fault: None,
             variables: Vec::new(),
             tests: Vec::new(),
+            log: Vec::new(),
         });
     };
     let programs: Vec<usize> = (0..prog.defs.len())
@@ -422,6 +425,7 @@ pub fn run_report(
         .collect();
     let name = prog.defs[def].name.clone();
     let tests = std::mem::take(&mut vm.unit_results);
+    let log = std::mem::take(&mut vm.log);
     drop(vm);
     Ok(RunReport {
         check,
@@ -430,5 +434,6 @@ pub fn run_report(
         fault,
         variables,
         tests,
+        log,
     })
 }

@@ -2,13 +2,13 @@
    libraries: Tc2_System
    expect: warning RP0120
    run: PRG_Main cycles=1
-   assert: res = 0 *)
+   assert: now = 0 *)
 PROGRAM PRG_Main
 VAR
-    logNow : BOOL;
-    res : DINT;
+    readClock : BOOL;
+    now : ULINT;
 END_VAR
-IF logNow THEN
-    res := ADSLOGSTR(ADSLOG_MSGTYPE_HINT, 'Started %s', 'motor');
+IF readClock THEN
+    now := F_GetSystemTime();
 END_IF;
 END_PROGRAM

@@ -270,9 +270,6 @@ mod tests {
         assert_eq!(
             tc.declare_only,
             [
-                "ADSLOGSTR",
-                "ADSLOGDINT",
-                "ADSLOGLREAL",
                 "GETCPUCOUNTER",
                 "MEMCPY",
                 "MEMMOVE",

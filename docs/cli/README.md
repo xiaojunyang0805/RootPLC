@@ -117,8 +117,13 @@ cycle, so timers behave as on a PLC with that cycle time.
 
 ```json
 {"command":"run","ok":true,"program":"PRG_Main","cycles":3,"fault":null,
- "diagnostics":[],"variables":{"start":"FALSE","running":"FALSE"}}
+ "diagnostics":[],"variables":{"start":"FALSE","running":"FALSE"},"tests":[],"log":[]}
 ```
+
+`tests` holds the results of a TcUnit suite; `log` the messages TwinCAT code
+writes with `ADSLOGSTR`, `ADSLOGDINT` and `ADSLOGLREAL` (library
+`Tc2_System`), each with its cycle, message-type mask and text; text output
+prints them as `log <cycle> <mask>: <message>`.
 
 Faults: `DIV_BY_ZERO`, `RANGE` (subrange), `INDEX` (array bounds),
 `NULL_REF`, `WATCHDOG` (more than 10 million statements in one cycle).
@@ -162,7 +167,9 @@ development; it is not certified and has no fieldbus yet.
 
 - Located variables (`AT %IX0.0`, `%QW2`, `%MD4`) are bound to the process
   image: inputs are copied in before each cycle and outputs out after it.
-  A type that does not fit its address is error RP0205.
+  A non-BOOL variable at a bit address is error RP0205; another type at a
+  byte, word or double-word address is TwinCAT's byte-offset reading
+  (warning RP0135).
 - A fault in a cycle, or a cycle longer than `--watchdog-ms` (default ten
   periods), stops the program and sets every output to 0 (safe outputs).
 - `--retain FILE` restores the variables of RETAIN sections at start and
@@ -311,7 +318,7 @@ activating one activates the libraries it requires.
 
 ```json
 {"command":"libraries","ok":true,"libraries":[{"name":"Tc2_System","vendor":"Beckhoff Automation GmbH",
- "version":"1.0.0","description":"…","declare_only":["ADSLOGSTR","ADSLOGDINT","ADSLOGLREAL"],"references":["…"]}]}
+ "version":"1.0.0","description":"…","declare_only":["GETCPUCOUNTER","MEMCPY","MEMMOVE"],"references":["…"]}]}
 ```
 
 ## mcp

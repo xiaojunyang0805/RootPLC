@@ -187,6 +187,17 @@ pub struct UnitResult {
     pub message: String,
 }
 
+/// A message written with TwinCAT's ADSLOG functions, [stdlib.compat.log].
+#[derive(Debug, Clone, PartialEq)]
+pub struct LogEntry {
+    /// Cycle it was written in, from 0 (set by [`Vm::begin_cycle`]).
+    pub cycle: u64,
+    /// Message-type mask (`ADSLOG_MSGTYPE_...`).
+    pub mask: u32,
+    /// Message text with the argument filled in.
+    pub text: String,
+}
+
 /// What one axis did over a run, reported by RootMotion's axis cycle
 /// ([motion.observe]).
 #[derive(Debug, Clone, PartialEq)]
@@ -269,6 +280,10 @@ pub struct Vm<'p> {
     /// Test results reported by a unit-test library such as TcUnit,
     /// [stdlib.compat.unit].
     pub unit_results: Vec<UnitResult>,
+    /// Messages written with ADSLOG, [stdlib.compat.log].
+    pub log: Vec<LogEntry>,
+    /// Number of the current cycle (from [`Vm::begin_cycle`]).
+    cycle: u64,
     /// Axes moved by RootMotion, in order of first report, [motion.observe].
     pub axes: Vec<AxisStats>,
     steps: u64,
@@ -498,6 +513,8 @@ impl<'p> Vm<'p> {
             now_ns: 0,
             failures: Vec::new(),
             unit_results: Vec::new(),
+            log: Vec::new(),
+            cycle: 0,
             axes: Vec::new(),
             steps: 0,
             file: 0,
@@ -1018,6 +1035,7 @@ impl<'p> Vm<'p> {
     /// the project declares it (`_TaskInfo`, TwinCAT_BuiltIns): CycleTime in
     /// 100 ns units, CycleCount and FirstCycle.
     pub fn begin_cycle(&mut self, cycle_ns: i128, n: u64) {
+        self.cycle = n;
         let prog = self.prog;
         let (Some(g), Some(groot)) = (prog.globals, self.globals) else {
             return;
@@ -2048,6 +2066,14 @@ impl<'p> Vm<'p> {
                     test: to_text(&arg(1)),
                     status: int(&arg(2)).clamp(0, 2) as u8,
                     message: to_text(&arg(3)),
+                });
+                Ok(Value::Int(0))
+            }
+            "__ROOTPLC_LOG" => {
+                self.log.push(LogEntry {
+                    cycle: self.cycle,
+                    mask: int(&arg(0)) as u32,
+                    text: to_text(&arg(1)),
                 });
                 Ok(Value::Int(0))
             }

@@ -57,14 +57,27 @@ TYPE
     T_MaxString : STRING[MAX_STRING_LENGTH];
 END_TYPE
 
-(* Writes a message to the event log and/or a message box. Declared only:
-   RootPLC type-checks calls but does not run them (no event log). *)
+(* Writes a message to the event log and/or a message box. RootPLC has no
+   event log: the message is recorded and `rootplc run` reports it
+   ([stdlib.compat.log]). The first placeholder (%s, %d, %f) takes the
+   argument. *)
 FUNCTION ADSLOGSTR : DINT
 VAR_INPUT
     msgCtrlMask : DWORD;
     msgFmtStr : T_MaxString;
     strArg : T_MaxString;
 END_VAR
+VAR
+    at : INT;
+    msg : T_MaxString;
+END_VAR
+msg := msgFmtStr;
+at := FIND(msg, '%s');
+IF at > 0 THEN
+    msg := REPLACE(msg, strArg, 2, at);
+END_IF;
+__ROOTPLC_LOG(msgCtrlMask, msg);
+ADSLOGSTR := 0;
 END_FUNCTION
 
 FUNCTION ADSLOGDINT : DINT
@@ -73,6 +86,17 @@ VAR_INPUT
     msgFmtStr : T_MaxString;
     dintArg : DINT;
 END_VAR
+VAR
+    at : INT;
+    msg : T_MaxString;
+END_VAR
+msg := msgFmtStr;
+at := FIND(msg, '%d');
+IF at > 0 THEN
+    msg := REPLACE(msg, DINT_TO_STRING(dintArg), 2, at);
+END_IF;
+__ROOTPLC_LOG(msgCtrlMask, msg);
+ADSLOGDINT := 0;
 END_FUNCTION
 
 FUNCTION ADSLOGLREAL : DINT
@@ -81,6 +105,17 @@ VAR_INPUT
     msgFmtStr : T_MaxString;
     lrealArg : LREAL;
 END_VAR
+VAR
+    at : INT;
+    msg : T_MaxString;
+END_VAR
+msg := msgFmtStr;
+at := FIND(msg, '%f');
+IF at > 0 THEN
+    msg := REPLACE(msg, LREAL_TO_STRING(lrealArg), 2, at);
+END_IF;
+__ROOTPLC_LOG(msgCtrlMask, msg);
+ADSLOGLREAL := 0;
 END_FUNCTION
 
 (* Library versions: every TwinCAT library has a constant of this type

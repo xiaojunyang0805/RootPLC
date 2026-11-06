@@ -127,15 +127,28 @@ pub fn run(r: &RunReport) -> String {
             )
         })
         .collect();
+    let log: Vec<String> = r
+        .log
+        .iter()
+        .map(|l| {
+            format!(
+                "{{\"cycle\":{},\"mask\":{},\"message\":{}}}",
+                l.cycle,
+                l.mask,
+                json_string(&l.text)
+            )
+        })
+        .collect();
     format!(
-        "{{\"command\":\"run\",\"ok\":{},\"program\":{},\"cycles\":{},\"fault\":{},\"diagnostics\":{},\"variables\":{{{}}},\"tests\":[{}]}}",
+        "{{\"command\":\"run\",\"ok\":{},\"program\":{},\"cycles\":{},\"fault\":{},\"diagnostics\":{},\"variables\":{{{}}},\"tests\":[{}],\"log\":[{}]}}",
         r.ok(),
         json_string(&r.program),
         r.cycles,
         fault(&r.check, r.fault.as_ref()),
         diagnostics(&r.check),
         vars.join(","),
-        tests.join(",")
+        tests.join(","),
+        log.join(",")
     )
 }
 

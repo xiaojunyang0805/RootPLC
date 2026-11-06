@@ -671,8 +671,8 @@ warning: call of a library function that RootPLC declares but does not implement
 Rule `stdlib.compat.declare-only` in `spec/08-stdlib.md`:
 
 **[stdlib.compat.declare-only]** A library function RootPLC can declare but
-not reproduce faithfully (for example one that writes to the vendor's event
-log) is declared only. A call is warning RP0120; executing it stops with the
+not reproduce faithfully (for example one that copies raw memory) is
+declared only. A call is warning RP0120; executing it stops with the
 fault `UNSUPPORTED`, so a run never continues with behaviour RootPLC cannot
 guarantee. For a declared-only function block this holds for a call of the
 block itself, for its methods (also those a derived block inherits and

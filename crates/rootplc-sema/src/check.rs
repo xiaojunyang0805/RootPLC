@@ -5249,8 +5249,10 @@ impl<'a> Checker<'a> {
         // 2 skipped) for the suite instance `suite` refers to
         // [motion.observe]: __ROOTPLC_AXIS_CYCLE(axis, velocity, acceleration,
         // max velocity, max acceleration, hard stop) reports one axis cycle
+        // [stdlib.compat.log]: __ROOTPLC_LOG(mask, text) records a message
         if (up == "__ROOTPLC_UNIT_RESULT" && args.len() == 4
-            || up == "__ROOTPLC_AXIS_CYCLE" && args.len() == 6)
+            || up == "__ROOTPLC_AXIS_CYCLE" && args.len() == 6
+            || up == "__ROOTPLC_LOG" && args.len() == 2)
             && self.intrinsics.contains(&up)
         {
             let irs: Vec<ir::Expr> = args.iter().map(|a| self.expr(a.expr).ir()).collect();

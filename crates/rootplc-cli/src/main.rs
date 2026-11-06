@@ -335,6 +335,9 @@ fn cmd_run(paths: &[PathBuf], args: &Args) -> ExitCode {
         for (n, v) in &r.variables {
             println!("  {n} = {v}");
         }
+        for l in &r.log {
+            println!("log {} {}: {}", l.cycle, l.mask, l.text);
+        }
         if let Some(f) = &r.fault {
             let (n, l, c) = json::location(&r.check, f.file, f.span.start);
             println!("{n}:{l}:{c}: fault {}: {}", f.kind.name(), f.message);
