@@ -77,6 +77,29 @@ fn mutation_on_the_slice() {
 }
 
 #[test]
+fn a_tcunit_test_call_is_not_a_test_block() {
+    let (kept, _) = slice_tests(vec![
+        (
+            PathBuf::from("suite.st"),
+            "FUNCTION_BLOCK Suite
+TEST('adds');
+TEST_FINISHED();
+END_FUNCTION_BLOCK"
+                .into(),
+        ),
+        (
+            PathBuf::from("t.st"),
+            "TEST real_one
+ASSERT_TRUE(TRUE);
+END_TEST"
+                .into(),
+        ),
+    ]);
+    let names: Vec<_> = kept.iter().map(|(p, _)| p.display().to_string()).collect();
+    assert_eq!(names, ["t.st"]);
+}
+
+#[test]
 fn no_tests_keeps_nothing() {
     let (kept, left) = slice_tests(vec![(
         PathBuf::from("a.st"),

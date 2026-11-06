@@ -50,7 +50,10 @@ fn names_of(src: &str) -> (BTreeSet<String>, BTreeSet<String>, bool) {
                     }
                 }
                 "type" | "var_global" => section = true,
-                "test" => has_test = true,
+                // a TEST block: TEST followed by its name (TcUnit calls TEST('x'))
+                "test" => {
+                    has_test |= toks.get(i + 1).is_some_and(|t| t.kind == TokenKind::Ident);
+                }
                 "end_type" | "end_var" => section = false,
                 // reserved words some vendors accept as names
                 _ => {
