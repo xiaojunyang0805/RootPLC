@@ -285,8 +285,7 @@ mod tests {
                 "FB_FileDelete",
                 "FB_CreateDir",
                 "ADSREAD",
-                "ADSWRITE",
-                "F_GetSystemTime"
+                "ADSWRITE"
             ]
         );
         assert_eq!(tc.references.len(), 23);
@@ -307,7 +306,8 @@ mod tests {
                 "__DELETE",
                 "ANY",
                 "__QUERYINTERFACE",
-                "__QUERYPOINTER"
+                "__QUERYPOINTER",
+                "__ROOTPLC_CLOCK_NS"
             ]
         );
     }

@@ -432,8 +432,10 @@ VAR_OUTPUT
 END_VAR
 END_FUNCTION_BLOCK
 
-(* Operating system timestamp, 100 ns units: declared only. *)
+(* Operating system timestamp: a file time, 100 ns units since 1601-01-01
+   UTC. RootPLC returns the virtual time of day ([stdlib.compat.clock]). *)
 FUNCTION F_GetSystemTime : ULINT
+F_GetSystemTime := LINT_TO_ULINT(__ROOTPLC_CLOCK_NS() / 100) + ULINT#116444736000000000;
 END_FUNCTION
 
 (* '127.16.17.3.1.1' from the six bytes of an AMS NetID. *)

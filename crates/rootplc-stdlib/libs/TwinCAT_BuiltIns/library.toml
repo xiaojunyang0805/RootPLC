@@ -8,7 +8,7 @@ version = "1.0.0"
 description = "TwinCAT built-in names: the BIT type, the __SYSTEM.IQueryInterface base interface, SIZEOF / XSIZEOF, XINT/UXINT/XWORD, PVOID (untyped reference), HRESULT, GUID, TwinCAT_SystemInfoVarList (_TaskInfo, _AppInfo), __SYSTEM.TYPE_CLASS"
 declare_only = []
 # operators this library enables, with TwinCAT's 64-bit memory layout
-intrinsics = ["SIZEOF", "XSIZEOF", "PVOID", "__POUNAME", "TIME", "__NEW", "__DELETE", "ANY", "__QUERYINTERFACE", "__QUERYPOINTER"]
+intrinsics = ["SIZEOF", "XSIZEOF", "PVOID", "__POUNAME", "TIME", "__NEW", "__DELETE", "ANY", "__QUERYINTERFACE", "__QUERYPOINTER", "__ROOTPLC_CLOCK_NS"]
 references = [
   "https://infosys.beckhoff.com/content/1033/tc3_plc_intro/2529343371.html (bit access, BIT members in structures)",
   "https://infosys.beckhoff.com/content/1033/tc3_plc_intro/2528896907.html (SIZEOF: result type by size)",

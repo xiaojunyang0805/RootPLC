@@ -178,3 +178,52 @@ END_PROGRAM
             .contains(r#""log":[{"cycle":0,"mask":1,"message":"Valve V1 open"}"#)
     );
 }
+
+#[test]
+fn virtual_time_of_day_in_tests_follows_advance() {
+    let src = "TEST clock
+VAR a : ULINT; b : ULINT; END_VAR
+a := F_GetSystemTime();
+ADVANCE(T#1s500ms);
+b := F_GetSystemTime();
+ASSERT_EQ(ULINT#15000000, b - a);
+(* 2026-01-01 00:00:00 UTC as a file time *)
+ASSERT_EQ(ULINT#134116992000000000, a);
+END_TEST
+";
+    let check = rootplc_driver::check_sources_with(
+        vec![("t.st".into(), src.to_string())],
+        &["Tc2_System".to_string()],
+    )
+    .expect("library resolves");
+    assert!(check.ok(), "test checks");
+    let report = rootplc_driver::test_report(check, None);
+    assert!(report.ok(), "{:?}", report.outcomes);
+}
+
+#[test]
+fn dc_task_time_and_system_time_follow_the_run() {
+    let src = "PROGRAM P
+VAR now : ULINT; dc : LINT; END_VAR
+now := F_GetSystemTime();
+dc := _TaskInfo[GETCURTASKINDEXEX()].DcTaskTime;
+END_PROGRAM
+";
+    let check = rootplc_driver::check_sources_with(
+        vec![("p.st".into(), src.to_string())],
+        &["TwinCAT_BuiltIns".to_string(), "Tc2_System".to_string()],
+    )
+    .expect("libraries resolve");
+    assert!(check.ok(), "program checks");
+    // three cycles of 10 ms: the third starts 20 ms after 2026-01-01
+    let run = rootplc_driver::run_report(check, Some("P"), 3, 10_000_000).expect("runs");
+    let var = |name: &str| {
+        run.variables
+            .iter()
+            .find(|(n, _)| n == name)
+            .map(|(_, v)| v.clone())
+            .unwrap_or_default()
+    };
+    assert_eq!(var("now"), "134116992000200000");
+    assert_eq!(var("dc"), "820540800020000000");
+}

@@ -187,6 +187,10 @@ pub struct UnitResult {
     pub message: String,
 }
 
+/// Start of the virtual time of day, 2026-01-01 00:00:00 UTC, in ns since
+/// 1970-01-01 ([stdlib.compat.clock]).
+pub const CLOCK_START_NS: i128 = 1_767_225_600 * 1_000_000_000;
+
 /// A message written with TwinCAT's ADSLOG functions, [stdlib.compat.log].
 #[derive(Debug, Clone, PartialEq)]
 pub struct LogEntry {
@@ -1060,6 +1064,11 @@ impl<'p> Vm<'p> {
             ("CycleTime", Value::Int(cycle_ns / 100)),
             ("CycleCount", Value::Int(i128::from(n))),
             ("FirstCycle", Value::Bool(n == 0)),
+            // ns since 2000-01-01, the distributed-clock epoch
+            (
+                "DcTaskTime",
+                Value::Int(CLOCK_START_NS + self.now_ns - 946_684_800 * 1_000_000_000),
+            ),
         ];
         for (name, v) in set {
             if let Some(k) = fields
@@ -2056,6 +2065,8 @@ impl<'p> Vm<'p> {
             }
             // [stdlib.compat.intrinsics]: time since start, ms (virtual clock)
             "TIME" => Ok(Value::Int(self.now_ns / 1_000_000)),
+            // [stdlib.compat.clock]: virtual time of day, ns since 1970
+            "__ROOTPLC_CLOCK_NS" => Ok(Value::Int(CLOCK_START_NS + self.now_ns)),
             "__ROOTPLC_UNIT_RESULT" => {
                 let suite = match arg(0) {
                     Value::Ref(Some(l)) => self.path_name(&l),

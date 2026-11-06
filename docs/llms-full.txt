@@ -3235,8 +3235,20 @@ project declares TwinCAT's task information (`_TaskInfo`, library
 `TwinCAT_BuiltIns`), `rootplc run` fills task 1 before every cycle:
 `CycleTime` is the cycle time in 100 ns units (`--cycle-ms 10` gives
 100000), `CycleCount` the number of cycles run before this one and
-`FirstCycle` TRUE in the first cycle only. Other members keep their initial
-values. TEST blocks drive programs themselves and do not fill it.
+`FirstCycle` TRUE in the first cycle only and `DcTaskTime` the start of
+the cycle on the virtual time of day ([stdlib.compat.clock]) in ns since
+2000-01-01 (the EtherCAT distributed-clock epoch). Other members keep their
+initial values. TEST blocks drive programs themselves and do not fill it.
+
+**[stdlib.compat.clock]** RootPLC has no wall clock in a run or a test: the
+virtual time of day is 2026-01-01 00:00:00 UTC plus the virtual clock of
+the VM (the time since the run or test started, advanced by each cycle or
+by `ADVANCE`), so every run is reproducible. `Tc2_System`'s
+`F_GetSystemTime` returns it as a Windows file time (100 ns units since
+1601-01-01, UTC) and `_TaskInfo[].DcTaskTime` as above. `TwinCAT_BuiltIns`
+enables the intrinsic `__ROOTPLC_CLOCK_NS()`, the virtual time of day in
+ns since 1970-01-01 UTC as a LINT, for this; it is not part of any vendor
+interface.
 
 
 ======== Specification: spec/13-motion.md ========

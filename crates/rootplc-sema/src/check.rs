@@ -5366,6 +5366,20 @@ impl<'a> Checker<'a> {
             };
             return V::with(rty, span, ExprKind::Call(Box::new(call)));
         }
+        // [stdlib.compat.clock]: __ROOTPLC_CLOCK_NS() is the virtual time of
+        // day, ns since 1970-01-01 UTC
+        if args.is_empty() && self.intrinsics.contains(&up) && up == "__ROOTPLC_CLOCK_NS" {
+            let call = ir::Call {
+                target: CallTarget::Builtin {
+                    name: up.clone(),
+                    ty: None,
+                },
+                inputs: Vec::new(),
+                outputs: Vec::new(),
+                args: Vec::new(),
+            };
+            return V::with(Ty::Elem(Elem::Lint), span, ExprKind::Call(Box::new(call)));
+        }
         if args.is_empty() && self.intrinsics.contains(&up) && up == "TIME" {
             let call = ir::Call {
                 target: CallTarget::Builtin {
