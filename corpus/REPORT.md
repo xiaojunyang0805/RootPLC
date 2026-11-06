@@ -9,20 +9,20 @@ confirmed that the code is valid, so it measures acceptance, not correctness. *I
 clean with no portability warning either ([scope.vendor-forms]): the unit uses no CODESYS or
 TwinCAT form RootPLC knows of, so it is IEC 61131-3 Structured Text as far as RootPLC can tell.
 
-**Headline (applications, libraries and samples; 200 projects, 13372 units): syntax OK 96.4% · clean 73.1% · median project clean 75.0% · IEC clean 21.3%.**
+**Headline (applications, libraries and samples; 200 projects, 13372 units): syntax OK 96.4% · clean 73.1% · median project clean 75.0% · IEC clean 21.2%.**
 
 | Figure | Projects | Units | Syntax OK | Clean | IEC clean |
 |---|---|---|---|---|---|
-| Headline (core set) | 200 | 13372 | 96.4% | 73.1% | 21.3% |
+| Headline (core set) | 200 | 13372 | 96.4% | 73.1% | 21.2% |
 | Holdout part of the core set (never used to choose fixes) | 32 | 901 | 95.2% | 66.4% | 22.9% |
-| Everything analysed, tool inputs included | 226 | 15470 | 94.7% | 70.8% | 23.4% |
+| Everything analysed, tool inputs included | 226 | 15470 | 94.7% | 70.8% | 23.3% |
 
 | Category | Units | Syntax OK | Clean | IEC clean |
 |---|---|---|---|---|
 | application | 2455 | 95.2% | 81.7% | 35.3% |
 | library | 9594 | 96.6% | 72.7% | 17.5% |
 | sample | 1323 | 97.2% | 59.6% | 22.4% |
-| tool-input | 2098 | 84.0% | 56.2% | 36.8% |
+| tool-input | 2098 | 84.0% | 56.1% | 36.8% |
 
 Categories (manifest `category`): *application* (a program for a machine or plant), *library*,
 *sample* (vendor samples, tutorials, blog and course code), *tool-input* (test inputs and examples
@@ -73,7 +73,7 @@ as empty, duplicated, not Structured Text or too small are listed at the end of 
 | [krystian-l-lis-stage](https://github.com/Krystian-L-Lis/Stage) | library (holdout) | MIT License | 64 | 4,294 | 89% | 75% | 30% |
 | [verkal1999-fischertechnik-i4-0-modules-simulator-twincat](https://github.com/verkal1999/Fischertechnik_I4.0_Modules_Simulator_TwinCAT) | application (holdout) | MIT License | 63 | 6,285 | 97% | 52% | 17% |
 | [siyka-au-mobject-ext](https://github.com/siyka-au/mobject-ext) | library | MIT License | 62 | 4,145 | 97% | 45% | 10% |
-| [fisothemes-twincat-dynamic-string-kit](https://github.com/fisothemes/TwinCAT-Dynamic-String-Kit) | library | MIT License | 56 | 2,125 | 100% | 80% | 29% |
+| [fisothemes-twincat-dynamic-string-kit](https://github.com/fisothemes/TwinCAT-Dynamic-String-Kit) | library | MIT License | 56 | 2,125 | 100% | 80% | 23% |
 | [sionverhoef-twincat-st](https://github.com/SionVerhoef/twincat-st) | tool-input | MIT License | 55 | 1,838 | 96% | 60% | 22% |
 | [iec-checker](https://github.com/iec-checker/iec-checker) | tool-input | LGPL-3.0 | 54 | 1,723 | 80% | 39% | 37% |
 | [controlforge-systems-controlforge-structured-text](https://github.com/ControlForge-Systems/controlforge-structured-text) | tool-input | MIT License | 54 | 3,112 | 78% | 65% | 35% |
@@ -340,7 +340,7 @@ Most frequent error codes:
 | Code | Count |
 |---|---|
 | RP0203 | 18422 |
-| RP0103 | 4946 |
+| RP0103 | 4954 |
 | RP0111 | 4722 |
 | RP0201 | 3603 |
 | RP0301 | 1339 |
@@ -362,12 +362,12 @@ Portability warnings: units with each vendor form (why clean units are not IEC c
 | RP0006 | 1082 |
 | RP0118 | 931 |
 | RP0117 | 833 |
+| RP0135 | 683 |
 | RP0116 | 581 |
-| RP0135 | 579 |
 | RP0127 | 494 |
 | RP0120 | 492 |
 | RP0129 | 484 |
-| RP0126 | 460 |
+| RP0126 | 464 |
 | RP0119 | 441 |
 | RP0115 | 362 |
 | RP0124 | 355 |
