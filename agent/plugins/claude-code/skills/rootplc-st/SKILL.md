@@ -6,7 +6,7 @@ description: Write, check and test IEC 61131-3 Structured Text (PLC code) with t
 # Writing PLC code with rootplc
 
 Use the MCP tools (`rootplc_check`, `rootplc_test`, `rootplc_run`,
-`rootplc_diff`, `rootplc_evidence`, `rootplc_explain`, `rootplc_examples`,
+`rootplc_diff`, `rootplc_sim`, `rootplc_evidence`, `rootplc_explain`, `rootplc_examples`,
 `rootplc_coverage`) when available; otherwise the same commands with `--json`.
 
 ## Loop

@@ -187,7 +187,7 @@ fn is_int(e: Elem) -> bool {
 }
 
 /// Nanoseconds of a duration literal (`T#1s500ms`, `TIME#2m`), or `None`.
-fn parse_duration(text: &str) -> Option<i128> {
+pub(crate) fn parse_duration(text: &str) -> Option<i128> {
     let upper = text.to_ascii_uppercase();
     let body = upper
         .strip_prefix("TIME#")
@@ -235,8 +235,18 @@ fn parse_duration(text: &str) -> Option<i128> {
 
 /// The value of a `--set` literal for an input of type `ty` ([diff.stimuli]).
 /// The VM keeps TIME in milliseconds and LTIME in nanoseconds.
-fn parse_value(prog: &rootplc_sema::ir::Program, text: &str, ty: &Ty) -> Result<Value, String> {
+pub(crate) fn parse_value(
+    prog: &rootplc_sema::ir::Program,
+    text: &str,
+    ty: &Ty,
+) -> Result<Value, String> {
     let t = text.trim();
+    if t.len() >= 2 && t.starts_with('\'') && t.ends_with('\'') {
+        // IEC escapes: $' is a quote, $$ a dollar sign
+        return Ok(Value::Str(
+            t[1..t.len() - 1].replace("$'", "'").replace("$$", "$"),
+        ));
+    }
     if t.eq_ignore_ascii_case("TRUE") {
         return Ok(Value::Bool(true));
     }

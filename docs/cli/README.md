@@ -158,6 +158,34 @@ comes with the inputs of that cycle and the four before:
 Agreement covers the sampled cycles only: set slow inputs, narrow ranges or
 add TEST blocks for behaviour the stimuli do not reach.
 
+## sim
+
+Runs one or more programs as one task on the virtual clock, driven by a
+scenario ([spec/17-simulation.md](../../spec/17-simulation.md)). A plant
+model is just another PROGRAM sharing global variables with the
+controller, so controller and plant are tested together without hardware.
+
+```
+programs PRG_Plant PRG_Main        # run in this order every cycle
+cycle T#100ms
+duration T#120s
+record rLevel bPump PRG_Main.nSwitches
+at T#0s set PRG_Main.bStart := TRUE
+at T#1s expect bPump = TRUE
+from T#60s to T#120s expect rLevel <= 61.0
+```
+
+`--trace run.csv` writes every recorded value per cycle; `--compare
+old.csv` reports the first cycle where a later run differs (regression of
+the whole behaviour). Exit code 0 when no fault, every expectation holds
+and the compared trace matches; 1 otherwise; 2 when the scenario cannot run.
+
+```json
+{"command":"sim","ok":true,"cycles":1200,"fault":null,"diagnostics":[],
+ "expectations":[{"line":6,"text":"at T#1s expect bPump = TRUE","ok":true,"checked":true}],
+ "final":{"rLevel":"46.85113","bPump":"FALSE"},"compare":null}
+```
+
 ## runtime
 
 Runtime v0 (spec/14-runtime.md): runs one PROGRAM cyclically on this
@@ -325,7 +353,7 @@ activating one activates the libraries it requires.
 
 Model Context Protocol server on stdio for agent hosts; see
 [agent/mcp/README.md](../../agent/mcp/README.md). Tools: `rootplc_check`,
-`rootplc_test`, `rootplc_run`, `rootplc_diff`, `rootplc_evidence`,
+`rootplc_test`, `rootplc_run`, `rootplc_diff`, `rootplc_sim`, `rootplc_evidence`,
 `rootplc_explain`, `rootplc_examples`, `rootplc_coverage`. Source tools accept `paths`, in-memory `files`, or a
 `source` string plus an optional `libraries` list, and return the JSON
 reports above. Resources: the agent

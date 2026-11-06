@@ -4,7 +4,7 @@
 //! Roadmap phase: 1 (stdio in Phase 0 as D1a; HTTP later). See `ARCHITECTURE.md`.
 //!
 //! Tools: `rootplc_check`, `rootplc_test`, `rootplc_run`, `rootplc_diff`,
-//! `rootplc_evidence`, `rootplc_explain`, `rootplc_examples`, `rootplc_coverage`. All are read-only: they never
+//! `rootplc_sim`, `rootplc_evidence`, `rootplc_explain`, `rootplc_examples`, `rootplc_coverage`. All are read-only: they never
 //! write files and never touch hardware. Results are the same JSON reports
 //! as `rootplc <command> --json`.
 //!
@@ -20,7 +20,7 @@ use std::path::PathBuf;
 use json::Json;
 
 /// Implementation status, reported by `rootplc mcp --version`.
-pub const STATUS: &str = "stdio MCP server: rootplc_check, rootplc_test, rootplc_run, rootplc_diff, rootplc_evidence, \
+pub const STATUS: &str = "stdio MCP server: rootplc_check, rootplc_test, rootplc_run, rootplc_diff, rootplc_sim, rootplc_evidence, \
      rootplc_explain, rootplc_examples, rootplc_coverage; resources; prompts";
 
 /// Protocol versions this server speaks, newest first.
@@ -51,6 +51,7 @@ fn tools() -> String {
 {{"name":"rootplc_test","title":"Run TEST blocks","description":"Compile the project and run every TEST ... END_TEST block in the deterministic VM. Assertions: ASSERT_TRUE, ASSERT_FALSE, ASSERT_EQ, ASSERT_NE. Tests may read every variable of an instance (white-box). Returns pass/fail per test with failure locations and run-time faults. With mutate: true, measures how good the tests are instead: every small change to the code (a flipped comparison, AND/OR, TRUE/FALSE, n to n+1, a doubled duration) must make a test fail; returns the mutation score and each surviving change, so you can add a test for it.","inputSchema":{{"type":"object","properties":{{{src},"filter":{{"type":"string","description":"Only tests whose name contains this text."}},"mutate":{{"type":"boolean","default":false,"description":"Run mutation testing (needs all tests passing first)."}},"mutate_limit":{{"type":"integer","minimum":1,"maximum":5000,"default":500}},"mutate_only":{{"type":"string","description":"Mutate only files whose path contains this text; tests and other files still run."}},"slice":{{"type":"boolean","default":false,"description":"Compile only the files the TEST blocks need, so errors in unrelated files do not stop the tests."}}}}}},{ro}}},
 {{"name":"rootplc_run","title":"Run a program","description":"Compile and run one PROGRAM for a number of PLC cycles in the VM (virtual clock), then return the value of every variable. Use it to inspect behaviour; use rootplc_test for pass/fail evidence.","inputSchema":{{"type":"object","properties":{{{src},"program":{{"type":"string","description":"PROGRAM to run; optional when there is only one."}},"cycles":{{"type":"integer","minimum":1,"maximum":1000000,"default":1}},"cycle_ms":{{"type":"integer","minimum":0,"default":10,"description":"Virtual time per cycle in milliseconds (timers use it)."}}}}}},{ro}}},
 {{"name":"rootplc_diff","title":"Compare a block with a reference","description":"Run two function blocks side by side in the VM, give them the same seeded pseudo-random inputs every cycle and compare their outputs. Inputs and outputs are matched by name; wrap a block with other names in a small adapter FB that has the reference's names. BOOL inputs toggle, numeric inputs jump within a range; other inputs keep their initial value unless set. Returns the verdict (agree / differ / fault), per output the cycles that differed, and the first difference with the inputs of that cycle and the four before, so you can turn it into a TEST. Agreement covers the sampled cycles only.","inputSchema":{{"type":"object","properties":{{{src},"reference":{{"type":"string","description":"The reference FUNCTION_BLOCK, e.g. RB_Motor (with libraries [\"RootBlocks\"])."}},"unit":{{"type":"string","description":"The FUNCTION_BLOCK to compare."}},"cycles":{{"type":"integer","minimum":1,"maximum":1000000,"default":1000}},"cycle_ms":{{"type":"integer","minimum":0,"default":10}},"seed":{{"type":"integer","minimum":0,"default":1}},"set":{{"type":"array","items":{{"type":"string"}},"description":"Inputs held at a value, e.g. [\"Mode=RB_MODE#Auto\", \"Delay=T#2s\"]."}},"ranges":{{"type":"array","items":{{"type":"string"}},"description":"Ranges of numeric inputs, e.g. [\"SP=0..80\"]; default 0..100."}},"toggle":{{"type":"number","minimum":0,"maximum":1,"default":0.1,"description":"Probability that an input changes in a cycle."}},"tolerance":{{"type":"number","minimum":0,"default":0.0001,"description":"Allowed difference of REAL outputs."}}}},"required":["reference","unit"]}},{ro}}},
+{{"name":"rootplc_sim","title":"Simulate programs with a scenario","description":"Run one or more PROGRAMs as one task on the virtual clock, for example a controller and a plant model written in ST that share global variables, driven by a scenario: values set at given times, expectations checked at a time or over an interval, variables recorded per cycle. Returns each expectation with its first failing cycle and value, the recorded values after the last cycle, and, with compare, the first difference from an earlier trace. Deterministic: the same sources and scenario give the same trace.","inputSchema":{{"type":"object","properties":{{{src},"scenario":{{"type":"string","description":"Scenario text, one statement per line: programs PRG_Plant PRG_Main / cycle T#10ms / duration T#30s / record PRG_Main.bRunning rLevel / at T#0s set PRG_Main.bStart := TRUE / at T#5s expect rLevel >= 50.0 / from T#1s to T#30s expect rLevel <= 90.0 [within 0.1]. Paths: Program.var.member[i] or a global variable."}},"compare":{{"type":"string","description":"CSV text of an earlier trace (from trace: true) to compare the run with."}},"trace":{{"type":"boolean","default":false,"description":"Also return the trace as CSV text (field trace_csv)."}}}},"required":["scenario"]}},{ro}}},
 {{"name":"rootplc_evidence","title":"Evidence pack for sign-off","description":"Build the evidence pack an engineer reviews before approving a change: input file hashes, check result (IEC clean or not), every test result, the mutation score with surviving changes, and a verdict (verified / not verified with reasons). Deterministic; never signed locally. Call it last, after rootplc_test passes.","inputSchema":{{"type":"object","properties":{{{src},"min_score":{{"type":"number","minimum":0,"maximum":100,"description":"Required mutation score in percent."}},"mutate":{{"type":"boolean","default":true}},"markdown":{{"type":"boolean","default":false,"description":"Return a readable summary instead of JSON."}}}}}},{ro}}},
 {{"name":"rootplc_explain","title":"Explain a diagnostic","description":"Explain a diagnostic code such as RP0103: severity, summary and the text of the spec rule that defines it.","inputSchema":{{"type":"object","properties":{{"code":{{"type":"string","description":"Diagnostic code, e.g. RP0103 or 103."}}}},"required":["code"]}},{ro}}},
 {{"name":"rootplc_examples","title":"Find verified ST patterns","description":"Search a library of Structured Text patterns (edge detection, timers, counters, state machines, interlocks, arrays, structs, test blocks). Every example compiles and passes its TEST blocks in this toolchain version. Adapt them; do not copy names blindly.","inputSchema":{{"type":"object","properties":{{"query":{{"type":"string","description":"Keywords, e.g. 'timer' or 'state machine'. Empty lists every example."}},"id":{{"type":"string","description":"Return this one example, e.g. 'edge-detect'."}}}}}},{ro}}},
@@ -284,6 +285,32 @@ fn call_tool(name: &str, args: &Json) -> String {
                     tool_result(&rootplc_driver::diff::to_json(&rep), false)
                 }
                 Err(e) => fail("diff", &e),
+            }
+        }
+        "rootplc_sim" => {
+            let Some(scenario) = args.get("scenario").and_then(Json::as_str) else {
+                return fail("sim", "give scenario (the scenario text)");
+            };
+            let old = args.get("compare").and_then(Json::as_str);
+            let want_trace = args.get("trace").and_then(Json::as_bool).unwrap_or(false);
+            match sources(args)
+                .and_then(|s| rootplc_driver::sim::sim_sources(s, &libraries(args), scenario, old))
+            {
+                Ok(rootplc_driver::sim::SimRun::NotCompiling(c)) => {
+                    tool_result(&rootplc_driver::json::check(&c), true)
+                }
+                Ok(rootplc_driver::sim::SimRun::Report(rep)) => {
+                    let mut json = rootplc_driver::sim::to_json(&rep);
+                    if want_trace {
+                        json.pop();
+                        json.push_str(&format!(
+                            ",\"trace_csv\":{}}}",
+                            rootplc_diag::json_string(&rootplc_driver::sim::trace_csv(&rep.trace))
+                        ));
+                    }
+                    tool_result(&json, false)
+                }
+                Err(e) => fail("sim", &e),
             }
         }
         "rootplc_examples" => {
@@ -605,7 +632,7 @@ mod tests {
             .and_then(|x| x.get("tools"))
             .and_then(Json::as_array)
             .expect("tools");
-        assert_eq!(tools.len(), 8);
+        assert_eq!(tools.len(), 9);
         assert_eq!(r.get("id").and_then(Json::as_str), Some("a"));
         let r = call(r#"{"jsonrpc":"2.0","id":2,"method":"nope"}"#);
         assert!(r.get("error").is_some());

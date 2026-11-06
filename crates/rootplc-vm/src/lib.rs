@@ -1125,6 +1125,148 @@ impl<'p> Vm<'p> {
         }
     }
 
+    /// Locate a variable by a path such as `fb.member[2].x` inside the
+    /// instance at `root` of POU `def` ([sim.scenario]): `.name` steps into
+    /// function-block instances and structures, `[i]` or `[i, j]` into
+    /// arrays with known bounds. Returns the location and its type.
+    pub fn locate(&self, root: usize, def: usize, path: &str) -> Result<(Loc, Ty), String> {
+        let pou = self
+            .prog
+            .pou(def)
+            .ok_or_else(|| "not a POU instance".to_string())?;
+        self.locate_in(
+            Loc {
+                root,
+                path: Vec::new(),
+            },
+            &pou.vars,
+            path,
+        )
+    }
+
+    /// Locate a global variable by its name as declared (`GVL.name` for a
+    /// global in a namespace or list, or `name`), then follow `rest` as in
+    /// [`Vm::locate`].
+    pub fn locate_global(&self, path: &str) -> Result<(Loc, Ty), String> {
+        let (Some(g), Some(groot)) = (self.prog.globals, self.globals) else {
+            return Err("the project has no global variables".into());
+        };
+        let pou = self
+            .prog
+            .pou(g)
+            .ok_or_else(|| "no global variables".to_string())?;
+        // longest declared name that is a prefix of the path
+        let lower = path.to_ascii_lowercase();
+        let found = pou
+            .vars
+            .iter()
+            .enumerate()
+            .filter(|(_, v)| {
+                let n = v.name.to_ascii_lowercase();
+                let bare = n.rsplit('.').next().unwrap_or(&n).to_string();
+                [n, bare].iter().any(|n| {
+                    lower == *n
+                        || lower.starts_with(&format!("{n}."))
+                        || lower.starts_with(&format!("{n}["))
+                })
+            })
+            .max_by_key(|(_, v)| v.name.len());
+        let Some((i, v)) = found else {
+            return Err(format!("no global variable '{path}'"));
+        };
+        let n = v.name.to_ascii_lowercase();
+        let used = if lower.starts_with(&n) {
+            v.name.len()
+        } else {
+            n.rsplit('.').next().unwrap_or(&n).len()
+        };
+        let rest = &path[used..];
+        let loc = Loc {
+            root: groot,
+            path: vec![i as u32],
+        };
+        self.follow(loc, v.ty.clone(), rest)
+    }
+
+    fn locate_in(
+        &self,
+        base: Loc,
+        vars: &[rootplc_sema::ir::Var],
+        path: &str,
+    ) -> Result<(Loc, Ty), String> {
+        let end = path.find(['.', '[']).unwrap_or(path.len());
+        let name = path[..end].trim();
+        let i = vars
+            .iter()
+            .position(|v| v.name.eq_ignore_ascii_case(name))
+            .ok_or_else(|| format!("no variable '{name}'"))?;
+        self.follow(base.child(i), vars[i].ty.clone(), &path[end..])
+    }
+
+    fn follow(&self, loc: Loc, ty: Ty, rest: &str) -> Result<(Loc, Ty), String> {
+        let rest = rest.trim();
+        if rest.is_empty() {
+            return Ok((loc, ty));
+        }
+        if let Some(r) = rest.strip_prefix('.') {
+            let vars: Vec<rootplc_sema::ir::Var> = match self.strip(&ty) {
+                Ty::Named(d) => match &self.prog.defs[d].kind {
+                    DefKind::Struct(fields) => fields.clone(),
+                    DefKind::Pou(p) => p.vars.clone(),
+                    _ => return Err(format!("'{r}': not a structure or instance")),
+                },
+                _ => return Err(format!("'{r}': not a structure or instance")),
+            };
+            return self.locate_in(loc, &vars, r);
+        }
+        if let Some(r) = rest.strip_prefix('[') {
+            let close = r.find(']').ok_or("missing ']'")?;
+            let Ty::Array { dims, elem } = self.strip(&ty) else {
+                return Err("an index on a value that is not an array".into());
+            };
+            let bounds: Vec<(i128, i128)> = dims
+                .iter()
+                .copied()
+                .collect::<Option<_>>()
+                .ok_or("an array without fixed bounds")?;
+            let idx: Vec<i128> = r[..close]
+                .split(',')
+                .map(|x| {
+                    x.trim()
+                        .parse::<i128>()
+                        .map_err(|_| format!("index '{}'", x.trim()))
+                })
+                .collect::<Result<_, _>>()?;
+            if idx.len() != bounds.len() {
+                return Err(format!(
+                    "{} indices for {} dimensions",
+                    idx.len(),
+                    bounds.len()
+                ));
+            }
+            let mut off = 0i128;
+            for (k, (lo, hi)) in idx.iter().zip(&bounds) {
+                if k < lo || k > hi {
+                    return Err(format!("index {k} outside {lo}..{hi}"));
+                }
+                off = off * (hi - lo + 1) + (k - lo);
+            }
+            return self.follow(loc.child(off as usize), *elem, &r[close + 1..]);
+        }
+        Err(format!("cannot read '{rest}'"))
+    }
+
+    /// The value at a location found by [`Vm::locate`].
+    pub fn value_at(&self, loc: &Loc) -> Option<&Value> {
+        self.get(loc, Span::new(0, 0)).ok()
+    }
+
+    /// Write a value at a location found by [`Vm::locate`], converted to
+    /// `ty`; false when it does not fit (subrange) or the location is gone.
+    pub fn set_at(&mut self, loc: &Loc, v: Value, ty: &Ty) -> bool {
+        self.store(loc, v, ty, Span::new(0, 0)).is_ok()
+    }
+
     /// Render a value of type `ty` as IEC literal text.
     pub fn display(&self, v: &Value, ty: &Ty) -> String {
         match (v, self.strip(ty)) {

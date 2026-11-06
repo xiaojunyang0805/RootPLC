@@ -30,7 +30,7 @@ fn located(report: &CheckReport, file: usize, offset: u32, extra: &str) -> Strin
     )
 }
 
-fn fault(report: &CheckReport, f: Option<&rootplc_vm::Fault>) -> String {
+pub(crate) fn fault(report: &CheckReport, f: Option<&rootplc_vm::Fault>) -> String {
     f.map_or("null".to_string(), |f| {
         let extra = format!(
             "\"kind\":\"{}\",\"message\":{}",
@@ -41,7 +41,7 @@ fn fault(report: &CheckReport, f: Option<&rootplc_vm::Fault>) -> String {
     })
 }
 
-fn diagnostics(report: &CheckReport) -> String {
+pub(crate) fn diagnostics(report: &CheckReport) -> String {
     let items: Vec<String> = report
         .files
         .iter()

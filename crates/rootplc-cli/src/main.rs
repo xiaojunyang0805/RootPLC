@@ -16,6 +16,8 @@ const USAGE: &str = "usage:
   rootplc diff  <file.st|dir>... --reference FB --unit FB [--cycles N] [--cycle-ms MS] [--seed N]
                 [--set NAME=VALUE]... [--range NAME=LO..HI]... [--toggle P] [--tolerance T] [--json]
                 (same stimuli to both blocks, outputs compared each cycle; exit 1 when they differ)
+  rootplc sim   <file.st|dir>... --scenario FILE [--trace OUT.csv] [--compare OLD.csv] [--json]
+                (programs and plant models on the virtual clock; expectations; CSV trace)
   rootplc runtime <file.st|dir>... [--program NAME] [--cycle-ms MS] [--cycles N] [--watchdog-ms MS]
                 [--retain FILE] [--status FILE] [--modbus [ADDR:]PORT] [--deploy DIR] [--json]   (runtime v0)
   rootplc deploy <file.st|dir>... --to DIR [--program NAME]   (request; runs only after approval)
@@ -25,7 +27,7 @@ const USAGE: &str = "usage:
   rootplc examples [words...] [--show ID] [--json]   (verified ST patterns)
   rootplc coverage <file.st|dir>... [--json]
   rootplc libraries [--json]                       (bundled compatibility libraries)
-  check, test, diff, run, runtime and coverage take --library NAME[,NAME] (e.g. Tc2_System)       (portable / dialect / dependent / blocked)
+  check, test, diff, run, sim, runtime and coverage take --library NAME[,NAME] (e.g. Tc2_System)       (portable / dialect / dependent / blocked)
   rootplc mcp            (MCP server on stdio, for agent hosts)
   rootplc --version
 
@@ -56,7 +58,7 @@ impl Args {
                 | "--agent" | "--library" | "--mutate-limit" | "--mutate-only" | "--min-score"
                 | "--out" | "--watchdog-ms" | "--retain" | "--status" | "--modbus" | "--deploy"
                 | "--to" | "--reference" | "--unit" | "--seed" | "--set" | "--range"
-                | "--toggle" | "--tolerance" => {
+                | "--toggle" | "--tolerance" | "--scenario" | "--trace" | "--compare" => {
                     let v = it.next().unwrap_or_default();
                     a.options.push((x, v));
                 }
@@ -426,6 +428,55 @@ fn cmd_diff(paths: &[PathBuf], args: &Args) -> ExitCode {
     exit(r.verdict == Verdict::Agree)
 }
 
+/// `rootplc sim` ([sim.command]).
+fn cmd_sim(paths: &[PathBuf], args: &Args) -> ExitCode {
+    use rootplc_driver::sim::{SimRun, render, sim_sources, to_json, trace_csv};
+    let Some(scenario) = args.opt("--scenario") else {
+        return io_error("sim", "give --scenario FILE", args.json);
+    };
+    let text = match std::fs::read_to_string(scenario) {
+        Ok(t) => t,
+        Err(e) => return io_error("sim", &format!("{scenario}: {e}"), args.json),
+    };
+    let old = match args
+        .opt("--compare")
+        .map(std::fs::read_to_string)
+        .transpose()
+    {
+        Ok(t) => t,
+        Err(e) => return io_error("sim", &format!("--compare: {e}"), args.json),
+    };
+    let sources = match rootplc_driver::read_sources(paths) {
+        Ok(s) => s,
+        Err(e) => return io_error("sim", &e, args.json),
+    };
+    let r = match sim_sources(sources, &args.all("--library"), &text, old.as_deref()) {
+        Ok(SimRun::Report(r)) => *r,
+        Ok(SimRun::NotCompiling(check)) => {
+            if args.json {
+                println!("{}", json::check(&check));
+            } else {
+                print_diagnostics(&check);
+                eprintln!("rootplc sim: the project does not compile");
+            }
+            return ExitCode::from(2);
+        }
+        Err(e) => return io_error("sim", &e, args.json),
+    };
+    if let Some(out) = args.opt("--trace") {
+        if let Err(e) = std::fs::write(out, trace_csv(&r.trace)) {
+            return io_error("sim", &format!("--trace {out}: {e}"), args.json);
+        }
+    }
+    if args.json {
+        println!("{}", to_json(&r));
+    } else {
+        print_diagnostics(&r.check);
+        print!("{}", render(&r));
+    }
+    exit(r.ok())
+}
+
 fn cmd_runtime(paths: &[PathBuf], args: &Args) -> ExitCode {
     use rootplc_runtime::{Config, NoIo, State, SystemClock, ffi, to_json, to_text};
     let num = |name: &str| args.opt(name).and_then(|v| v.parse::<u64>().ok());
@@ -793,6 +844,7 @@ fn main() -> ExitCode {
                 | Command::Test
                 | Command::Run
                 | Command::Diff
+                | Command::Sim
                 | Command::Runtime
                 | Command::Deploy
                 | Command::Coverage
@@ -809,6 +861,7 @@ fn main() -> ExitCode {
         Some(Command::Libraries) => cmd_libraries(args.json),
         Some(Command::Run) => cmd_run(&paths, &args),
         Some(Command::Diff) => cmd_diff(&paths, &args),
+        Some(Command::Sim) => cmd_sim(&paths, &args),
         Some(Command::Runtime) => cmd_runtime(&paths, &args),
         Some(Command::Deploy) => cmd_deploy(&paths, &args),
         Some(Command::Approve) => cmd_approve(rest.first(), &args),
