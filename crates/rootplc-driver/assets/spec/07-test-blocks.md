@@ -61,6 +61,7 @@ which exactly one token is changed by one of these operators:
 | negation | `NOT` removed |
 | integer literal | `n` → `n + 1` |
 | duration | a non-zero value doubled (`T#5s` → `T#10s`; `T#0s` is left alone, doubling cannot change it) |
+| enumeration value | `T#V`, `T.V` or `V` → the next value of `T` in declaration order, the last → the first (types declared in the mutated project's files; a bare `V` only when exactly one such type has it). This also mutates CASE labels and state assignments of step chains on enumerations |
 
 Only tokens in statements are mutated: never inside a TEST block, a
 declaration section (`VAR` … `END_VAR`, `TYPE` … `END_TYPE`), a comment, a
