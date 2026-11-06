@@ -807,6 +807,7 @@ Codes RP00xx are lexical, RP01xx types, RP02xx names and structure, RP03xx synta
 | [RP0115](#rp0115) | warning | enumeration base type after the values (not portable); write UINT (...) |
 | [RP0114](#rp0114) | error | a VAR_IN_OUT argument must be a variable |
 | [RP0303](#rp0303) | error | a method or function without a result type used in an expression; call it as a statement |
+| [RP0304](#rp0304) | warning | a TON called only in CASE branches is left running when the step changes; it fires early when the branch runs again |
 | [RP0113](#rp0113) | warning | FUNCTION without a result type (not portable); call it as a statement |
 | [RP0112](#rp0112) | warning | STRING(n) length in parentheses (not portable); write STRING[n] |
 | [RP0111](#rp0111) | error | unknown type name |
@@ -1566,6 +1567,28 @@ of its methods without a prefix, `M(args)`; arguments bind as for functions.
 A method without a result type has no value: its call is a statement, and
 using it in an expression (`x := inst.M()`) is error RP0303, as for a
 function without a result type ([pous.function]).
+
+## RP0304
+
+warning: a TON called only in CASE branches is left running when the step changes; it fires early when the branch runs again
+
+Rule `statements.case.timer` in `spec/05-statements.md`:
+
+**[statements.case.timer]** A step chain often times a step with a `TON`
+called only in that step's CASE branch. When the branch is left while the
+timer's `IN` is still `TRUE`, the timer is no longer called: it keeps
+`IN = TRUE` and its start time, so the next time the branch runs it may
+fire at once (a homing retried after a timeout faults immediately). Warning
+RP0304 is given when a `TON` or `LTON` instance is called only inside the
+branches of one CASE statement, and a path through one of those branches
+assigns the CASE selector without the timer's last call on that path having
+`IN := FALSE` (a literal). No warning is given when the timer is called with
+`IN := FALSE` in a branch where it is not started (cleared before
+re-entry), or when a branch calls it with `IN := FALSE` and later starts it
+(reset before each use). The check is syntactic: it follows IF and CASE
+branches but not the values of conditions. To fix, call the timer with
+`IN := FALSE` before changing the step, or call it every cycle outside the
+CASE with `IN` set to the step condition.
 
 ## RP0113
 
@@ -2739,6 +2762,22 @@ case_stmt    = 'CASE' expression 'OF' { case_label { ',' case_label } ':' statem
                [ 'ELSE' statement_list ] 'END_CASE'
 case_label   = constant [ '..' constant ]                    (* constant: literal, enumeration value, signed integer *)
 ```
+
+**[statements.case.timer]** A step chain often times a step with a `TON`
+called only in that step's CASE branch. When the branch is left while the
+timer's `IN` is still `TRUE`, the timer is no longer called: it keeps
+`IN = TRUE` and its start time, so the next time the branch runs it may
+fire at once (a homing retried after a timeout faults immediately). Warning
+RP0304 is given when a `TON` or `LTON` instance is called only inside the
+branches of one CASE statement, and a path through one of those branches
+assigns the CASE selector without the timer's last call on that path having
+`IN := FALSE` (a literal). No warning is given when the timer is called with
+`IN := FALSE` in a branch where it is not started (cleared before
+re-entry), or when a branch calls it with `IN := FALSE` and later starts it
+(reset before each use). The check is syntactic: it follows IF and CASE
+branches but not the values of conditions. To fix, call the timer with
+`IN := FALSE` before changing the step, or call it every cycle outside the
+CASE with `IN` set to the step condition.
 
 **[statements.for]**
 ```

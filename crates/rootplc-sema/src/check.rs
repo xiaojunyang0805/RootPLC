@@ -2963,11 +2963,83 @@ impl<'a> Checker<'a> {
                 for s in self.child_nodes(node, N::StmtList) {
                     out.body = self.stmt_list(s);
                 }
+                self.lint_case_timers(&out.body);
                 self.scope = None;
             }
             _ => return,
         }
         self.irs.insert(id, out);
+    }
+
+    /// [statements.case.timer]: a TON called only in the branches of one
+    /// CASE, whose branch is left on a path where it was not last called with
+    /// `IN := FALSE`, keeps `IN = TRUE` and its start time, so it fires early
+    /// when its branch runs again.
+    fn lint_case_timers(&mut self, body: &[Stmt]) {
+        let mut calls = Vec::new();
+        timer_calls(&self.defs, body, None, &mut 0, &mut calls);
+        let mut keys: Vec<&String> = calls.iter().map(|c| &c.key).collect();
+        keys.sort();
+        keys.dedup();
+        let mut found = Vec::new();
+        for key in keys {
+            let mine: Vec<&TimerCall> = calls.iter().filter(|c| &c.key == key).collect();
+            // every call inside the branches of one CASE
+            let Some(Some((case, _))) = mine.first().map(|c| c.arm) else {
+                continue;
+            };
+            if mine.iter().any(|c| c.arm.map(|a| a.0) != Some(case)) {
+                continue;
+            }
+            let running: Vec<usize> = mine
+                .iter()
+                .filter(|c| !c.stops)
+                .filter_map(|c| c.arm.map(|a| a.1))
+                .collect();
+            // reset, then started, in one branch: the timer is cleared
+            // before each use (calls are in source order)
+            let restarts = mine.iter().enumerate().any(|(i, c)| {
+                c.stops
+                    && mine[i + 1..]
+                        .iter()
+                        .any(|d| !d.stops && d.arm.map(|a| a.1) == c.arm.map(|a| a.1))
+            });
+            if restarts {
+                continue;
+            }
+            // a reset in another branch clears the timer before re-entry
+            if mine
+                .iter()
+                .any(|c| c.stops && c.arm.is_some_and(|a| !running.contains(&a.1)))
+            {
+                continue;
+            }
+            let Some((sel, arms, default)) = nth_case(body, case, &mut 0) else {
+                continue;
+            };
+            let sel = format!("{:?}", sel.kind);
+            for &arm in &running {
+                let list = arms.get(arm).map_or(default, |a| &a.body[..]);
+                if let Some(span) = leaves(&self.defs, list, key, &sel) {
+                    found.push((span, mine[0].span));
+                    break;
+                }
+            }
+        }
+        for (span, call) in found {
+            let text = self
+                .src()
+                .get(call.start as usize..call.end as usize)
+                .unwrap_or("timer");
+            let name = text.split('(').next().unwrap_or(text).trim().to_string();
+            let msg = format!(
+                "'{name}' is called only in this CASE branch, and a path that changes the step here does not end with a call of it with IN := FALSE: it keeps running and fires early the next time the branch is entered"
+            );
+            let hint = format!(
+                "call {name}(IN := FALSE) before changing the step, or call {name} every cycle outside the CASE with IN := the step condition"
+            );
+            self.diag(codes::TIMER_LEFT_RUNNING, msg, span, Some(hint));
+        }
     }
 
     /// [variables.initializer.check].
@@ -5784,4 +5856,207 @@ fn fold(cls: Cls, opk: T, opt: &str, a: K, b: K) -> Option<Fold> {
         }
         _ => None,
     }
+}
+
+/// A call of a TON instance, for [`Checker::lint_case_timers`].
+struct TimerCall {
+    /// The instance place, as text of its IR form.
+    key: String,
+    /// (CASE number in the body, branch index; the ELSE branch is the last),
+    /// or None outside every CASE.
+    arm: Option<(usize, usize)>,
+    /// Called with `IN := FALSE`.
+    stops: bool,
+    span: Span,
+}
+
+/// A statement that calls a TON or LTON instance: (place key, IN := FALSE?, call).
+fn timer_of<'e>(defs: &[Def<'_>], s: &'e Stmt) -> Option<(String, bool, &'e ir::Expr)> {
+    let Stmt::Eval(e) = s else { return None };
+    let ExprKind::Call(c) = &e.kind else {
+        return None;
+    };
+    let ir::CallTarget::Instance(place, def) = &c.target else {
+        return None;
+    };
+    let name = defs.get(*def)?.name.to_ascii_uppercase();
+    if name != "TON" && name != "LTON" {
+        return None;
+    }
+    // PT is a duration, so a FALSE constant input is IN
+    let stops = c
+        .inputs
+        .iter()
+        .any(|(_, v)| matches!(v.kind, ExprKind::Const(Const::Bool(false))));
+    Some((format!("{:?}", place.kind), stops, e))
+}
+
+fn timer_calls(
+    defs: &[Def<'_>],
+    body: &[Stmt],
+    arm: Option<(usize, usize)>,
+    cases: &mut usize,
+    out: &mut Vec<TimerCall>,
+) {
+    for s in body {
+        if let Some((key, stops, e)) = timer_of(defs, s) {
+            out.push(TimerCall {
+                key,
+                arm,
+                stops,
+                span: e.span,
+            });
+        }
+        match s {
+            Stmt::If(branches, other) => {
+                for (_, b) in branches {
+                    timer_calls(defs, b, arm, cases, out);
+                }
+                timer_calls(defs, other, arm, cases, out);
+            }
+            Stmt::Case { arms, default, .. } => {
+                let me = *cases;
+                *cases += 1;
+                // inside an outer CASE the outer branch stays the context
+                for (i, a) in arms.iter().enumerate() {
+                    timer_calls(defs, &a.body, arm.or(Some((me, i))), cases, out);
+                }
+                timer_calls(defs, default, arm.or(Some((me, arms.len()))), cases, out);
+            }
+            Stmt::For(f) => timer_calls(defs, &f.body, arm, cases, out),
+            Stmt::While(_, b) | Stmt::Repeat(b, _) => timer_calls(defs, b, arm, cases, out),
+            _ => {}
+        }
+    }
+}
+
+/// The CASE numbered `n` in the order [`timer_calls`] counts them:
+/// (selector, branches, ELSE branch).
+fn nth_case<'b>(
+    body: &'b [Stmt],
+    n: usize,
+    seen: &mut usize,
+) -> Option<(&'b ir::Expr, &'b [ir::CaseArm], &'b [Stmt])> {
+    for s in body {
+        let found = match s {
+            Stmt::If(branches, other) => branches
+                .iter()
+                .find_map(|(_, b)| nth_case(b, n, seen))
+                .or_else(|| nth_case(other, n, seen)),
+            Stmt::Case { sel, arms, default } => {
+                if *seen == n {
+                    return Some((sel, arms, default));
+                }
+                *seen += 1;
+                arms.iter()
+                    .find_map(|a| nth_case(&a.body, n, seen))
+                    .or_else(|| nth_case(default, n, seen))
+            }
+            Stmt::For(f) => nth_case(&f.body, n, seen),
+            Stmt::While(_, b) | Stmt::Repeat(b, _) => nth_case(b, n, seen),
+            _ => None,
+        };
+        if found.is_some() {
+            return found;
+        }
+    }
+    None
+}
+
+/// One path through a CASE branch, for [`leaves`].
+#[derive(Clone, Copy)]
+struct TimerPath {
+    /// The timer was last called with `IN := FALSE` on this path.
+    stopped: bool,
+    /// The selector was assigned on this path (the step changes).
+    left: Option<Span>,
+}
+
+/// Walks the statements of one branch over every path. The branch is left
+/// at its end (or at RETURN), so a path is a leak when it assigned the
+/// selector `sel` and the timer `key` was not last called with
+/// `IN := FALSE`. Returns the span of the first such assignment.
+fn leaves(defs: &[Def<'_>], body: &[Stmt], key: &str, sel: &str) -> Option<Span> {
+    let start = vec![TimerPath {
+        stopped: false,
+        left: None,
+    }];
+    let mut ended = Vec::new();
+    let mut end = timer_paths(defs, body, key, sel, start, &mut ended);
+    end.extend(ended);
+    end.iter().find(|p| !p.stopped).and_then(|p| p.left)
+}
+
+fn timer_paths(
+    defs: &[Def<'_>],
+    body: &[Stmt],
+    key: &str,
+    sel: &str,
+    mut paths: Vec<TimerPath>,
+    ended: &mut Vec<TimerPath>,
+) -> Vec<TimerPath> {
+    fn merge(mut v: Vec<TimerPath>) -> Vec<TimerPath> {
+        let mut out: Vec<TimerPath> = Vec::new();
+        for p in v.drain(..) {
+            if !out
+                .iter()
+                .any(|q| q.stopped == p.stopped && q.left.is_some() == p.left.is_some())
+            {
+                out.push(p);
+            }
+        }
+        out
+    }
+    for s in body {
+        if paths.is_empty() {
+            break;
+        }
+        if let Some((k, stops, _)) = timer_of(defs, s) {
+            if k == key {
+                for p in &mut paths {
+                    p.stopped = stops;
+                }
+            }
+            continue;
+        }
+        match s {
+            Stmt::Assign(place, _) if format!("{:?}", place.kind) == sel => {
+                for p in &mut paths {
+                    p.left = p.left.or(Some(place.span));
+                }
+            }
+            Stmt::If(branches, other) => {
+                let mut out = Vec::new();
+                for (_, b) in branches {
+                    out.extend(timer_paths(defs, b, key, sel, paths.clone(), ended));
+                }
+                out.extend(timer_paths(defs, other, key, sel, paths.clone(), ended));
+                paths = merge(out);
+            }
+            Stmt::Case { arms, default, .. } => {
+                let mut out = Vec::new();
+                for a in arms {
+                    out.extend(timer_paths(defs, &a.body, key, sel, paths.clone(), ended));
+                }
+                out.extend(timer_paths(defs, default, key, sel, paths.clone(), ended));
+                paths = merge(out);
+            }
+            Stmt::For(_) | Stmt::While(..) | Stmt::Repeat(..) => {
+                let b = match s {
+                    Stmt::For(f) => &f.body,
+                    Stmt::While(_, b) | Stmt::Repeat(b, _) => b,
+                    _ => unreachable!(),
+                };
+                // the body runs zero or more times
+                let mut out = paths.clone();
+                out.extend(timer_paths(defs, b, key, sel, paths.clone(), ended));
+                paths = merge(out);
+            }
+            Stmt::Return => {
+                ended.append(&mut paths);
+            }
+            _ => {}
+        }
+    }
+    paths
 }
