@@ -1300,11 +1300,15 @@ Rule `types.derived.array` in `spec/02-types.md`:
 `DINT` expressions with l <= u, otherwise error RP0108. A constant index
 outside the bounds is error RP0109. A run-time index outside the bounds
 raises the fault `INDEX`. `ARRAY[*]` is allowed only for `VAR_IN_OUT`
-parameters. Only an array can be indexed; indexing anything else is error
-RP0103. CODESYS and TwinCAT also index strings (`s[i]`, the byte of
-character i counted from 0) and references ([types.reference]); RootPLC
-does not support these yet and reports them as RP0103, so code that uses
-them is not counted as clean.
+parameters. IEC 61131-3 indexes only arrays; indexing a value that is
+not an array, a string or a reference is error RP0103. CODESYS and TwinCAT
+also index strings: `s[i]` is the code of character i counted from 0, a
+`BYTE` for `STRING` and a `WORD` for `WSTRING`; it reads 0 at and after the
+end of the string, and an index above the declared length is the fault
+`INDEX`. Assigning `s[i]` replaces character i, appends one when i is the
+current length, and cuts the string there when the value is 0; an index at
+or above the declared length is the fault `INDEX`. RootPLC accepts this with
+warning RP0135 ([scope.vendor-forms]).
 
 ## RP0109
 
@@ -1316,11 +1320,15 @@ Rule `types.derived.array` in `spec/02-types.md`:
 `DINT` expressions with l <= u, otherwise error RP0108. A constant index
 outside the bounds is error RP0109. A run-time index outside the bounds
 raises the fault `INDEX`. `ARRAY[*]` is allowed only for `VAR_IN_OUT`
-parameters. Only an array can be indexed; indexing anything else is error
-RP0103. CODESYS and TwinCAT also index strings (`s[i]`, the byte of
-character i counted from 0) and references ([types.reference]); RootPLC
-does not support these yet and reports them as RP0103, so code that uses
-them is not counted as clean.
+parameters. IEC 61131-3 indexes only arrays; indexing a value that is
+not an array, a string or a reference is error RP0103. CODESYS and TwinCAT
+also index strings: `s[i]` is the code of character i counted from 0, a
+`BYTE` for `STRING` and a `WORD` for `WSTRING`; it reads 0 at and after the
+end of the string, and an index above the declared length is the fault
+`INDEX`. Assigning `s[i]` replaces character i, appends one when i is the
+current length, and cuts the string there when the value is 0; an index at
+or above the declared length is the fault `INDEX`. RootPLC accepts this with
+warning RP0135 ([scope.vendor-forms]).
 
 ## RP0110
 
@@ -1346,9 +1354,11 @@ Rule `types.reference` in `spec/02-types.md`:
 reference. Dereferencing `NULL` raises the fault `NULL_REF`. CODESYS
 `POINTER TO T` is read as `REF_TO T` with warning RP0116, and `ADR(x)` as
 `REF(x)` with warning RP0117; pointer arithmetic is not supported (an
-arithmetic operator on a reference is RP0103, and so is indexing one,
-`p[i]`, which CODESYS and TwinCAT read as the element i places after the
-target). `POINTER TO` is not part of
+arithmetic operator on a reference is RP0103). The CODESYS / TwinCAT index
+on a pointer, `p[i]`, is accepted with warning RP0135: it is the element i
+places after the target, which must lie inside the same array (or
+structure) and hold a value of the same kind; otherwise the fault `INDEX`.
+`p[0]` is the target itself. `POINTER TO` is not part of
 the language.
 
 ## RP0117
@@ -1362,9 +1372,11 @@ Rule `types.reference` in `spec/02-types.md`:
 reference. Dereferencing `NULL` raises the fault `NULL_REF`. CODESYS
 `POINTER TO T` is read as `REF_TO T` with warning RP0116, and `ADR(x)` as
 `REF(x)` with warning RP0117; pointer arithmetic is not supported (an
-arithmetic operator on a reference is RP0103, and so is indexing one,
-`p[i]`, which CODESYS and TwinCAT read as the element i places after the
-target). `POINTER TO` is not part of
+arithmetic operator on a reference is RP0103). The CODESYS / TwinCAT index
+on a pointer, `p[i]`, is accepted with warning RP0135: it is the element i
+places after the target, which must lie inside the same array (or
+structure) and hold a value of the same kind; otherwise the fault `INDEX`.
+`p[0]` is the target itself. `POINTER TO` is not part of
 the language.
 
 ## RP0118
@@ -2221,11 +2233,15 @@ with the fault `UNSUPPORTED`.
 `DINT` expressions with l <= u, otherwise error RP0108. A constant index
 outside the bounds is error RP0109. A run-time index outside the bounds
 raises the fault `INDEX`. `ARRAY[*]` is allowed only for `VAR_IN_OUT`
-parameters. Only an array can be indexed; indexing anything else is error
-RP0103. CODESYS and TwinCAT also index strings (`s[i]`, the byte of
-character i counted from 0) and references ([types.reference]); RootPLC
-does not support these yet and reports them as RP0103, so code that uses
-them is not counted as clean.
+parameters. IEC 61131-3 indexes only arrays; indexing a value that is
+not an array, a string or a reference is error RP0103. CODESYS and TwinCAT
+also index strings: `s[i]` is the code of character i counted from 0, a
+`BYTE` for `STRING` and a `WORD` for `WSTRING`; it reads 0 at and after the
+end of the string, and an index above the declared length is the fault
+`INDEX`. Assigning `s[i]` replaces character i, appends one when i is the
+current length, and cuts the string there when the value is 0; an index at
+or above the declared length is the fault `INDEX`. RootPLC accepts this with
+warning RP0135 ([scope.vendor-forms]).
 
 **[types.derived.string]** `STRING[n]` and `WSTRING[n]` with 1 <= n <= 65535
 (otherwise RP0108). The CODESYS and TwinCAT spelling `STRING(n)` means the
@@ -2239,9 +2255,11 @@ warning RP0110.
 reference. Dereferencing `NULL` raises the fault `NULL_REF`. CODESYS
 `POINTER TO T` is read as `REF_TO T` with warning RP0116, and `ADR(x)` as
 `REF(x)` with warning RP0117; pointer arithmetic is not supported (an
-arithmetic operator on a reference is RP0103, and so is indexing one,
-`p[i]`, which CODESYS and TwinCAT read as the element i places after the
-target). `POINTER TO` is not part of
+arithmetic operator on a reference is RP0103). The CODESYS / TwinCAT index
+on a pointer, `p[i]`, is accepted with warning RP0135: it is the element i
+places after the target, which must lie inside the same array (or
+structure) and hold a value of the same kind; otherwise the fault `INDEX`.
+`p[0]` is the target itself. `POINTER TO` is not part of
 the language.
 
 **[types.reference.alias]** CODESYS `REFERENCE TO T` declares an alias,
