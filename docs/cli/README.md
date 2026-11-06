@@ -163,15 +163,15 @@ add TEST blocks for behaviour the stimuli do not reach.
 `rootplc build . --target c --out DIR` translates the program into one
 portable C99 file, `DIR/rootplc_program.c`
 ([spec/18-codegen-c.md](../../spec/18-codegen-c.md)). It computes what the
-VM computes: same values after every cycle, same faults (DIV_BY_ZERO,
+VM computes: same values after every cycle, same faults (DIV_BY_ZERO, NULL_REF,
 INDEX, RANGE). Entry points: `rootplc_init()`, `rootplc_cycle(cycle_ns)`
 (returns 0 or a fault code) and the clock `rootplc_now_ns`. Compiled with
 `-DROOTPLC_MAIN`, the file has a `main` that runs N cycles and prints every
 variable (`./prog 100 10`: 100 cycles of 10 ms). Checked in CI against the
 VM on every conformance case it supports; builds with gcc, clang and MSVC.
 
-Strings are supported (as code points, like the VM). Not yet in v0:
-references, VAR_IN_OUT, methods, interfaces,
+Strings, references and VAR_IN_OUT are supported. Not yet in v0:
+methods, interfaces,
 inheritance, FB_init, located and RETAIN variables; such a program gives
 exit code 2 and the first construct with its location.
 

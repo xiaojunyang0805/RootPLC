@@ -376,14 +376,14 @@ fn c_back_end_matches_the_vm() {
 
 #[test]
 fn unsupported_constructs_name_their_place() {
-    let src = "PROGRAM P\nVAR x : INT; r : REF_TO INT; END_VAR\nr := REF(x);\nEND_PROGRAM\n";
+    let src = "FUNCTION_BLOCK FB_C\nVAR n : INT; END_VAR\nMETHOD Inc\nn := n + 1;\nEND_METHOD\nEND_FUNCTION_BLOCK\nPROGRAM P\nVAR c : FB_C; END_VAR\nc.Inc();\nEND_PROGRAM\n";
     let check =
         rootplc_driver::check_sources_with(vec![("p.st".into(), src.into())], &[]).expect("check");
     let r = rootplc_driver::build::build_c(check, None).expect("build");
     let u = r.unsupported.as_ref().expect("unsupported");
     // declarations carry no position in the IR: the POU's first statement
-    assert_eq!((u.file.as_str(), u.line), ("p.st", 3));
-    assert!(u.construct.contains("reference"), "{}", u.construct);
+    assert_eq!((u.file.as_str(), u.line), ("p.st", 9));
+    assert!(u.construct.contains("method"), "{}", u.construct);
     assert!(!r.ok());
 }
 
@@ -405,6 +405,10 @@ fn faults_stop_the_cycle_as_in_the_vm() {
         (
             "RANGE",
             "TYPE T_S : INT (0..2); END_TYPE\nPROGRAM P\nVAR s : T_S; END_VAR\ns := s + 1;\nEND_PROGRAM\n",
+        ),
+        (
+            "NULL_REF",
+            "PROGRAM P\nVAR x : INT; r : REF_TO INT; n : INT; END_VAR\nn := n + 1;\nIF n < 3 THEN r := REF(x); ELSE r := NULL; END_IF;\nr^ := n;\nEND_PROGRAM\n",
         ),
     ];
     let dir = std::env::temp_dir().join(format!("rootplc-c-fault-{}", std::process::id()));
