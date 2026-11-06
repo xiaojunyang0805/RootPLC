@@ -163,14 +163,26 @@ members count one byte each (TwinCAT packs them into shared bytes; this is
 not modelled yet).
 
 **[stdlib.compat.declare-only]** A library function RootPLC can declare but
-not reproduce faithfully (for example one that writes to the vendor's event
-log) is declared only. A call is warning RP0120; executing it stops with the
+not reproduce faithfully (for example one that copies raw memory) is
+declared only. A call is warning RP0120; executing it stops with the
 fault `UNSUPPORTED`, so a run never continues with behaviour RootPLC cannot
 guarantee. For a declared-only function block this holds for a call of the
 block itself, for its methods (also those a derived block inherits and
 does not override) and for reading or writing its properties; a library can
 also mark a single method as declared only. Declaring instances, passing
 them and assigning them to interfaces needs no implementation.
+
+**[stdlib.compat.log]** `Tc2_System`'s `ADSLOGSTR`, `ADSLOGDINT` and
+`ADSLOGLREAL` record their message instead of writing to the TwinCAT event
+log. The first `%s`, `%d` or `%f` respectively in the format text is replaced
+by the argument (a DINT in decimal, an LREAL as `LREAL_TO_STRING` writes it,
+which may differ from TwinCAT's number format), and the functions return 0.
+`rootplc run` reports each message with the cycle it was written in (from 0)
+and its message-type mask (JSON field `log`; text lines `log <cycle>
+<mask>: <message>`); a message box (`ADSLOG_MSGTYPE_MSGBOX`) is recorded like
+any other message. TEST blocks and `rootplc diff` run the functions without
+reporting the messages. The library enables the intrinsic `__ROOTPLC_LOG`
+for this; it is not part of any vendor interface.
 
 **[stdlib.compat.unit]** The library `TcUnit` provides the API of TcUnit,
 the open-source unit-test framework for TwinCAT 3, written from its public
