@@ -339,6 +339,13 @@ spec = "pous.oop.method"
 stage = "sema"
 
 [[code]]
+id = "RP0304"
+severity = "warning"
+summary = "a TON called only in CASE branches is left running when the step changes; it fires early when the branch runs again"
+spec = "statements.case.timer"
+stage = "sema"
+
+[[code]]
 id = "RP0113"
 severity = "warning"
 summary = "FUNCTION without a result type (not portable); call it as a statement"
