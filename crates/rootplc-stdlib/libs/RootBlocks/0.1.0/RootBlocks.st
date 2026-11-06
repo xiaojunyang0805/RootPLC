@@ -1106,6 +1106,9 @@ VAR
     eStop    : R_TRIG;
     eAbort   : R_TRIG;
     eReset   : R_TRIG;
+    acted    : BOOL;
+    active   : BOOL;
+    before   : RB_PHASE_STATE;
 END_VAR
 eStart(CLK := Start);
 eHold(CLK := Hold);
@@ -1113,44 +1116,61 @@ eRestart(CLK := Restart);
 eStop(CLK := Stop);
 eAbort(CLK := Abort);
 eReset(CLK := Reset);
+(* [F05.phase.priority]: the first valid command of abort, stop, hold,
+   restart, start, reset acts; validity is judged on the state at the start
+   of the call, and any invalid command sets Rejected *)
 Rejected := FALSE;
+acted := FALSE;
+before := State;
+active := before = RB_PHASE_STATE#Running OR before = RB_PHASE_STATE#Held;
 IF eAbort.Q THEN
-    IF State = RB_PHASE_STATE#Running OR State = RB_PHASE_STATE#Held OR State = RB_PHASE_STATE#Stopped THEN
+    IF active OR before = RB_PHASE_STATE#Stopped THEN
         State := RB_PHASE_STATE#Aborted;
+        acted := TRUE;
     ELSE
         Rejected := TRUE;
     END_IF;
-ELSIF eStop.Q THEN
-    IF State = RB_PHASE_STATE#Running OR State = RB_PHASE_STATE#Held THEN
+END_IF;
+IF eStop.Q THEN
+    IF NOT active THEN
+        Rejected := TRUE;
+    ELSIF NOT acted THEN
         State := RB_PHASE_STATE#Stopped;
-    ELSE
-        Rejected := TRUE;
+        acted := TRUE;
     END_IF;
-ELSIF eHold.Q THEN
-    IF State = RB_PHASE_STATE#Running THEN
+END_IF;
+IF eHold.Q THEN
+    IF before <> RB_PHASE_STATE#Running THEN
+        Rejected := TRUE;
+    ELSIF NOT acted THEN
         State := RB_PHASE_STATE#Held;
-    ELSE
-        Rejected := TRUE;
+        acted := TRUE;
     END_IF;
-ELSIF eRestart.Q THEN
-    IF State = RB_PHASE_STATE#Held THEN
+END_IF;
+IF eRestart.Q THEN
+    IF before <> RB_PHASE_STATE#Held THEN
+        Rejected := TRUE;
+    ELSIF NOT acted THEN
         State := RB_PHASE_STATE#Running;
-    ELSE
-        Rejected := TRUE;
     END_IF;
-ELSIF eStart.Q THEN
-    IF State = RB_PHASE_STATE#Idle THEN
+END_IF;
+(* restart, start and reset, and Finished, are valid in different states:
+   once one of them has acted no later one can, so no flag is needed *)
+IF eStart.Q THEN
+    IF before <> RB_PHASE_STATE#Idle THEN
+        Rejected := TRUE;
+    ELSIF NOT acted THEN
         State := RB_PHASE_STATE#Running;
-    ELSE
-        Rejected := TRUE;
     END_IF;
-ELSIF eReset.Q THEN
-    IF State = RB_PHASE_STATE#Complete OR State = RB_PHASE_STATE#Stopped OR State = RB_PHASE_STATE#Aborted THEN
+END_IF;
+IF eReset.Q THEN
+    IF NOT (before = RB_PHASE_STATE#Complete OR before = RB_PHASE_STATE#Stopped OR before = RB_PHASE_STATE#Aborted) THEN
+        Rejected := TRUE;
+    ELSIF NOT acted THEN
         State := RB_PHASE_STATE#Idle;
-    ELSE
-        Rejected := TRUE;
     END_IF;
-ELSIF Finished AND State = RB_PHASE_STATE#Running THEN
+END_IF;
+IF NOT acted AND Finished AND before = RB_PHASE_STATE#Running THEN
     State := RB_PHASE_STATE#Complete;
 END_IF;
 Running := State = RB_PHASE_STATE#Running;

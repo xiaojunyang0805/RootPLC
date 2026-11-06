@@ -223,3 +223,42 @@ ASSERT_TRUE(p.Rejected);
 p(Abort := FALSE, Hold := TRUE);
 ASSERT_TRUE(p.Rejected);
 END_TEST
+
+TEST phase_highest_valid_command_acts
+VAR p : RB_Phase; END_VAR
+(* in idle an abort is invalid: the start given with it acts, and the
+   abort is reported as rejected *)
+p(Start := TRUE, Abort := TRUE);
+ASSERT_TRUE(p.State = RB_PHASE_STATE#Running);
+ASSERT_TRUE(p.Rejected);
+(* running: abort and hold together, abort wins; the hold was valid, so
+   nothing is rejected *)
+p(Start := FALSE, Abort := FALSE);
+p(Abort := TRUE, Hold := TRUE);
+ASSERT_TRUE(p.State = RB_PHASE_STATE#Aborted);
+ASSERT_FALSE(p.Rejected);
+(* aborted: reset and start together; start is invalid there, reset acts *)
+p(Abort := FALSE, Hold := FALSE);
+p(Reset := TRUE, Start := TRUE);
+ASSERT_TRUE(p.State = RB_PHASE_STATE#Idle);
+ASSERT_TRUE(p.Rejected);
+(* idle: a restart (invalid) and a start: start acts *)
+p(Reset := FALSE, Start := FALSE);
+p(Restart := TRUE, Start := TRUE);
+ASSERT_TRUE(p.State = RB_PHASE_STATE#Running);
+ASSERT_TRUE(p.Rejected);
+(* running: a command acting keeps Finished from completing in that call *)
+p(Restart := FALSE, Start := FALSE);
+p(Hold := TRUE, Finished := TRUE);
+ASSERT_TRUE(p.State = RB_PHASE_STATE#Held);
+(* held: stop and restart together; stop wins, restart was valid *)
+p(Hold := FALSE, Finished := FALSE);
+p(Stop := TRUE, Restart := TRUE);
+ASSERT_TRUE(p.State = RB_PHASE_STATE#Stopped);
+ASSERT_FALSE(p.Rejected);
+(* stopped: a stop again is invalid *)
+p(Stop := FALSE, Restart := FALSE);
+p(Stop := TRUE);
+ASSERT_TRUE(p.Rejected);
+ASSERT_TRUE(p.State = RB_PHASE_STATE#Stopped);
+END_TEST
