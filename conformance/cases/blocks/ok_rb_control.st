@@ -158,16 +158,35 @@ ASSERT_TRUE(ABS(c.Out - 94.9) < 0.01);
 ADVANCE(T#100ms);
 c(Mode := RB_MODE#Auto, SP := 0.0, PV := 1.0, Kp := 1.0, Ti := T#1s, Td := T#1s);
 ASSERT_TRUE(ABS(c.Out - 44.8) < 0.01);
-(* low limit: P = -60, the integral held at 60 *)
+(* low limit: P = -60 already holds the output at 0, so the integral
+   (45.8) does not move further down and is not raised to cancel P *)
 FOR i := 1 TO 50 DO
     ADVANCE(T#100ms);
     c(Mode := RB_MODE#Auto, SP := 0.0, PV := 60.0, Kp := 1.0, Ti := T#1s, Td := T#1s);
 END_FOR;
 ASSERT_TRUE(ABS(c.Out) < 0.01);
-(* the measurement falls 1 in 0.1 s: P = -59, D = +10, I = 60 - 5.9 *)
+(* the measurement falls 1 in 0.1 s: P = -59, D = +10, I = 45.8: still 0 *)
 ADVANCE(T#100ms);
 c(Mode := RB_MODE#Auto, SP := 0.0, PV := 59.0, Kp := 1.0, Ti := T#1s, Td := T#1s);
-ASSERT_TRUE(ABS(c.Out - 5.1) < 0.01);
+ASSERT_TRUE(ABS(c.Out) < 0.01);
+(* the error turns positive: P = 1, I = 45.8: the output follows gently *)
+ADVANCE(T#100ms);
+c(Mode := RB_MODE#Auto, SP := 60.0, PV := 59.0, Kp := 1.0, Ti := T#1s, Td := T#0s);
+ASSERT_TRUE(ABS(c.Out - 46.9) < 0.01);
+END_TEST
+
+TEST pid_no_jump_after_a_long_saturation
+VAR c : RB_PID; i : INT; END_VAR
+(* pinned at the lower limit by a large error for 5 s *)
+FOR i := 1 TO 50 DO
+    ADVANCE(T#100ms);
+    c(Mode := RB_MODE#Auto, SP := 0.0, PV := 73.6, Kp := 2.0, Ti := T#10s);
+END_FOR;
+ASSERT_TRUE(ABS(c.Out) < 0.001);
+(* a small positive error gives a small output, not the upper limit *)
+ADVANCE(T#100ms);
+c(Mode := RB_MODE#Auto, SP := 75.0, PV := 73.6, Kp := 2.0, Ti := T#10s);
+ASSERT_TRUE(c.Out > 2.0 AND c.Out < 3.5);
 END_TEST
 
 TEST pid_bumpless_with_an_error_present

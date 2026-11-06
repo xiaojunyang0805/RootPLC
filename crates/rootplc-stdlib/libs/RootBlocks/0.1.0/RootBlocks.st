@@ -852,6 +852,7 @@ VAR
     lastPV    : LREAL;
     intSec    : LREAL;
     derSec    : LREAL;
+    di        : LREAL;
 END_VAR
 resetEdge(CLK := Reset);
 IF resetEdge.Q THEN
@@ -887,12 +888,18 @@ IF Error THEN
     i := 0.0;
 ELSIF Mode = RB_MODE#Auto THEN
     IF intSec > 0.0 THEN
-        i := i + REAL_TO_LREAL(Kp) * e * cyc.Seconds / intSec;
+        (* anti-windup by conditional integration: the integral moves with
+           the error until the output reaches a limit, never beyond it and
+           never against the error *)
+        di := REAL_TO_LREAL(Kp) * e * cyc.Seconds / intSec;
+        IF di > 0.0 THEN
+            i := MIN(i + di, MAX(i, hi - p - d));
+        ELSIF di < 0.0 THEN
+            i := MAX(i + di, MIN(i, lo - p - d));
+        END_IF;
     ELSE
         i := 0.0;
     END_IF;
-    (* anti-windup: the integral never pushes beyond the output range *)
-    i := LIMIT(lo - p - d, i, hi - p - d);
     u := LIMIT(lo, p + i + d, hi);
 ELSE
     IF Mode = RB_MODE#Manual THEN
