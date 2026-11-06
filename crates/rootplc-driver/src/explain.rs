@@ -61,6 +61,7 @@ pub const SPEC: &[(&str, &str)] = &[
         "spec/18-codegen-c.md",
         include_str!("../assets/spec/18-codegen-c.md"),
     ),
+    ("spec/19-lsp.md", include_str!("../assets/spec/19-lsp.md")),
 ];
 
 /// Explanation of one diagnostic code.

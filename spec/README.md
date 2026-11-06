@@ -24,6 +24,7 @@ conformance case in `../conformance/` refers to it by that ID.
 - [16-diff](16-diff.md): Differential verification: does a block behave like a reference?
 - [17-simulation](17-simulation.md): Simulation: scenarios, plant programs, traces and trace comparison
 - [18-codegen-c](18-codegen-c.md): Native code: Structured Text to portable C99, checked against the VM
+- [19-lsp](19-lsp.md): Editor support: the language server (diagnostics, hover, definition, outline)
 
 ## Profiles (Phase 3+)
 - [profile/agent-ready.md](profile/agent-ready.md): Agent-Ready PLC Profile (runtime ABI, agent API, device description)
