@@ -2946,6 +2946,30 @@ impl<'a> Checker<'a> {
                         self.diag(codes::DUPLICATE_NAME, msg, v.span, None);
                     }
                 }
+                // [variables.unique]: a member named like a variable
+                let mut members: Vec<usize> = self
+                    .owner
+                    .iter()
+                    .filter(|(_, o)| **o == id)
+                    .map(|(m, _)| *m)
+                    .collect();
+                members.sort_unstable();
+                let mut reported = HashSet::new();
+                for m in members {
+                    let full = &self.defs[m].name;
+                    let short = full.rsplit('.').next().unwrap_or(full);
+                    let short = short.split('#').next().unwrap_or(short).to_string();
+                    let key = short.to_ascii_lowercase();
+                    if seen.contains(&key) && reported.insert(key) {
+                        let msg =
+                            format!("'{short}' is already declared as a variable of {}", d.name);
+                        let sp = self.defs[m].span;
+                        let saved = self.cur;
+                        self.cur = self.defs[m].file;
+                        self.diag(codes::DUPLICATE_NAME, msg, sp, None);
+                        self.cur = saved;
+                    }
+                }
                 for (k, v) in p.vars.iter().enumerate() {
                     // inherited variables: their initial values come from the base
                     let init = if k < p.inherited {
