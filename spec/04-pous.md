@@ -206,11 +206,10 @@ variable, and so does a write through a pointer or reference to the
 caller's variable taken before the call (an instance that keeps a pointer
 into itself, passed as `VAR_IN_OUT`, sees one variable, not two). The
 argument must be a variable, an element or a member (RP0114); a constant or
-an expression is an error. A `STRING` or `WSTRING` parameter whose declared
-length differs from the argument's, and an open array, are copied in before
-the call and back after it instead: such a string parameter holds the
-caller's whole text, whatever the declared lengths, and the caller's own
-length applies when the value is written back. While the call runs, `REF`
+an expression is an error. A `STRING` or `WSTRING` parameter and an open
+array are copied in before the call and back after it instead: a string
+parameter holds the caller's whole text, whatever the declared lengths, and
+the caller's own length applies when the value is written back. While the call runs, `REF`
 or `ADR` of the parameter (or of an element or member of it) is the address
 of the caller's variable, so it stays valid after the call. After the call,
 a function block's `VAR_IN_OUT` variable holds a copy of the value the

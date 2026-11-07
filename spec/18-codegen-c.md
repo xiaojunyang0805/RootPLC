@@ -85,10 +85,12 @@ SIN, COS, TAN, ASIN, ACOS, ATAN, EXPT, TRUNC, MIN, MAX, LIMIT, SEL, MUX,
 MOVE, SHL, SHR, ROL, ROR, the type conversions between elementary types
 and `TIME()`; references (`REF_TO`, `REF()`, `^`, NULL, comparisons for
 equality; C pointers) and VAR_IN_OUT parameters of functions and function
-blocks, copied in before the call and back after it as in the VM
-([pous.call.in-out]); the object-oriented features ([build.c.oop]).
+blocks as in the VM ([pous.call.in-out]): a pointer to the caller's
+variable while the call runs (a block's variable keeps a copy afterwards),
+strings copied in before the call and back after it; the object-oriented
+features ([build.c.oop]).
 Only the global variables the program uses are emitted, and those with an
-address or in a RETAIN section. Not yet: `REF()` of a VAR_IN_OUT parameter
+address or in a RETAIN section. Not yet: `REF()` of a VAR_IN_OUT string
 (the VM reaches the caller's variable), indexing a reference `p[i]`,
 `__NEW`, UNION (the VM does not run unions either), compatibility-library
 intrinsics and TEST blocks (tests run in the VM). VAR_STAT variables are
