@@ -2555,6 +2555,21 @@ impl<'p> Vm<'p> {
                 let mut v = arg(0);
                 if let Some(from) = ty {
                     v = self.convert(v, from).unwrap_or_else(|_| arg(0));
+                    // [types.conversion.explicit]: between time types the
+                    // same duration or instant, in the target's unit
+                }
+                // [types.conversion.explicit]: between time types the same
+                // duration or instant, in the target's unit (TO_X: the
+                // argument's own type)
+                let src = ty.or_else(|| exprs.first().map(|x| &x.ty));
+                if let (Some(Ty::Elem(f)), Ty::Elem(t), Value::Int(n)) =
+                    (src.map(|s| self.strip(s)), self.strip(&e.ty), &v)
+                {
+                    if let (Some(uf), Some(ut)) = (f.time_unit_ns(), t.time_unit_ns()) {
+                        if uf != ut {
+                            v = Value::Int(n.saturating_mul(uf) / ut);
+                        }
+                    }
                 }
                 // to a STRING: the text of the value (INT_TO_STRING(42) = '42',
                 // TIME_TO_STRING gives T#...ms); only a CHAR converts to its

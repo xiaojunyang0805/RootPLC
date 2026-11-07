@@ -141,6 +141,18 @@ impl Elem {
         matches!(self, Time | Ltime)
     }
 
+    /// Nanoseconds per stored unit of a time type ([types.elementary]):
+    /// milliseconds for `TIME` and `TOD`, seconds for `DATE` and `DT`,
+    /// nanoseconds for the `L` forms; `None` for other types.
+    pub fn time_unit_ns(self) -> Option<i128> {
+        match self {
+            Time | Tod => Some(1_000_000),
+            Date | Dt => Some(1_000_000_000),
+            Ltime | Ldate | Ltod | Ldt => Some(1),
+            _ => None,
+        }
+    }
+
     fn direct(self) -> &'static [Elem] {
         match self {
             Sint => &[Int, Dint, Lint, Real, Lreal],

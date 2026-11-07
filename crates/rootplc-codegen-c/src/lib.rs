@@ -1855,6 +1855,21 @@ impl<'p> Gen<'p> {
                         d = self.dom(from, at)?;
                     }
                 }
+                // [types.conversion.explicit]: between time types the same
+                // duration or instant, in the target's unit (TO_X: the
+                // argument's own type)
+                let src = ty.or_else(|| args.first().map(|x| &x.ty));
+                if let (Some(f), Some(t)) = (src.and_then(|s| self.elem(s)), self.elem(&e.ty)) {
+                    if let (Some(uf), Some(ut)) = (f.time_unit_ns(), t.time_unit_ns()) {
+                        if uf > ut {
+                            c = format!("((int64_t)({c}) * INT64_C({}))", uf / ut);
+                            d = Dom::I;
+                        } else if uf < ut {
+                            c = format!("((int64_t)({c}) / INT64_C({}))", ut / uf);
+                            d = Dom::I;
+                        }
+                    }
+                }
                 fin(self, c, d)
             }
         }

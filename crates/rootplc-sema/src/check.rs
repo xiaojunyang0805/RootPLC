@@ -1674,7 +1674,44 @@ impl<'a> Checker<'a> {
             }
         }
         self.coerce(target, &v);
-        v.ir()
+        let e = v.ir();
+        self.widen_time(target, e)
+    }
+
+    /// [types.conversion.explicit]: an implicit conversion between time types
+    /// with different units (`TIME` to `LTIME`, `DT` to `LDT`, ...) is the
+    /// explicit conversion function, so the value keeps its meaning.
+    fn widen_time(&self, target: &Ty, e: ir::Expr) -> ir::Expr {
+        let (Ty::Elem(t), Ty::Elem(s)) = (self.strip(target), self.strip(&e.ty)) else {
+            return e;
+        };
+        match (s.time_unit_ns(), t.time_unit_ns()) {
+            (Some(us), Some(ut)) if us != ut => {
+                let span = e.span;
+                // a constant is converted at once (initial values stay constant)
+                if let ExprKind::Const(Const::Int(n)) = e.kind {
+                    return ir::Expr {
+                        ty: Ty::Elem(t),
+                        kind: ExprKind::Const(Const::Int(n.saturating_mul(us) / ut)),
+                        span,
+                    };
+                }
+                ir::Expr {
+                    ty: Ty::Elem(t),
+                    kind: ExprKind::Call(Box::new(ir::Call {
+                        target: ir::CallTarget::Builtin {
+                            name: format!("{}_TO_{}", s.name(), t.name()),
+                            ty: Some(Ty::Elem(s)),
+                        },
+                        inputs: Vec::new(),
+                        outputs: Vec::new(),
+                        args: vec![e],
+                    })),
+                    span,
+                }
+            }
+            _ => e,
+        }
     }
 
     /// IMPLEMENTS: every method of every named interface exists, unless the
@@ -3165,7 +3202,7 @@ impl<'a> Checker<'a> {
                 let v = self.expr_expecting(ty, inner);
                 self.coerce(ty, &v);
                 let constant = v.k.is_some();
-                let e = v.ir();
+                let e = self.widen_time(ty, v.ir());
                 // [variables.initializer.variable]: CODESYS / TwinCAT
                 if !constant && names_variable(&e) {
                     let msg = "initial value names a variable; IEC 61131-3 initial values are constant (evaluated at instance creation, in declaration order)";
@@ -4864,7 +4901,16 @@ impl<'a> Checker<'a> {
                 }
             }
         }
-        let mut out = mk(rty, st, l, r);
+        // [types.conversion.explicit]: TIME compared with LTIME (DT with
+        // LDT, ...) compares the same unit
+        let (li, ri) = (self.widen_time(&st, l.ir()), self.widen_time(&st, r.ir()));
+        let e = ExprKind::Binary {
+            op: bop,
+            opty: st,
+            l: Box::new(li),
+            r: Box::new(ri),
+        };
+        let mut out = V::with(rty, span, e);
         out.k = k;
         out
     }
@@ -5636,6 +5682,10 @@ impl<'a> Checker<'a> {
             return self.bound_call(up, vals, span);
         }
         let bool_ty = Ty::Elem(Elem::Bool);
+        let common = matches!(
+            b,
+            Builtin::Common | Builtin::Sel | Builtin::Mux | Builtin::Conv(..)
+        );
         let (ret, hint): (Ty, Option<Ty>) = match b {
             Builtin::Advance => {
                 // [tests.time]: mocked time exists only in TEST blocks.
@@ -5764,6 +5814,7 @@ impl<'a> Checker<'a> {
                 )
             }
         };
+        let widen_to = hint.clone();
         let call = ir::Call {
             target: CallTarget::Builtin {
                 name: up.to_string(),
@@ -5771,7 +5822,14 @@ impl<'a> Checker<'a> {
             },
             inputs: Vec::new(),
             outputs: Vec::new(),
-            args: vals.into_iter().map(V::ir).collect(),
+            args: vals
+                .into_iter()
+                .map(|v| match (&common, &widen_to) {
+                    // [types.conversion.explicit]: MAX(TIME, LTIME) in LTIME
+                    (true, Some(h)) => self.widen_time(h, v.ir()),
+                    _ => v.ir(),
+                })
+                .collect(),
         };
         V::with(ret, span, ExprKind::Call(Box::new(call)))
     }
