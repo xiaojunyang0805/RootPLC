@@ -72,7 +72,9 @@ its initial value and is reported), and saved to it when the runtime stops
 and at most once a second while it runs. The file is written to a new name
 and then renamed, so a power loss leaves the old or the new file, never a
 torn one. Only elementary types are retained in version 0; a structured
-RETAIN variable is reported at start and keeps its initial value.
+RETAIN variable is reported at start and keeps its initial value. The file
+has one line per variable: its name, its type name and its value as IEC
+literal text (`TRUE`, `-42`, `3.25`), separated by tabs.
 
 **[runtime.status]** The runtime reports its state (`running`, `stopped` or
 `fault`, with the fault), the cycle statistics of [runtime.cycle], and the

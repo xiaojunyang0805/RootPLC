@@ -134,3 +134,20 @@ image to 0 (safe outputs, [runtime.watchdog]) and the program stops. A port
 supplies the clock, the sleep until the next cycle and the I/O;
 `ports/posix` runs cyclically on Linux (and other POSIX systems) with the
 image kept in memory.
+
+**[build.c.shim.services]** The C runtime offers what the Rust runtime
+offers on a board, in the same formats, so files and clients work with
+either: RETAIN variables are written as the text of [runtime.retain] and
+restored from it (a file written by one runtime is read by the other); the
+status report has the fields of [runtime.status] (JSON `command`
+"runtime", `state`, `fault`, `period_us`, `cycles`, `exec_us`,
+`jitter_max_us`, `overruns`, `notes`, `variables`); a cycle whose execution
+takes longer than the watchdog time stops the program with safe outputs and
+the fault `WATCHDOG` ([runtime.watchdog]; measured when the cycle ends);
+and the Modbus TCP server answers as [runtime.modbus] describes, over the
+C runtime's image (`ROOTPLC_AREA` bytes per area). The POSIX port takes
+`--retain FILE`, `--status FILE`, `--watchdog-ms MS`, `--modbus
+[ADDR:]PORT` and `--json` as `rootplc runtime` does, serves Modbus clients
+between cycles in its one thread, saves RETAIN variables and the status at
+most once a second, and stops cleanly on SIGINT or SIGTERM (RETAIN saved,
+final report printed).
