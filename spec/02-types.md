@@ -103,6 +103,14 @@ Their results are fully defined:
 - real to integer: round to nearest, ties away from zero; saturate at the
   target limits; NaN gives 0. `TRUNC` rounds toward zero instead;
 - integer to real: round to nearest-even;
+- between time types (`TIME`, `LTIME`, `DATE`, `TOD`, `DT` and the `L`
+  forms): the same duration or instant in the target's unit (table above),
+  truncated towards zero when the unit is coarser: `TIME_TO_LTIME(T#3ms)`
+  is `LT#3ms`, `LTIME_TO_TIME(LT#1500us)` is `T#1ms`,
+  `TO_LDT(DT#2026-01-01-10:00:00)` is `LDT#2026-01-01-10:00:00`; the
+  implicit conversions `TIME` to `LTIME` and `DATE`, `TOD`, `DT` to their
+  `L` forms ([types.conversion.implicit]) do the same; a value that does not
+  fit the target wraps like an integer;
 - bit string to integer and back: the same bits, with the target width;
 - to `STRING` / `WSTRING`: the text form. Integers and bit strings are
   written in decimal, `BOOL` as `TRUE` / `FALSE`, reals in the shortest
