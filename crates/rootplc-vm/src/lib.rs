@@ -295,9 +295,11 @@ pub struct Vm<'p> {
     /// Root holding the global variables, [config.global-list].
     globals: Option<usize>,
     /// [pous.call.in-out]: while a call runs, each VAR_IN_OUT slot and the
-    /// caller's variable it was copied from; ADR / REF of the slot names
-    /// the caller's variable.
-    aliases: Vec<(Loc, Loc)>,
+    /// caller's variable behind it; ADR / REF of the slot names the
+    /// caller's variable. With `true` the slot is the caller's variable
+    /// ([`Vm::by_reference`]): every access goes there. With `false` (a
+    /// string) the value is copied in and back.
+    aliases: Vec<(Loc, Loc, bool)>,
     /// [stdlib.compat.dynamic]: variables created by __NEW, at roots from
     /// [`HEAP`] on; `None` once freed by __DELETE.
     heap: Vec<Option<Value>>,
@@ -1455,7 +1457,14 @@ impl<'p> Vm<'p> {
 
     fn place(&mut self, e: &Expr, cx: &Ctx) -> R<Loc> {
         match &e.kind {
-            ExprKind::Var(i) => Ok(self.slot(&cx.this, *i)),
+            ExprKind::Var(i) => {
+                let l = self.slot(&cx.this, *i);
+                Ok(if self.aliases.is_empty() {
+                    l
+                } else {
+                    self.redirect(l)
+                })
+            }
             ExprKind::This => match &cx.inst {
                 Some((l, _)) => Ok(l.clone()),
                 None => Err(self.fault(FaultKind::Unsupported, e.span, "THIS outside an instance")),
@@ -1812,7 +1821,7 @@ impl<'p> Vm<'p> {
         pou: &rootplc_sema::ir::Pou,
         frame: &Loc,
         cx: &Ctx,
-    ) -> R<Vec<(Loc, Loc)>> {
+    ) -> R<Vec<(Loc, Loc, bool)>> {
         let mut out = Vec::new();
         for (slot, ex) in &c.inputs {
             if pou.vars[*slot].section != Section::InOut
@@ -1829,9 +1838,39 @@ impl<'p> Vm<'p> {
                 continue;
             }
             let target = self.place(ex, cx)?;
-            out.push((frame.child(*slot), self.unalias(target)));
+            let same = self.by_reference(&pou.vars[*slot].ty, &ex.ty);
+            out.push((frame.child(*slot), self.unalias(target), same));
         }
         Ok(out)
+    }
+
+    /// [pous.call.in-out]: is a VAR_IN_OUT parameter of type `param` the
+    /// caller's variable of type `arg` while the call runs? Strings and
+    /// open arrays are copied in and back instead.
+    fn by_reference(&self, param: &Ty, arg: &Ty) -> bool {
+        let p = self.strip(param);
+        !is_open(&p) && !matches!(p, Ty::Str { .. }) && p == self.strip(arg)
+    }
+
+    /// `l`, or the caller's variable when `l` lies in a VAR_IN_OUT slot that
+    /// is the caller's variable while its call runs.
+    fn redirect(&self, mut l: Loc) -> Loc {
+        loop {
+            let hit = self.aliases.iter().rev().find(|(slot, _, same)| {
+                *same && slot.root == l.root && l.path.starts_with(&slot.path)
+            });
+            match hit {
+                Some((slot, target, _)) => {
+                    let mut path = target.path.clone();
+                    path.extend_from_slice(&l.path[slot.path.len()..]);
+                    l = Loc {
+                        root: target.root,
+                        path,
+                    };
+                }
+                None => return l,
+            }
+        }
     }
 
     /// `l`, or the caller's variable when `l` lies in a VAR_IN_OUT slot of a
@@ -1842,9 +1881,9 @@ impl<'p> Vm<'p> {
                 .aliases
                 .iter()
                 .rev()
-                .find(|(slot, _)| slot.root == l.root && l.path.starts_with(&slot.path));
+                .find(|(slot, _, _)| slot.root == l.root && l.path.starts_with(&slot.path));
             match hit {
-                Some((slot, target)) => {
+                Some((slot, target, _)) => {
                     let mut path = target.path.clone();
                     path.extend_from_slice(&l.path[slot.path.len()..]);
                     l = Loc {
@@ -1880,9 +1919,15 @@ impl<'p> Vm<'p> {
             {
                 continue;
             }
+            let target = self.place(ex, cx)?;
+            if self.by_reference(&pou.vars[*slot].ty, &ex.ty) {
+                // the slot was the caller's variable: keep a copy of its value
+                let v = self.get(&target, span)?.clone();
+                *self.get_mut(&frame.child(*slot), span)? = v;
+                continue;
+            }
             let v = self.get(&frame.child(*slot), span)?.clone();
             let v = open_unwrap(&pou.vars[*slot].ty, &self.strip(&ex.ty), v);
-            let target = self.place(ex, cx)?;
             self.store(&target, v, &ex.ty, ex.span)?;
         }
         Ok(())

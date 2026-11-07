@@ -782,13 +782,21 @@ Rule `pous.call.in-out` in `spec/04-pous.md`:
 
 **[pous.call.in-out]** A `VAR_IN_OUT` parameter refers to the caller's
 variable: changes made by the called function or function block are visible
-in that variable after the call. RootPLC copies the value in before the call
-and back after it. The argument must be a variable, an element or a member
-(RP0114); a constant or an expression is an error. A `STRING` or `WSTRING`
-parameter holds the caller's whole text, whatever the declared lengths; the
-caller's own length applies when the value is written back. While the call runs,
-`REF` or `ADR` of the parameter (or of an element or member of it) is the
-address of the caller's variable, so it stays valid after the call.
+in that variable after the call. The parameter is the caller's variable
+itself while the call runs: every read and write of it goes to that
+variable, and so does a write through a pointer or reference to the
+caller's variable taken before the call (an instance that keeps a pointer
+into itself, passed as `VAR_IN_OUT`, sees one variable, not two). The
+argument must be a variable, an element or a member (RP0114); a constant or
+an expression is an error. A `STRING` or `WSTRING` parameter and an open
+array are copied in before the call and back after it instead: a string
+parameter holds the caller's whole text, whatever the declared lengths, and
+the caller's own length applies when the value is written back. While the call runs, `REF`
+or `ADR` of the parameter (or of an element or member of it) is the address
+of the caller's variable, so it stays valid after the call. After the call,
+a function block's `VAR_IN_OUT` variable holds a copy of the value the
+caller's variable had when the call ended (in TwinCAT it stays a reference
+to the caller's variable).
 
 ## RP0303
 

@@ -75,6 +75,7 @@ static int rp_code, rp_startup;
 static inline void rp_fault(int code) { rp_code = code; longjmp(rp_jmp, 1); }
 /* a reference that must not be NULL (fault NULL_REF) */
 #define RP_NN(p) ((p) ? (p) : (rp_fault(4), (p)))
+#define RP_IO(p, v) ((p) ? (p) : &(v))
 
 static inline int64_t rp_div_i(int64_t a, int64_t b) {
     if (b == 0) rp_fault(1);
@@ -617,6 +618,15 @@ impl<'p> Gen<'p> {
         matches!(self.strip(t), Ty::Str { .. })
     }
 
+    /// [pous.call.in-out]: a VAR_IN_OUT parameter of this type is the
+    /// caller's variable while the call runs (strings and open arrays are
+    /// copied in and back). Such a variable `x` has a pointer `io_x` beside
+    /// its copy `v_x`: set during a call, NULL otherwise.
+    fn io_ref(&self, t: &Ty) -> bool {
+        !self.is_str(t)
+            && !matches!(self.strip(t), Ty::Array { dims, .. } if dims.iter().any(Option::is_none))
+    }
+
     fn is_ref(&self, t: &Ty) -> bool {
         match self.strip(t) {
             Ty::Ref(_) | Ty::Null => true,
@@ -790,6 +800,9 @@ impl<'p> Gen<'p> {
             self.check_var(v, at)?;
             let t = self.ctype(&v.ty, at)?;
             let _ = writeln!(body, "    {t} v_{};", ident(&v.name));
+            if v.section == Section::InOut && self.io_ref(&v.ty) {
+                let _ = writeln!(body, "    {t} *io_{};", ident(&v.name));
+            }
         }
         if vars.is_empty() {
             body.push_str("    int unused;\n");
@@ -1011,6 +1024,16 @@ impl<'p> Gen<'p> {
                     return Ok(st);
                 }
                 let name = self.slot_name(frame, *i, e.span.start)?;
+                if CUR_SECTIONS.with(|v| v.borrow().get(*i).copied()) == Some(Section::InOut) {
+                    let t = self
+                        .cur_pou
+                        .and_then(|d| self.prog.pou(d))
+                        .and_then(|p| p.vars.get(*i))
+                        .map(|v| v.ty.clone());
+                    if t.is_some_and(|t| self.io_ref(&t)) {
+                        return Ok(format!("(*RP_IO({frame}->io_{name}, {frame}->v_{name}))"));
+                    }
+                }
                 Ok(format!("{frame}->v_{name}"))
             }
             ExprKind::Global(i) => {
@@ -1040,6 +1063,10 @@ impl<'p> Gen<'p> {
                     if let Some(st) = self.static_of(Some(d), *i) {
                         return Ok(st);
                     }
+                }
+                if f.section == Section::InOut && self.io_ref(&f.ty) {
+                    let n = ident(&f.name);
+                    return Ok(format!("(*RP_IO({base}.io_{n}, {base}.v_{n}))"));
                 }
                 Ok(format!("{base}.v_{}", ident(&f.name)))
             }
@@ -1196,8 +1223,10 @@ impl<'p> Gen<'p> {
             ExprKind::Ref(x) => {
                 // REF of a VAR_IN_OUT reaches the caller's variable in the VM
                 if let ExprKind::Var(i) = &x.kind {
-                    if CUR_SECTIONS.with(|v| v.borrow().get(*i).copied()) == Some(Section::InOut) {
-                        return self.no(at, "REF() of a VAR_IN_OUT parameter");
+                    if CUR_SECTIONS.with(|v| v.borrow().get(*i).copied()) == Some(Section::InOut)
+                        && !self.io_ref(&x.ty)
+                    {
+                        return self.no(at, "REF() of a VAR_IN_OUT string or open array");
                     }
                 }
                 Ok((format!("(&{})", self.place(x, "f")?), Dom::P))
@@ -1509,7 +1538,7 @@ impl<'p> Gen<'p> {
             }
             let tt = self.ctype(&x.ty, at)?;
             let vt = self.ctype(&v.ty, at)?;
-            if tt != vt {
+            if tt != vt || (self.io_ref(&v.ty) && self.strip(&v.ty) != self.strip(&x.ty)) {
                 return self.no(x.span.start, "a VAR_IN_OUT argument of another type");
             }
             let p = self.place(x, "f")?;
@@ -2046,6 +2075,29 @@ impl<'p> Gen<'p> {
             }
         }
         let name = self.pou_ident(id);
+        // [pous.call.in-out]: the parameter is the caller's variable while
+        // the body runs; afterwards it keeps a copy, as in the VM
+        let mut by_ref = Vec::new();
+        for (slot, x) in &c.inputs {
+            let Some(v) = vars.get(*slot) else { continue };
+            if v.section != Section::InOut
+                || !self.io_ref(&v.ty)
+                || self.strip(&v.ty) != self.strip(&x.ty)
+                || !is_place(x)
+            {
+                continue;
+            }
+            let tp = self.place(x, "f")?;
+            let ct = self.ctype(&v.ty, x.span.start)?;
+            let n = ident(&v.name);
+            self.label += 1;
+            let k = self.label;
+            let _ = writeln!(
+                out,
+                "{pad}{{ {ct} *rp_io{k} = {p}.io_{n}; {p}.io_{n} = &{tp};"
+            );
+            by_ref.push((*slot, n, k));
+        }
         // through a reference the body of the instance's own block runs
         let through_ref = !builtin && matches!(inst.kind, ExprKind::Deref(_)) && !is_this(inst);
         if through_ref {
@@ -2054,10 +2106,16 @@ impl<'p> Gen<'p> {
         } else {
             let _ = writeln!(out, "{pad}B_{name}((P_{name} *)&{p});");
         }
+        for (_, n, k) in by_ref.iter().rev() {
+            let _ = writeln!(
+                out,
+                "{pad}{p}.v_{n} = *{p}.io_{n}; {p}.io_{n} = rp_io{k}; }}"
+            );
+        }
         // [pous.call.in-out]: copy-in above, copy-out here, as in the VM
         for (slot, x) in &c.inputs {
             let Some(v) = vars.get(*slot) else { continue };
-            if v.section != Section::InOut {
+            if v.section != Section::InOut || by_ref.iter().any(|(s, _, _)| s == slot) {
                 continue;
             }
             if !is_place(x) {
@@ -2456,6 +2514,9 @@ impl<'p> Gen<'p> {
                 for v in &p.vars {
                     let place = format!("p->v_{}", ident(&v.name));
                     self.init_into(&mut init, &place, &v.ty, v.init.as_ref(), at)?;
+                    if v.section == Section::InOut && self.io_ref(&v.ty) {
+                        let _ = writeln!(init, "    p->io_{} = 0;", ident(&v.name));
+                    }
                 }
                 let mut body = String::new();
                 self.stmts(&mut body, &p.body, 1)?;
@@ -2499,6 +2560,9 @@ impl<'p> Gen<'p> {
                 for v in &p.vars {
                     let place = format!("p->v_{}", ident(&v.name));
                     self.init_into(&mut init, &place, &v.ty, v.init.as_ref(), at)?;
+                    if v.section == Section::InOut && self.io_ref(&v.ty) {
+                        let _ = writeln!(init, "    p->io_{} = 0;", ident(&v.name));
+                    }
                 }
                 let mut body = String::new();
                 self.stmts(&mut body, &p.body, 1)?;
@@ -2528,7 +2592,11 @@ impl<'p> Gen<'p> {
                         Section::InOut => {
                             io_params.push(format!("{ct} *io{k}"));
                             let _ = writeln!(assign, "    fr.v_{vn} = *io{k};");
-                            inouts.push_str(&format!("    *io{k} = fr.v_{vn};\n"));
+                            if self.io_ref(&v.ty) {
+                                let _ = writeln!(assign, "    fr.io_{vn} = io{k};");
+                            } else {
+                                inouts.push_str(&format!("    *io{k} = fr.v_{vn};\n"));
+                            }
                         }
                         _ => {}
                     }
