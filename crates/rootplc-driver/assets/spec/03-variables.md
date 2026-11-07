@@ -111,7 +111,10 @@ declared instance runs (so `THIS^` is the declaring instance). A block without
 across all its sections. Names compare case-insensitively
 ([lexical.identifier.case]). Likewise, every type and POU name is declared once
 in a project. A second declaration is error RP0204, reported at the second
-one. A user POU may replace a standard function block (spec/08-stdlib.md).
+one. A user POU may replace a standard function block (spec/08-stdlib.md). A
+method, action or property of a function block or program with the name of
+one of its variables (inherited ones included) is RP0204 too, reported at
+the member: inside the block the name would denote both.
 
 **[variables.resolution]** A name used in a statement or initial value
 resolves, in this order, to:
