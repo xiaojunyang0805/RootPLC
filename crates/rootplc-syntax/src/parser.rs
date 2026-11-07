@@ -481,7 +481,16 @@ impl<'a> Parser<'a> {
 
     /// One declaration at the top level or inside a namespace.
     fn top_item(&mut self) {
-        if self.at_kw("PROGRAM") {
+        if self.at(TokenKind::Semicolon) {
+            // [pous.stray-semicolon]: TwinCAT exports write END_TYPE;
+            let sp = self.span_here();
+            self.error(
+                codes::VENDOR_SYNTAX,
+                "';' between declarations is a TwinCAT form; IEC 61131-3 has none".into(),
+                sp,
+            );
+            self.bump();
+        } else if self.at_kw("PROGRAM") {
             self.pou(N::Program, "PROGRAM", "END_PROGRAM", false);
         } else if self.at_kw("FUNCTION_BLOCK") {
             self.pou(
@@ -1095,6 +1104,17 @@ impl<'a> Parser<'a> {
 
     /// [variables.declaration], [variables.located].
     fn var_decl(&mut self) {
+        if self.at(TokenKind::Semicolon) {
+            // [variables.declaration]: an empty declaration (x : INT;;)
+            let sp = self.span_here();
+            self.error(
+                codes::VENDOR_SYNTAX,
+                "an empty declaration ';' is a CODESYS / TwinCAT form; IEC 61131-3 has none".into(),
+                sp,
+            );
+            self.bump();
+            return;
+        }
         self.b.start(N::VarDecl);
         if !self.name() {
             self.b.finish();
