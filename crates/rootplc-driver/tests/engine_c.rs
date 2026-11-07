@@ -94,12 +94,11 @@ fn c_engine_names_what_it_cannot_run() {
     if rootplc_driver::native::find_compiler().is_none() {
         return;
     }
-    let src =
-        "PROGRAM P\nVAR n : INT; END_VAR\nVAR_STAT k : INT; END_VAR\nn := n + 1;\nEND_PROGRAM\n";
+    let src = "TYPE U_Word : UNION w : WORD; b : BYTE; END_UNION; END_TYPE\nPROGRAM P\nVAR u : U_Word; n : INT; END_VAR\nn := n + 1;\nEND_PROGRAM\n";
     let c = rootplc_driver::check_sources_with(vec![(PathBuf::from("p.st"), src.into())], &[])
         .expect("check");
     if !c.ok() {
-        return; // VAR_STAT in a program may be rejected by the checker
+        return;
     }
     let mut opts = RunOptions::new(Config::with_period_ms(10));
     opts.engine = Engine::C;
