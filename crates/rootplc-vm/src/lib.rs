@@ -1517,7 +1517,14 @@ impl<'p> Vm<'p> {
                     }
                 }
                 let base = self.place(b, cx)?;
-                Ok(self.slot(&base, *i))
+                let l = self.slot(&base, *i);
+                // [pous.call.in-out]: THIS^.x (an action or method reaching the
+                // block's VAR_IN_OUT) is the caller's variable as well
+                Ok(if self.aliases.is_empty() {
+                    l
+                } else {
+                    self.redirect(l)
+                })
             }
             ExprKind::Index(b, idx) => {
                 let static_ty = self.strip(&b.ty);
