@@ -27,9 +27,18 @@ static int64_t now_ns(void) {
 
 static void sleep_until(int64_t t) {
     struct timespec ts;
+#if defined(TIMER_ABSTIME) && !defined(__APPLE__)
     ts.tv_sec = (time_t)(t / 1000000000);
     ts.tv_nsec = (long)(t % 1000000000);
     while (clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &ts, NULL) != 0) {}
+#else
+    /* no absolute sleep (macOS): sleep for the time left */
+    int64_t left = t - now_ns();
+    if (left <= 0) return;
+    ts.tv_sec = (time_t)(left / 1000000000);
+    ts.tv_nsec = (long)(left % 1000000000);
+    while (nanosleep(&ts, &ts) != 0) {}
+#endif
 }
 
 static void print_var(const rootplc_var *v) {

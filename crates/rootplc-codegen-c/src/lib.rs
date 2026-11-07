@@ -608,7 +608,12 @@ impl<'p> Gen<'p> {
                 Ok(name)
             }
             Ty::Str { len, .. } => {
-                self.smax = self.smax.max(*len).max(1);
+                // a parameter without a length (VAR_IN_OUT s : STRING) takes
+                // the caller's string: it does not set the capacity
+                if *len < 65_535 {
+                    self.smax = self.smax.max(*len);
+                }
+                self.smax = self.smax.max(1);
                 Ok("rp_str".into())
             }
             Ty::Ref(inner) => {
