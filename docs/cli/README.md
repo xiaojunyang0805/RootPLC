@@ -170,10 +170,10 @@ INDEX, RANGE). Entry points: `rootplc_init()`, `rootplc_cycle(cycle_ns)`
 variable (`./prog 100 10`: 100 cycles of 10 ms). Checked in CI against the
 VM on every conformance case it supports; builds with gcc, clang and MSVC.
 
-Strings, references, VAR_IN_OUT, methods, properties, inheritance, interfaces
-and FB_init are supported. Not yet in v0: located, RETAIN and VAR_STAT
-variables, UNION,
-REAL and dates as text, and compatibility intrinsics; such a program gives
+Strings, references, VAR_IN_OUT, methods, properties, inheritance, interfaces,
+FB_init, VAR_STAT, located and RETAIN variables are supported. Not yet in v0:
+UNION and
+compatibility intrinsics; such a program gives
 exit code 2 and the first construct with its location.
 
 ```json

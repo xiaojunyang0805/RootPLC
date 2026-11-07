@@ -382,7 +382,7 @@ fn c_back_end_matches_the_vm() {
 
 #[test]
 fn unsupported_constructs_name_their_place() {
-    let src = "FUNCTION_BLOCK FB_Count\nVAR_STAT k : INT; END_VAR\nk := k + 1;\nEND_FUNCTION_BLOCK\nPROGRAM P\nVAR c : FB_Count; END_VAR\nc();\nEND_PROGRAM\n";
+    let src = "TYPE U_Word : UNION w : WORD; b : BYTE; END_UNION; END_TYPE\nPROGRAM P\nVAR u : U_Word; n : INT; END_VAR\nn := n + 1;\nEND_PROGRAM\n";
     let check =
         rootplc_driver::check_sources_with(vec![("p.st".into(), src.into())], &[]).expect("check");
     let r = rootplc_driver::build::build_c(check, None).expect("build");
@@ -390,7 +390,7 @@ fn unsupported_constructs_name_their_place() {
     // declarations carry no position in the IR: the POU's first statement
     assert_eq!(u.file.as_str(), "p.st");
     assert!(u.line > 0);
-    assert!(u.construct.contains("VAR_STAT"), "{}", u.construct);
+    assert!(u.construct.contains("UNION"), "{}", u.construct);
     assert!(!r.ok());
 }
 

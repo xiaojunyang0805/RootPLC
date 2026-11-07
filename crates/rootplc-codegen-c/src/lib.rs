@@ -202,7 +202,9 @@ static inline void B_RP_SR(P_RP_SR *s) { s->v_Q1 = s->v_S1 || (!s->v_R && s->v_Q
 static inline void B_RP_RS(P_RP_RS *s) { s->v_Q1 = !s->v_R1 && (s->v_S || s->v_Q1); }
 "#;
 
-const STR_PRELUDE: &str = r#"typedef struct { int32_t n; int32_t c[RP_SMAX]; } rp_str;
+const STR_PRELUDE: &str = r#"#include <stdio.h>
+#include <stdlib.h>
+typedef struct { int32_t n; int32_t c[RP_SMAX]; } rp_str;
 static inline rp_str rp_empty(void) { rp_str r; r.n = 0; return r; }
 static inline rp_str rp_lit(int32_t n, const int32_t *c) {
     rp_str r;
@@ -306,6 +308,91 @@ static inline rp_str rp_chr(int64_t c) {
     return r;
 }
 static inline rp_str rp_booltext(int b) { return rp_ascii(b ? "TRUE" : "FALSE"); }
+/* a REAL or LREAL as the VM writes it: the shortest digits that read back,
+   decimal for 1E-4 <= |x| < 1E16 (".0" for whole numbers), otherwise d.dddE<exp> */
+static inline rp_str rp_realtext(double x, int single) {
+    char buf[40], dig[24], out[48];
+    int p, n = 0, e = 0, k, o = 0;
+    double a = x < 0 ? -x : x;
+    if (x != x) return rp_ascii("NaN");
+    if (a == 1.0 / 0.0) return rp_ascii(x < 0 ? "-inf" : "inf");
+    if (x == 0.0) return rp_ascii(signbit(x) ? "-0.0" : "0.0");
+    for (p = 0; p <= (single ? 8 : 16); p++) {
+        snprintf(buf, sizeof buf, "%.*e", p, x);
+        if (single ? (float)strtod(buf, 0) == (float)x : strtod(buf, 0) == x) break;
+    }
+    for (k = 0; buf[k] && buf[k] != 'e'; k++)
+        if (buf[k] >= '0' && buf[k] <= '9') dig[n++] = buf[k];
+    while (n > 1 && dig[n - 1] == '0') n--;
+    dig[n] = 0;
+    if (buf[k] == 'e') e = atoi(buf + k + 1);
+    if (x < 0) out[o++] = '-';
+    if (a >= 1e-4 && a < 1e16) {
+        if (e >= 0) {
+            for (k = 0; k <= e; k++) out[o++] = k < n ? dig[k] : '0';
+            out[o++] = '.';
+            if (n > e + 1) for (k = e + 1; k < n; k++) out[o++] = dig[k];
+            else out[o++] = '0';
+        } else {
+            out[o++] = '0';
+            out[o++] = '.';
+            for (k = 0; k < -e - 1; k++) out[o++] = '0';
+            for (k = 0; k < n; k++) out[o++] = dig[k];
+        }
+        out[o] = 0;
+    } else {
+        out[o++] = dig[0];
+        if (n > 1) { out[o++] = '.'; for (k = 1; k < n; k++) out[o++] = dig[k]; }
+        snprintf(out + o, sizeof out - (size_t)o, "E%d", e);
+    }
+    return rp_ascii(out);
+}
+/* yyyy-mm-dd of a day count since 1970-01-01 (proleptic Gregorian) */
+static inline rp_str rp_date(int64_t days) {
+    char b[32];
+    int64_t z = days + 719468, era = (z >= 0 ? z : z - 146096) / 146097;
+    int64_t doe = z - era * 146097;
+    int64_t yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+    int64_t doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    int64_t mp = (5 * doy + 2) / 153, d = doy - (153 * mp + 2) / 5 + 1;
+    int64_t m = mp < 10 ? mp + 3 : mp - 9, y = yoe + era * 400 + (m <= 2);
+    snprintf(b, sizeof b, "%04lld-%02lld-%02lld", (long long)y, (long long)m, (long long)d);
+    return rp_ascii(b);
+}
+static inline int64_t rp_floordiv(int64_t a, int64_t b) { int64_t q = a / b; return (a % b != 0 && ((a < 0) != (b < 0))) ? q - 1 : q; }
+/* hh:mm:ss[.f] of a time of day in units of 1/per_s second */
+static inline rp_str rp_clock(int64_t t, int64_t per_s) {
+    char b[48];
+    int64_t day = 86400 * per_s, secs, frac;
+    int width = 0, k;
+    t = t - rp_floordiv(t, day) * day;
+    secs = t / per_s;
+    frac = t % per_s;
+    snprintf(b, sizeof b, "%02lld:%02lld:%02lld", (long long)(secs / 3600), (long long)(secs / 60 % 60), (long long)(secs % 60));
+    if (frac != 0) {
+        char f[24];
+        int64_t q;
+        for (q = per_s; q > 1; q /= 10) width++;
+        snprintf(f, sizeof f, "%0*lld", width, (long long)frac);
+        for (k = (int)strlen(f); k > 0 && f[k - 1] == '0'; k--) f[k - 1] = 0;
+        strcat(b, ".");
+        strcat(b, f);
+    }
+    return rp_ascii(b);
+}
+/* the VM's text of a date or time value: kind 0 DATE (s), 1 LDATE (ns),
+   2 TOD (ms), 3 LTOD (ns), 4 DT (s), 5 LDT (ns) */
+static inline rp_str rp_datetext(int64_t n, int kind) {
+    const int64_t NS = 1000000000;
+    switch (kind) {
+    case 0: return rp_cat(rp_ascii("D#"), rp_date(rp_floordiv(n, 86400)));
+    case 1: return rp_cat(rp_ascii("LD#"), rp_date(rp_floordiv(n, 86400 * NS)));
+    case 2: return rp_cat(rp_ascii("TOD#"), rp_clock(n, 1000));
+    case 3: return rp_cat(rp_ascii("LTOD#"), rp_clock(n, NS));
+    case 4: return rp_cat(rp_cat(rp_cat(rp_ascii("DT#"), rp_date(rp_floordiv(n, 86400))), rp_ascii("-")), rp_clock(n - rp_floordiv(n, 86400) * 86400, 1));
+    default: return rp_cat(rp_cat(rp_cat(rp_ascii("LDT#"), rp_date(rp_floordiv(n, 86400 * NS))), rp_ascii("-")), rp_clock(n - rp_floordiv(n, 86400 * NS) * 86400 * NS, NS));
+    }
+}
 /* a duration as T#1d2h3m4s5ms (LT# with us and ns for LTIME) */
 static inline rp_str rp_dur(int64_t n, int nanos) {
     static const char *names[] = { "d", "h", "m", "s", "ms", "us", "ns" };
@@ -374,6 +461,12 @@ struct Gen<'p> {
     body_dispatch: std::collections::BTreeSet<usize>,
     /// Blocks whose FB_init tree function `FI_` is emitted.
     fi_done: std::collections::BTreeSet<usize>,
+    /// The POU whose body is generated (for VAR_STAT slots).
+    cur_pou: Option<usize>,
+    /// VAR_STAT variables used: (declaring block, slot).
+    statics: std::collections::BTreeSet<(usize, usize)>,
+    /// Enumerations converted to text.
+    enum_texts: std::collections::BTreeSet<usize>,
     /// Definitions already emitted (by def index).
     done_defs: Vec<bool>,
     /// Bodies.
@@ -472,6 +565,9 @@ impl<'p> Gen<'p> {
             dispatch: std::collections::BTreeMap::new(),
             body_dispatch: std::collections::BTreeSet::new(),
             fi_done: std::collections::BTreeSet::new(),
+            cur_pou: None,
+            statics: std::collections::BTreeSet::new(),
+            enum_texts: std::collections::BTreeSet::new(),
             done_defs: vec![false; prog.defs.len()],
             funcs: String::new(),
             protos: String::new(),
@@ -629,10 +725,7 @@ impl<'p> Gen<'p> {
         }
     }
 
-    fn check_var(&self, v: &Var, at: u32) -> R<()> {
-        if v.stat {
-            return self.no(at, format!("VAR_STAT variable '{}'", v.name));
-        }
+    fn check_var(&self, _v: &Var, _at: u32) -> R<()> {
         Ok(())
     }
 
@@ -914,6 +1007,9 @@ impl<'p> Gen<'p> {
     fn place(&mut self, e: &Expr, frame: &str) -> R<String> {
         match &e.kind {
             ExprKind::Var(i) => {
+                if let Some(st) = self.static_of(self.cur_pou, *i) {
+                    return Ok(st);
+                }
                 let name = self.slot_name(frame, *i, e.span.start)?;
                 Ok(format!("{frame}->v_{name}"))
             }
@@ -940,6 +1036,11 @@ impl<'p> Gen<'p> {
                 let Some(f) = fields.get(*i) else {
                     return self.no(e.span.start, "a member access");
                 };
+                if let Ty::Named(d) = self.strip(&b.ty) {
+                    if let Some(st) = self.static_of(Some(d), *i) {
+                        return Ok(st);
+                    }
+                }
                 Ok(format!("{base}.v_{}", ident(&f.name)))
             }
             ExprKind::Index(b, idx) => {
@@ -1670,7 +1771,11 @@ impl<'p> Gen<'p> {
                     let from = ty.and_then(|t| self.elem(t));
                     let named_enum = ty.is_some_and(|t| matches!(self.strip(t), Ty::Named(i) if matches!(self.prog.defs[i].kind, DefKind::Enum(_))));
                     if named_enum {
-                        return self.no(at, format!("{name} (an enumeration as text)"));
+                        let Some(Ty::Named(ed)) = ty.map(|t| self.strip(t)) else {
+                            return self.no(at, format!("{name} (an enumeration as text)"));
+                        };
+                        self.enum_texts.insert(ed);
+                        return fin(self, format!("rp_enum_{ed}((int64_t)({c}))"), Dom::S);
                     }
                     let text = match (from, d) {
                         (Some(Elem::Char | Elem::Wchar), _) => format!("rp_chr((int64_t)({c}))"),
@@ -1688,9 +1793,18 @@ impl<'p> Gen<'p> {
                             ),
                             _,
                         ) => {
-                            return self.no(at, format!("{name} (a date or time of day as text)"));
+                            let kind = match from {
+                                Some(Elem::Date) => 0,
+                                Some(Elem::Ldate) => 1,
+                                Some(Elem::Tod) => 2,
+                                Some(Elem::Ltod) => 3,
+                                Some(Elem::Dt) => 4,
+                                _ => 5,
+                            };
+                            format!("rp_datetext((int64_t)({c}), {kind})")
                         }
-                        (_, Dom::R) => return self.no(at, format!("{name} (a REAL as text)")),
+                        (Some(Elem::Real), Dom::R) => format!("rp_realtext((double)({c}), 1)"),
+                        (_, Dom::R) => format!("rp_realtext((double)({c}), 0)"),
                         (_, Dom::U) => format!("rp_utoa((uint64_t)({c}))"),
                         _ => {
                             // the value of the source type first (wrap)
@@ -1979,6 +2093,31 @@ impl<'p> Gen<'p> {
     }
 
     // ------------------------------------------------------------ POUs
+
+    /// [variables.static]: slot `i` of block `d`, when it is a VAR_STAT
+    /// variable: the one C variable all instances share (of the block that
+    /// declares it, a base block for an inherited one).
+    fn static_of(&mut self, d: Option<usize>, i: usize) -> Option<String> {
+        let mut d = d?;
+        let p = self.prog.pou(d)?;
+        if !matches!(p.kind, PouKind::FunctionBlock | PouKind::Program) || !p.vars.get(i)?.stat {
+            return None;
+        }
+        while let Some(b) = self.prog.pou(d).and_then(|p| p.base) {
+            if self.prog.pou(b).is_some_and(|bp| i < bp.vars.len()) {
+                d = b;
+            } else {
+                break;
+            }
+        }
+        self.statics.insert((d, i));
+        let v = self.prog.pou(d)?.vars.get(i)?;
+        Some(format!(
+            "rp_stat_{}_{}",
+            ident(&self.prog.defs[d].name),
+            ident(&v.name)
+        ))
+    }
 
     /// Is there an FB_init to run inside a value of type `t`
     /// ([pous.oop.fb-init])?
@@ -2308,6 +2447,7 @@ impl<'p> Gen<'p> {
         let at = p.body.first().map_or(0, stmt_offset);
         CUR_VARS.with(|v| *v.borrow_mut() = p.vars.iter().map(|x| x.name.clone()).collect());
         CUR_SECTIONS.with(|v| *v.borrow_mut() = p.vars.iter().map(|x| x.section).collect());
+        self.cur_pou = Some(id);
         match p.kind {
             PouKind::Program | PouKind::FunctionBlock => {
                 self.this_c = "f".into();
@@ -2579,6 +2719,42 @@ pub fn generate(prog: &Program, program: usize) -> Result<String, Unsupported> {
         k += 1;
     }
     let dispatchers = g.dispatchers(&mut k)?;
+    // VAR_STAT variables: one each, initialised once ([variables.static])
+    let mut stat_decl = String::new();
+    let mut stat_init = String::new();
+    for (d, i) in g.statics.clone() {
+        let Some(v) = prog.pou(d).and_then(|p| p.vars.get(i)).cloned() else {
+            continue;
+        };
+        let ct = g.ctype(&v.ty, 0)?;
+        let name = format!("rp_stat_{}_{}", ident(&prog.defs[d].name), ident(&v.name));
+        let _ = writeln!(stat_decl, "static {ct} {name};");
+        g.init_into(&mut stat_init, &name, &v.ty, v.init.as_ref(), 0)?;
+    }
+    let mut enum_fns = String::new();
+    for ed in g.enum_texts.clone() {
+        if let DefKind::Enum(vals) = &prog.defs[ed].kind {
+            let tname = &prog.defs[ed].name;
+            let mut body = String::new();
+            for (n, v) in vals {
+                let text: Vec<String> = format!("{tname}#{n}")
+                    .chars()
+                    .map(|c| (c as u32).to_string())
+                    .collect();
+                let _ = writeln!(
+                    body,
+                    "    if (v == {}) return rp_lit({}, (const int32_t[]){{{}}});",
+                    int_lit(*v),
+                    text.len(),
+                    text.join(", ")
+                );
+            }
+            let _ = writeln!(
+                enum_fns,
+                "static rp_str rp_enum_{ed}(int64_t v) {{\n{body}    return rp_itoa(v);\n}}"
+            );
+        }
+    }
     let pname = ident(&prog.defs[program].name);
     let mut out = String::from(PRELUDE);
     if g.smax > 0 {
@@ -2600,13 +2776,15 @@ pub fn generate(prog: &Program, program: usize) -> Result<String, Unsupported> {
         );
     }
     out.push_str(&gtype);
+    out.push_str(&stat_decl);
+    out.push_str(&enum_fns);
     out.push_str(&g.protos);
     out.push_str(&dispatchers);
     out.push_str(&g.funcs);
     let _ = write!(
         out,
         "static P_{pname} rp_main;\n\
-         ROOTPLC_API void rootplc_init(void) {{\n{ginit}    I_{pname}(&rp_main);\n    rootplc_now_ns = 0;\n    rp_startup = 0;\n    if (setjmp(rp_jmp) != 0) {{ rp_startup = rp_code; return; }}\n{fi}}}\n\
+         ROOTPLC_API void rootplc_init(void) {{\n{ginit}{stat_init}    I_{pname}(&rp_main);\n    rootplc_now_ns = 0;\n    rp_startup = 0;\n    if (setjmp(rp_jmp) != 0) {{ rp_startup = rp_code; return; }}\n{fi}}}\n\
          ROOTPLC_API int rootplc_cycle(int64_t cycle_ns) {{\n    if (rp_startup) {{ int c = rp_startup; rp_startup = 0; return c; }}\n    if (setjmp(rp_jmp) != 0) return rp_code;\n    B_{pname}(&rp_main);\n    rootplc_now_ns += cycle_ns;\n    return 0;\n}}\n\
          ROOTPLC_API int rootplc_step(int64_t elapsed_ns) {{\n    if (rp_startup) {{ int c = rp_startup; rp_startup = 0; return c; }}\n    rootplc_now_ns += elapsed_ns;\n    if (setjmp(rp_jmp) != 0) return rp_code;\n    B_{pname}(&rp_main);\n    return 0;\n}}\n\
          ROOTPLC_API uint32_t rootplc_abi_version(void) {{ return 0; }}\n"
