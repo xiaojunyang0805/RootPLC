@@ -19,8 +19,8 @@ fields `command` ("build"), `ok`, `target` ("c"), `program`, `out`,
 `diagnostics` and `unsupported` (null or `{file, line, column, construct}`).
 
 **[build.c.file]** The file is self-contained: it includes only the C
-standard headers `stdint.h`, `string.h`, `math.h`, `setjmp.h` and, for the
-main function, `stdio.h` and `stdlib.h`. It defines one C structure per
+standard headers `stdint.h`, `string.h`, `math.h`, `setjmp.h` and, when the
+program uses strings or for the main function, `stdio.h` and `stdlib.h`. It defines one C structure per
 structure type, function block and program (members in declaration order,
 named `v_` followed by the declared name), a body function per POU, and
 three entry points:
@@ -66,9 +66,14 @@ value stored in a `STRING[n]` is cut to `n` characters. The string
 functions LEN, FIND, CONCAT, LEFT, RIGHT, MID, INSERT, DELETE and REPLACE,
 comparisons (character by character), conversions from a string to an
 integer (the number the text spells, else 0) or a CHAR (its first
-character), and conversions to a string from integers, BOOL, CHAR, TIME
-and LTIME are supported. Not yet: REAL, dates, times of day and
-enumerations as text, and character access `s[i]`.
+character), and conversions to a string from every elementary type and
+from enumerations give the VM's text: integers in decimal, BOOL as
+`TRUE`/`FALSE`, a CHAR as its character, durations as `T#1m30s250ms`,
+dates and times of day as `D#2026-11-07`, `TOD#12:30:15.25` and
+`DT#2026-11-07-08:09:10` (and the L forms), an enumeration value as
+`Type#Value`, and REAL and LREAL as the shortest digits that read back,
+in decimal for 1E-4 <= |x| < 1E16 (`100.0`, `0.00025`) and with an
+exponent otherwise (`1E-5`, `1.5E16`). Not yet: character access `s[i]`.
 
 **[build.c.subset]** v0 supports: elementary types, strings
 ([build.c.strings]), enumerations, subranges, aliases, arrays with fixed bounds, structures;
@@ -85,8 +90,10 @@ blocks, copied in before the call and back after it as in the VM
 Only the global variables the program uses are emitted, and those with an
 address or in a RETAIN section. Not yet: `REF()` of a VAR_IN_OUT parameter
 (the VM reaches the caller's variable), indexing a reference `p[i]`,
-`__NEW`, VAR_STAT, UNION, compatibility-library intrinsics and TEST blocks
-(tests run in the VM).
+`__NEW`, UNION (the VM does not run unions either), compatibility-library
+intrinsics and TEST blocks (tests run in the VM). VAR_STAT variables are
+one C variable per declaring block, initialised once at start
+([variables.static]).
 
 **[build.c.oop]** Methods, properties and actions run in a frame of their
 own with a pointer to the instance (`THIS`). Every function-block and
