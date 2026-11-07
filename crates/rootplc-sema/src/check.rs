@@ -3140,7 +3140,14 @@ impl<'a> Checker<'a> {
             _ => {
                 let v = self.expr_expecting(ty, inner);
                 self.coerce(ty, &v);
-                Some(Init::Expr(v.ir()))
+                let constant = v.k.is_some();
+                let e = v.ir();
+                // [variables.initializer.variable]: CODESYS / TwinCAT
+                if !constant && names_variable(&e) {
+                    let msg = "initial value names a variable; IEC 61131-3 initial values are constant (evaluated at instance creation, in declaration order)";
+                    self.diag(codes::VENDOR_MEANING, msg.into(), span, None);
+                }
+                Some(Init::Expr(e))
             }
         }
     }
@@ -6094,4 +6101,20 @@ fn timer_paths(
         }
     }
     paths
+}
+
+/// [variables.initializer.variable]: does an initial value read a variable?
+fn names_variable(e: &ir::Expr) -> bool {
+    match &e.kind {
+        ExprKind::Var(_)
+        | ExprKind::Global(_)
+        | ExprKind::Member(..)
+        | ExprKind::Index(..)
+        | ExprKind::Deref(_)
+        | ExprKind::This => true,
+        ExprKind::Bit(x, _) | ExprKind::Unary(_, x) | ExprKind::ToItf(x, _) => names_variable(x),
+        ExprKind::Binary { l, r, .. } => names_variable(l) || names_variable(r),
+        ExprKind::Call(c) => c.inputs.iter().any(|(_, x)| names_variable(x)),
+        _ => false,
+    }
 }

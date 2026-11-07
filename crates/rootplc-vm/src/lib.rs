@@ -678,11 +678,19 @@ impl<'p> Vm<'p> {
             DefKind::Alias(t) => self.default_value(t),
             DefKind::Pou(p) if p.kind == rootplc_sema::ir::PouKind::Interface => Value::Obj(None),
             DefKind::Pou(p) => {
-                let mut v: Vec<Value> = p
-                    .vars
-                    .iter()
-                    .map(|f| self.init_value(&f.ty, f.init.as_ref()))
-                    .collect();
+                // [variables.initializer.variable]: an initial value may read
+                // the variables declared before it
+                let mut v: Vec<Value> = Vec::with_capacity(p.vars.len() + 3);
+                for f in &p.vars {
+                    let x = match f.init.as_ref() {
+                        Some(Init::Expr(e)) => self
+                            .eval_init(e, &v)
+                            .and_then(|x| self.convert(x, &f.ty).ok())
+                            .unwrap_or_else(|| self.default_value(&f.ty)),
+                        other => self.init_value(&f.ty, other),
+                    };
+                    v.push(x);
+                }
                 if p.builtin {
                     v.extend(std::iter::repeat_n(Value::Int(0), 3));
                 }
@@ -729,6 +737,29 @@ impl<'p> Vm<'p> {
     }
 
     /// Value of a constant expression (initial values).
+    /// An initial value of a POU variable: a constant expression, or one
+    /// that reads the variables `env` declared before it
+    /// ([variables.initializer.variable]).
+    fn eval_init(&self, e: &Expr, env: &[Value]) -> Option<Value> {
+        match &e.kind {
+            ExprKind::Var(i) => env.get(*i).cloned(),
+            ExprKind::Unary(UnOp::Neg, x) => match self.eval_init(x, env)? {
+                Value::Int(n) => Some(Value::Int(-n)),
+                Value::Real(r) => Some(Value::Real(-r)),
+                _ => None,
+            },
+            ExprKind::Unary(UnOp::Not, x) => match self.eval_init(x, env)? {
+                Value::Bool(b) => Some(Value::Bool(!b)),
+                _ => None,
+            },
+            ExprKind::Binary { op, opty, l, r } => {
+                let (a, b) = (self.eval_init(l, env)?, self.eval_init(r, env)?);
+                self.binop(*op, opty, &e.ty, a, b).ok()
+            }
+            _ => self.const_eval(e),
+        }
+    }
+
     fn const_eval(&self, e: &Expr) -> Option<Value> {
         match &e.kind {
             ExprKind::Const(c) => Some(const_value(c)),

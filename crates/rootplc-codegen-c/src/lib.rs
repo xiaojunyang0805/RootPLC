@@ -2524,7 +2524,11 @@ impl<'p> Gen<'p> {
                     self.protos,
                     "static void I_{name}(P_{name} *p);\nstatic void B_{name}(P_{name} *f);"
                 );
-                let _ = writeln!(self.funcs, "static void I_{name}(P_{name} *p) {{\n{init}}}");
+                let pre = init_prelude(&p.vars, &name);
+                let _ = writeln!(
+                    self.funcs,
+                    "static void I_{name}(P_{name} *p) {{\n{pre}{init}}}"
+                );
                 let _ = writeln!(self.funcs, "static void B_{name}(P_{name} *f) {{\n{body}}}");
             }
             PouKind::Function | PouKind::Method => {
@@ -2628,7 +2632,11 @@ impl<'p> Gen<'p> {
                     self.protos,
                     "static void I_{name}(P_{name} *p);\nstatic void B_{name}(P_{name} *f{selfb});\nstatic {rt} C_{name}({selfp}{ps});"
                 );
-                let _ = writeln!(self.funcs, "static void I_{name}(P_{name} *p) {{\n{init}}}");
+                let pre = init_prelude(&p.vars, &name);
+                let _ = writeln!(
+                    self.funcs,
+                    "static void I_{name}(P_{name} *p) {{\n{pre}{init}}}"
+                );
                 let _ = writeln!(
                     self.funcs,
                     "static void B_{name}(P_{name} *f{selfb}) {{\n{body}}}"
@@ -3068,5 +3076,28 @@ fn flatten(g: &mut Gen, out: &mut String, name: &str, c: &str, t: &Ty, depth: us
             Ok(())
         }
         _ => Ok(()),
+    }
+}
+
+/// [variables.initializer.variable]: an `I_` function whose initial values
+/// read other variables starts from zero and names the instance `f`, so the
+/// variables declared earlier hold their initial values (as in the VM).
+fn init_prelude(vars: &[Var], name: &str) -> String {
+    let reads = vars
+        .iter()
+        .any(|v| matches!(&v.init, Some(Init::Expr(e)) if init_reads(e)));
+    if reads {
+        format!("    P_{name} *f = p;\n    memset(p, 0, sizeof *p);\n")
+    } else {
+        String::new()
+    }
+}
+
+fn init_reads(e: &Expr) -> bool {
+    match &e.kind {
+        ExprKind::Var(_) | ExprKind::Member(..) | ExprKind::Index(..) | ExprKind::Deref(_) => true,
+        ExprKind::Bit(x, _) | ExprKind::Unary(_, x) => init_reads(x),
+        ExprKind::Binary { l, r, .. } => init_reads(l) || init_reads(r),
+        _ => false,
     }
 }
