@@ -1613,7 +1613,7 @@ impl<'a> Checker<'a> {
                 ) && v.k.is_none();
                 if place
                     && !matches!(self.strip(&v.ty), Ty::Ref(_))
-                    && self.compatible(&inner, &v.ty)
+                    && (self.compatible(&inner, &v.ty) || self.upcast(&inner, &v.ty))
                 {
                     let span = v.span;
                     return ir::Expr {
@@ -3963,7 +3963,9 @@ impl<'a> Checker<'a> {
             (Ty::Str { wide: false, .. }, Ty::Elem(Elem::Char))
             | (Ty::Str { wide: true, .. }, Ty::Elem(Elem::Wchar)) => true,
             (Ty::Named(a), Ty::Named(b)) => a == b,
-            (Ty::Ref(a), Ty::Ref(b)) => self.compatible(a, b) && self.compatible(b, a),
+            (Ty::Ref(a), Ty::Ref(b)) => {
+                (self.compatible(a, b) && self.compatible(b, a)) || self.upcast(a, b)
+            }
             (Ty::Array { dims: da, elem: ea }, Ty::Array { dims: db, elem: eb }) => {
                 (da == db || da.iter().all(Option::is_none))
                     && self.compatible(ea, eb)
@@ -3971,6 +3973,25 @@ impl<'a> Checker<'a> {
             }
             _ => false,
         }
+    }
+
+    /// [pous.oop.upcast]: is `from` a function block that extends `to`
+    /// (directly or through further bases)?
+    fn upcast(&self, to: &Ty, from: &Ty) -> bool {
+        let (Ty::Named(t), Ty::Named(mut f)) = (self.strip(to), self.strip(from)) else {
+            return false;
+        };
+        for _ in 0..64 {
+            let Kind::Pou(p) = &self.defs[f].kind else {
+                return false;
+            };
+            match p.base {
+                Some(b) if b == t => return true,
+                Some(b) if b != f => f = b,
+                _ => return false,
+            }
+        }
+        false
     }
 
     fn mismatch(&mut self, to: &Ty, v: &V) {

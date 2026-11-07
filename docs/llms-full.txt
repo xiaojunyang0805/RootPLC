@@ -2629,6 +2629,13 @@ function block (otherwise RP0111). A variable of B with the name of a
 variable of A is RP0204. The body of B replaces the body of A; `SUPER^()`
 runs the body of A on the same instance.
 
+**[pous.oop.upcast]** A reference to an instance of B is also a reference to
+an A (IEC 61131-3 ed.3 polymorphism): `REF_TO B` converts implicitly to
+`REF_TO A` (also through further bases), and a variable of type B can be
+given for a `REFERENCE TO A` parameter. Calls through such a reference run
+B's methods and body ([pous.oop.override]). The other direction, and
+storing a B instance in a variable of type A, stay RP0103.
+
 **[pous.oop.override]** A method of B with the name of a method of A
 overrides it. Every call on an instance runs the method of the instance's own
 block, also when the call is made inside a method inherited from A
