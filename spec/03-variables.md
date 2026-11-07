@@ -39,7 +39,9 @@ var_decl     = name { ',' name } [ 'AT' direct_variable ] ':' type_spec [ ':=' i
 ```
 
 A keyword or elementary type name used as `name` is error RP0004
-([lexical.keyword]). A missing `;` is error RP0301 ([statements.terminator]).
+([lexical.keyword]). A missing `;` is error RP0301 ([statements.terminator]). An
+empty declaration, a `;` alone in a variable section or structure (`x : INT;;`,
+CODESYS and TwinCAT), is accepted with warning RP0134 ([scope.vendor-forms]).
 
 **[variables.constant-names]** A variable of a `VAR CONSTANT` section whose
 initial value is a constant expression is itself a constant: initial values

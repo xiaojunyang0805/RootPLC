@@ -36,6 +36,10 @@ source_file  = { pou }
 pou          = program | function | function_block | type_block | test_block
 ```
 
+**[pous.stray-semicolon]** A `;` between two top-level declarations, as
+TwinCAT exports write after `END_TYPE` (`END_TYPE;`), is accepted with
+warning RP0134 ([scope.vendor-forms]).
+
 **[pous.program]**
 ```
 program      = 'PROGRAM' name { var_section } statement_list 'END_PROGRAM'
