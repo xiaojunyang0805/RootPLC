@@ -187,6 +187,7 @@ const char *rootplc_rt_fault_name(int code) {
     case ROOTPLC_FAULT_INDEX: return "INDEX";
     case ROOTPLC_FAULT_RANGE: return "RANGE";
     case ROOTPLC_FAULT_NULL_REF: return "NULL_REF";
+    case ROOTPLC_FAULT_WATCHDOG: return "WATCHDOG";
     default: return "UNKNOWN";
     }
 }

@@ -47,8 +47,13 @@ fn check() -> rootplc_driver::CheckReport {
 }
 
 fn run(engine: Engine, cycles: u64) -> Result<Report, String> {
+    run_retain(engine, cycles, None)
+}
+
+fn run_retain(engine: Engine, cycles: u64, retain: Option<&Path>) -> Result<Report, String> {
     let mut cfg = Config::with_period_ms(10);
     cfg.cycles = Some(cycles);
+    cfg.retain = retain.map(Path::to_path_buf);
     let mut opts = RunOptions::new(cfg);
     opts.engine = engine;
     run_runtime(&check(), opts, Inputs, Virtual(0), &AtomicBool::new(false))
@@ -149,6 +154,10 @@ fn c_runtime_shim_matches_the_vm_engine() {
     let dir = std::env::temp_dir().join(format!("rootplc-shim-{}", std::process::id()));
     std::fs::create_dir_all(&dir).expect("dir");
     std::fs::write(dir.join("rootplc_program.c"), r.code.expect("code")).expect("write");
+    // a RETAIN file written by the Rust runtime (VM engine), for the shim to read
+    let rust_retain = dir.join("rust.retain");
+    let first = run_retain(Engine::Vm, 25, Some(&rust_retain)).expect("vm");
+    assert_eq!(value(&first, "starts"), "5");
     let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let p = |x: &Path| {
         if wsl {
@@ -157,15 +166,24 @@ fn c_runtime_shim_matches_the_vm_engine() {
             x.display().to_string()
         }
     };
+    let src = |f: &str| p(&repo.join(f));
     let script = format!(
-        "{cc} -std=c99 -O2 -I'{inc}' '{prog}' '{rt}' '{port}' -lm -o '{exe}' > '{log}' 2>&1 && '{exe}' --virtual --cycles 25 --set I0=1 --set I2=21 > '{out}' 2>&1",
-        inc = p(&repo.join("runtime-c/include")),
+        "{cc} -std=c99 -O2 -I'{inc}' '{prog}' '{rt}' '{svc}' '{mb}' '{port}' -lm -o '{exe}' > '{log}' 2>&1 &&          {cc} -std=c99 -I'{inc}' '{mb}' '{tm}' -o '{tmexe}' >> '{log}' 2>&1 && '{tmexe}' > '{tmout}' 2>&1;          '{exe}' --virtual --cycles 25 --set I0=1 --set I2=21 --retain '{shim_retain}' > '{out}' 2>&1;          '{exe}' --virtual --cycles 5 --set I0=1 --set I2=21 --retain '{rust_retain}' --json > '{json}' 2>&1",
+        inc = src("runtime-c/include"),
         prog = p(&dir.join("rootplc_program.c")),
-        rt = p(&repo.join("runtime-c/src/rootplc_rt.c")),
-        port = p(&repo.join("runtime-c/ports/posix/main.c")),
+        rt = src("runtime-c/src/rootplc_rt.c"),
+        svc = src("runtime-c/src/rootplc_services.c"),
+        mb = src("runtime-c/src/rootplc_modbus.c"),
+        port = src("runtime-c/ports/posix/main.c"),
+        tm = src("runtime-c/test/test_modbus.c"),
         exe = p(&dir.join("plc")),
+        tmexe = p(&dir.join("test_modbus")),
         log = p(&dir.join("cc.txt")),
         out = p(&dir.join("out.txt")),
+        tmout = p(&dir.join("tm.txt")),
+        json = p(&dir.join("json.txt")),
+        shim_retain = p(&dir.join("shim.retain")),
+        rust_retain = p(&rust_retain),
     );
     let status = if wsl {
         Command::new("wsl.exe").args(["sh", "-c", &script]).status()
@@ -173,9 +191,20 @@ fn c_runtime_shim_matches_the_vm_engine() {
         Command::new("sh").args(["-c", &script]).status()
     };
     assert!(status.is_ok());
-    let out = std::fs::read_to_string(dir.join("out.txt")).unwrap_or_default();
-    let log = std::fs::read_to_string(dir.join("cc.txt")).unwrap_or_default();
-    assert!(out.contains("cycles=25"), "shim did not run:\n{log}\n{out}");
+    let read = |f: &str| std::fs::read_to_string(dir.join(f)).unwrap_or_default();
+    let (out, log) = (read("out.txt"), read("cc.txt"));
+    assert!(
+        out.contains("cycles=25"),
+        "shim did not run:
+{log}
+{out}"
+    );
+    // the Modbus handler answers as the Rust runtime's
+    assert!(
+        read("tm.txt").contains("test_modbus: ok"),
+        "{}",
+        read("tm.txt")
+    );
     let shim = |name: &str| {
         out.lines()
             .find_map(|l| l.strip_prefix(&format!("{name}=")))
@@ -184,18 +213,39 @@ fn c_runtime_shim_matches_the_vm_engine() {
     };
     let vm = run(Engine::Vm, 25).expect("vm");
     for name in [
-        "start", "level", "lamp", "speed", "count", "tally", "starts",
+        "start", "level", "lamp", "speed", "count", "tally", "starts", "hold",
     ] {
         assert_eq!(shim(name), value(&vm, name), "{name}");
     }
-    // REAL: printed with %.9g by the shim
-    let h: f32 = shim("hold").parse().expect("hold");
-    let v: f32 = value(&vm, "hold").parse().expect("hold");
-    assert_eq!(h, v);
+    assert_eq!(shim("state"), "stopped");
     // output image: lamp bit 1 of byte 0, speed in bytes 2..4, tally in byte 4
     let img = shim("out");
     let speed = 42u16.to_le_bytes();
     assert_eq!(&img[4..8], format!("{:02X}{:02X}", speed[0], speed[1]));
     assert_eq!(&img[8..10], format!("{:02X}", 25u8));
+    // RETAIN: the shim's file is the Rust runtime's format, both ways
+    let shim_retain = read("shim.retain");
+    assert_eq!(
+        shim_retain,
+        "starts	UDINT	5
+"
+    );
+    let again = run_retain(Engine::Vm, 25, Some(&dir.join("shim.retain"))).expect("vm");
+    assert!(
+        again.notes.iter().any(|n| n.contains("restored 1 RETAIN")),
+        "{:?}",
+        again.notes
+    );
+    assert_eq!(value(&again, "starts"), "10");
+    let json = read("json.txt");
+    assert!(
+        json.starts_with("{\"command\":\"runtime\",\"state\":\"stopped\""),
+        "{json}"
+    );
+    assert!(json.contains("restored 1 RETAIN variable(s)"), "{json}");
+    assert!(
+        json.contains("{\"name\":\"starts\",\"type\":\"UDINT\",\"at\":null,\"value\":\"6\"}"),
+        "{json}"
+    );
     let _ = std::fs::remove_dir_all(&dir);
 }

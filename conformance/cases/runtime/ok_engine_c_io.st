@@ -1,4 +1,4 @@
-(* spec: [build.c.abi] [build.c.shim] [runtime.engine] [runtime.image]
+(* spec: [build.c.abi] [build.c.shim] [build.c.shim.services] [runtime.engine] [runtime.image] [runtime.retain]
    expect: ok *)
 (* Located inputs, outputs and memory, a RETAIN counter and a timer:
    crates/rootplc-driver/tests/engine_c.rs runs this program on the VM
